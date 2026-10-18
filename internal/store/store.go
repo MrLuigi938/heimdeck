@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -19,10 +21,19 @@ type Store struct {
 	box *secret.Box
 }
 
+// Group visibility: always shown, hidden until revealed, or password protected.
+const (
+	Visible   = "visible"
+	Hidden    = "hidden"
+	Protected = "protected"
+)
+
 type Group struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Position int    `json:"position"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	Position     int    `json:"position"`
+	Visibility   string `json:"visibility"`
+	PasswordHash string `json:"-"`
 }
 
 type Tile struct {
@@ -30,6 +41,7 @@ type Tile struct {
 	GroupID     int64             `json:"groupId"`
 	Name        string            `json:"name"`
 	URL         string            `json:"url"`
+	ExternalURL string            `json:"externalUrl"`
 	APIURL      string            `json:"apiUrl"`
 	Icon        string            `json:"icon"`
 	Description string            `json:"description"`
@@ -73,6 +85,14 @@ CREATE TABLE IF NOT EXISTS tiles (
 	show_widget INTEGER NOT NULL DEFAULT 1,
 	position INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS status_log (
+	tile_id INTEGER NOT NULL,
+	kind TEXT NOT NULL,
+	ts INTEGER NOT NULL,
+	online INTEGER NOT NULL,
+	ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS status_log_ts ON status_log (ts);
 CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -87,6 +107,16 @@ func Open(path string, box *secret.Box) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(schema); err != nil {
 		return nil, err
+	}
+	// Columns added after the first release; "duplicate column" errors mean they already exist.
+	for _, stmt := range []string{
+		`ALTER TABLE tiles ADD COLUMN external_url TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE groups ADD COLUMN visibility TEXT NOT NULL DEFAULT 'visible'`,
+		`ALTER TABLE groups ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return nil, err
+		}
 	}
 	return &Store{db: db, box: box}, nil
 }
@@ -194,7 +224,7 @@ func (s *Store) SaveSettings(m map[string]string) error {
 // ---- groups ----
 
 func (s *Store) Groups() ([]Group, error) {
-	rows, err := s.db.Query(`SELECT id, name, position FROM groups ORDER BY position, id`)
+	rows, err := s.db.Query(`SELECT id, name, position, visibility, password_hash FROM groups ORDER BY position, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +232,7 @@ func (s *Store) Groups() ([]Group, error) {
 	out := []Group{}
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.Name, &g.Position); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.Position, &g.Visibility, &g.PasswordHash); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -218,11 +248,21 @@ func (s *Store) CreateGroup(name string) (Group, error) {
 		return Group{}, err
 	}
 	id, _ := res.LastInsertId()
-	return Group{ID: id, Name: name, Position: pos}, nil
+	return Group{ID: id, Name: name, Position: pos, Visibility: Visible}, nil
 }
 
-func (s *Store) RenameGroup(id int64, name string) error {
-	_, err := s.db.Exec(`UPDATE groups SET name = ? WHERE id = ?`, name, id)
+func (s *Store) Group(id int64) (Group, error) {
+	var g Group
+	err := s.db.QueryRow(`SELECT id, name, position, visibility, password_hash FROM groups WHERE id = ?`, id).
+		Scan(&g.ID, &g.Name, &g.Position, &g.Visibility, &g.PasswordHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return g, err
+}
+
+func (s *Store) UpdateGroup(g Group) error {
+	_, err := s.db.Exec(`UPDATE groups SET name = ?, visibility = ?, password_hash = ? WHERE id = ?`, g.Name, g.Visibility, g.PasswordHash, g.ID)
 	return err
 }
 
@@ -243,12 +283,12 @@ func (s *Store) DeleteGroup(id int64) error {
 
 // ---- tiles ----
 
-const tileCols = `id, group_id, name, url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position`
+const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position`
 
 func (s *Store) scanTile(sc interface{ Scan(...any) error }) (Tile, error) {
 	var t Tile
 	var cfg, sec string
-	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Position)
+	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Position)
 	if err != nil {
 		return t, err
 	}
@@ -295,22 +335,25 @@ func (s *Store) SaveTile(t *Tile) error {
 	}
 	if t.ID == 0 {
 		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM tiles WHERE group_id = ?`, t.GroupID).Scan(&t.Position)
-		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.GroupID, t.Name, t.URL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Position)
+		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Position)
 		if err != nil {
 			return err
 		}
 		t.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ? WHERE id = ?`,
-		t.GroupID, t.Name, t.URL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.ID)
+	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ? WHERE id = ?`,
+		t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.ID)
 	return err
 }
 
 func (s *Store) DeleteTile(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM tiles WHERE id = ?`, id)
+	if err == nil {
+		_, err = s.db.Exec(`DELETE FROM status_log WHERE tile_id = ?`, id)
+	}
 	return err
 }
 
@@ -337,4 +380,85 @@ func (s *Store) SaveLayout(l Layout) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// ---- status history ----
+
+type Check struct {
+	TileID int64
+	Kind   string // "int" (internal address) or "ext" (public address)
+	Online bool
+	MS     int64
+}
+
+func (s *Store) LogChecks(at time.Time, checks []Check) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, c := range checks {
+		if _, err := tx.Exec(`INSERT INTO status_log (tile_id, kind, ts, online, ms) VALUES (?, ?, ?, ?, ?)`,
+			c.TileID, c.Kind, at.Unix(), c.Online, c.MS); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) PruneChecks(before time.Time) error {
+	_, err := s.db.Exec(`DELETE FROM status_log WHERE ts < ?`, before.Unix())
+	return err
+}
+
+// Bucket aggregates the checks of one tile address within a time slot.
+type Bucket struct {
+	TileID int64
+	Kind   string
+	Start  int64
+	Up     int
+	Total  int
+	AvgMS  float64
+}
+
+func (s *Store) CheckBuckets(since time.Time, size time.Duration) ([]Bucket, error) {
+	sec := int64(size.Seconds())
+	rows, err := s.db.Query(`SELECT tile_id, kind, (ts / ?) * ?, SUM(online), COUNT(*), COALESCE(AVG(CASE WHEN online THEN ms END), 0)
+		FROM status_log WHERE ts >= ? GROUP BY tile_id, kind, ts / ? ORDER BY 3`, sec, sec, since.Unix(), sec)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Bucket{}
+	for rows.Next() {
+		var b Bucket
+		if err := rows.Scan(&b.TileID, &b.Kind, &b.Start, &b.Up, &b.Total, &b.AvgMS); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// LastDown returns when each tile address was last seen offline.
+func (s *Store) LastDown(since time.Time) (map[string]int64, error) {
+	rows, err := s.db.Query(`SELECT tile_id, kind, MAX(ts) FROM status_log WHERE online = 0 AND ts >= ? GROUP BY tile_id, kind`, since.Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int64{}
+	for rows.Next() {
+		var id, ts int64
+		var kind string
+		if err := rows.Scan(&id, &kind, &ts); err != nil {
+			return nil, err
+		}
+		out[CheckKey(id, kind)] = ts
+	}
+	return out, rows.Err()
+}
+
+func CheckKey(tileID int64, kind string) string {
+	return kind + ":" + strconv.FormatInt(tileID, 10)
 }

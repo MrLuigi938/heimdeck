@@ -1,11 +1,14 @@
 <script>
-  import { get, post, put, del } from './api.js';
+  import { get, post, put } from './api.js';
   import { toast } from './toast.svelte.js';
   import Tile from './Tile.svelte';
   import Search from './Search.svelte';
   import TileEditor from './TileEditor.svelte';
   import Discover from './Discover.svelte';
   import Settings from './Settings.svelte';
+  import GroupEditor from './GroupEditor.svelte';
+  import Uptime from './Uptime.svelte';
+  import { network, isLocal, setOverride, detectLocal } from './network.svelte.js';
 
   let data = $state(null);
   let status = $state({});
@@ -16,12 +19,61 @@
   let now = $state(new Date());
   let dragging = $state(null);
   let dropTarget = $state(null);
+  let editingGroup = $state(null);
+  let unlockPw = $state({});
+  let showHidden = $state(readHidden());
+
+  function readHidden() {
+    try {
+      return sessionStorage.getItem('heimdeck-show-hidden') === '1';
+    } catch {
+      return false;
+    }
+  }
+  function toggleHidden() {
+    showHidden = !showHidden;
+    try {
+      sessionStorage.setItem('heimdeck-show-hidden', showHidden ? '1' : '0');
+    } catch {
+      /* private mode */
+    }
+  }
 
   let settings = $derived(data?.settings || {});
   let defs = $derived(Object.fromEntries((data?.integrations || []).map((d) => [d.id, d])));
   let allTiles = $derived((data?.groups || []).flatMap((g) => g.tiles));
   let newTab = $derived(settings.openInNewTab !== 'false');
   let hasSearchServices = $derived(allTiles.some((t) => defs[t.integration]?.hasSearch));
+  let openGroups = $derived((data?.groups || []).filter((g) => !g.locked));
+  let hasHidden = $derived((data?.groups || []).some((g) => g.visibility === 'hidden'));
+  let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
+  $effect(() => {
+    network.localHosts = settings.localHosts || '';
+  });
+  let local = $derived(isLocal());
+  let autoLocal = $derived(detectLocal(network.localHosts));
+
+  // Header switch: follow auto-detection, or force "home"/"away" for this session.
+  function toggleNetwork() {
+    const next = local ? 'remote' : 'local';
+    setOverride((next === 'local') === autoLocal ? '' : next);
+  }
+
+  async function unlock(e, g) {
+    e.preventDefault();
+    try {
+      await post(`/groups/${g.id}/unlock`, { password: unlockPw[g.id] || '' });
+      unlockPw[g.id] = '';
+      await load();
+      loadStatus();
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+  async function lock(g) {
+    await post(`/groups/${g.id}/lock`);
+    load();
+  }
 
   async function load() {
     try {
@@ -84,17 +136,6 @@
     const name = prompt('Name der neuen Gruppe');
     if (!name?.trim()) return;
     await post('/groups', { name });
-    load();
-  }
-  async function renameGroup(g) {
-    const name = prompt('Neuer Name', g.name);
-    if (!name?.trim() || name === g.name) return;
-    await put(`/groups/${g.id}`, { name });
-    load();
-  }
-  async function deleteGroup(g) {
-    if (!confirm(`Gruppe „${g.name}“${g.tiles.length ? ` mit ${g.tiles.length} Kachel(n)` : ''} löschen?`)) return;
-    await del(`/groups/${g.id}`);
     load();
   }
   function moveGroup(i, dir) {
@@ -160,9 +201,12 @@
 
   function saved() {
     editing = null;
+    editingGroup = null;
     showDiscover = false;
     showSettings = false;
     load().then(loadStatus);
+    // The server re-checks a saved tile right away; pick the result up shortly after.
+    setTimeout(loadStatus, 4000);
   }
 </script>
 
@@ -175,8 +219,17 @@
           <div class="muted greet">{greeting} · {dateText} · {timeText}</div>
         {/if}
       </div>
-      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} />
+      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} />
       <div class="tools">
+        {#if hasExternal}
+          <button class="ghost net" onclick={toggleNetwork}
+            title={`${local ? 'Zuhause: lokale Adressen werden geöffnet' : 'Unterwegs: öffentliche Adressen werden geöffnet'}${network.override ? ' (manuell gewählt)' : ' (automatisch erkannt)'} – klicken zum Umschalten`}>
+            {local ? '🏠' : '🌐'}<span class="net-label">{local ? 'Zuhause' : 'Unterwegs'}</span>{#if network.override}<span class="manual">•</span>{/if}
+          </button>
+        {/if}
+        {#if hasHidden}
+          <button class="ghost icon" class:on={showHidden} title={showHidden ? 'Ausgeblendete Gruppen verbergen' : 'Ausgeblendete Gruppen anzeigen'} onclick={toggleHidden}>👁</button>
+        {/if}
         {#if data.docker}
           <button class="ghost icon" title="Container automatisch finden" onclick={() => (showDiscover = true)}>🐳</button>
         {/if}
@@ -210,23 +263,33 @@
     {/if}
 
     {#each data.groups as group, gi (group.id)}
-      {#if group.tiles.length || editMode}
+      {#if group.locked}
+        <form class="locked card" onsubmit={(e) => unlock(e, group)}>
+          <span class="lock-name">🔒 {group.name}</span>
+          <span class="spacer"></span>
+          <input type="password" placeholder="Passwort" bind:value={unlockPw[group.id]} autocomplete="off" aria-label="Passwort für {group.name}" />
+          <button class="small">Entsperren</button>
+        </form>
+      {:else if (group.tiles.length || editMode) && (group.visibility !== 'hidden' || showHidden || editMode)}
         <section class="group" aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2>{group.name}</h2>
+            {#if group.visibility === 'hidden'}<span class="vis" title="Ausgeblendete Gruppe">👁 ausgeblendet</span>{/if}
+            {#if group.visibility === 'protected'}
+              <button class="ghost small vis" title="Gruppe wieder sperren" onclick={() => lock(group)}>🔓 sperren</button>
+            {/if}
             {#if editMode}
               <div class="group-tools">
                 <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title="Nach oben">↑</button>
                 <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === data.groups.length - 1} title="Nach unten">↓</button>
-                <button class="ghost small" onclick={() => renameGroup(group)}>Umbenennen</button>
-                <button class="ghost small danger" onclick={() => deleteGroup(group)}>Löschen</button>
+                <button class="ghost small" onclick={() => (editingGroup = group)}>Bearbeiten</button>
               </div>
             {/if}
           </div>
           <div class="grid">
             {#each group.tiles as tile (tile.id)}
               <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
-                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab}
+                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local}
                   onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
               </div>
             {/each}
@@ -237,13 +300,20 @@
         </section>
       {/if}
     {/each}
+
+    {#if allTiles.length && settings.showUptime !== 'false'}
+      <Uptime tiles={allTiles} {status} />
+    {/if}
   </div>
 
   {#if editing}
-    <TileEditor tile={editing} groups={data.groups} integrations={data.integrations} onClose={() => (editing = null)} onSaved={saved} />
+    <TileEditor tile={editing} groups={openGroups} integrations={data.integrations} onClose={() => (editing = null)} onSaved={saved} />
   {/if}
   {#if showDiscover}
-    <Discover groups={data.groups} onClose={() => (showDiscover = false)} onSaved={saved} />
+    <Discover groups={openGroups} onClose={() => (showDiscover = false)} onSaved={saved} />
+  {/if}
+  {#if editingGroup}
+    <GroupEditor group={editingGroup} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
     <Settings {settings} username={data.username} onClose={() => (showSettings = false)} onSaved={saved} />
@@ -263,6 +333,12 @@
   .group-head { display: flex; align-items: center; gap: 8px; min-height: 30px; }
   .group-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
   .group-tools { display: flex; gap: 2px; flex-wrap: wrap; }
+  .vis { font-size: 12px; color: var(--muted); }
+  .locked { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+  .lock-name { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .locked input { width: 180px; padding: 6px 10px; }
+  .net { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+  .manual { color: var(--accent); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: scale(1.02); }
@@ -278,6 +354,7 @@
     .top :global(.search) { grid-column: 1 / -1; grid-row: 2; max-width: none; }
   }
   @media (max-width: 640px) {
+    .net-label { display: none; }
     .page { padding: 16px 16px 60px; gap: 22px; }
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   }

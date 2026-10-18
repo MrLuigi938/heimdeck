@@ -6,6 +6,9 @@ Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber 
 - **Container automatisch finden**: Heimdeck liest deine Docker-Container aus und schlägt passende Kacheln mit Icon, Adresse und Dienst-Typ vor.
 - **Live-Daten**: Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer usw.
 - **Aktionen**: Jellyseerr-Anfragen genehmigen oder ablehnen, SABnzbd pausieren oder fortsetzen.
+- **Zuhause oder unterwegs**: Jede Kachel kann zusätzlich eine öffentliche Adresse haben. Öffnest du das Dashboard über eine lokale Adresse, werden lokale Links verwendet, sonst die öffentlichen. Umschalten geht oben rechts per Klick.
+- **Verfügbarkeit**: Heimdeck prüft jede Minute alle Dienste (lokal und öffentlich) und zeigt den Verlauf über 24 Stunden oder 3 Tage mit Ausfällen und Antwortzeiten.
+- **Gruppen ausblenden oder schützen**: Eine Gruppe kann ausgeblendet sein (Anzeige per 👁 für die aktuelle Sitzung) oder ein eigenes Passwort haben.
 - **Gemeinsame Suche** (Taste `/`): Kacheln, Jellyfin-Bibliothek, Jellyseerr (mit Knopf „Anfragen“) und Paperless-Dokumente in einem Suchfeld.
 - **Login-Schutz**: Passwörter werden mit bcrypt gespeichert, API-Keys verschlüsselt (AES-256). Keys gelangen nie in den Browser.
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).
@@ -53,6 +56,7 @@ Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der
 
 ## Tipps
 
+- **Was gilt als „zuhause“?** Wenn das Dashboard über eine private IP (192.168.…, 10.…), `localhost`, `*.local`, `*.lan` oder einen Namen ohne Punkt geöffnet wird. Weitere Hostnamen kannst du in den Einstellungen eintragen.
 - **Interne Adresse**: Erreicht Heimdeck einen Dienst anders als dein Browser (z. B. `http://radarr:7878` im selben Docker-Netzwerk), trage das unter „Weitere Optionen“ ein.
 - **Docker-Labels** überschreiben die automatische Erkennung:
   ```yaml

@@ -148,7 +148,8 @@ func toDTO(t store.Tile) tileDTO {
 
 type groupDTO struct {
 	store.Group
-	Tiles []tileDTO `json:"tiles"`
+	Locked bool      `json:"locked"`
+	Tiles  []tileDTO `json:"tiles"`
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -167,9 +168,16 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	locked, err := s.lockedGroups(r)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
 	byGroup := map[int64][]tileDTO{}
 	for _, t := range tiles {
-		byGroup[t.GroupID] = append(byGroup[t.GroupID], toDTO(t))
+		if !locked[t.GroupID] {
+			byGroup[t.GroupID] = append(byGroup[t.GroupID], toDTO(t))
+		}
 	}
 	out := make([]groupDTO, 0, len(groups))
 	for _, g := range groups {
@@ -177,7 +185,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		if ts == nil {
 			ts = []tileDTO{}
 		}
-		out = append(out, groupDTO{Group: g, Tiles: ts})
+		out = append(out, groupDTO{Group: g, Locked: locked[g.ID], Tiles: ts})
 	}
 	name, _ := s.store.Username(s.auth.UserID(r))
 	writeJSON(w, map[string]any{
@@ -192,6 +200,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
 	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
+	"localHosts": true, "showUptime": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -230,39 +239,6 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, g)
 }
 
-func (s *Server) handleRenameGroup(w http.ResponseWriter, r *http.Request) {
-	id, err := pathID(r)
-	if err != nil {
-		writeErr(w, 400, err)
-		return
-	}
-	var body struct {
-		Name string `json:"name"`
-	}
-	if err := readJSON(r, &body); err != nil || strings.TrimSpace(body.Name) == "" {
-		writeErr(w, 400, errors.New("Name fehlt"))
-		return
-	}
-	if err := s.store.RenameGroup(id, strings.TrimSpace(body.Name)); err != nil {
-		writeErr(w, 500, err)
-		return
-	}
-	writeJSON(w, map[string]bool{"ok": true})
-}
-
-func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
-	id, err := pathID(r)
-	if err != nil {
-		writeErr(w, 400, err)
-		return
-	}
-	if err := s.store.DeleteGroup(id); err != nil {
-		writeErr(w, 500, err)
-		return
-	}
-	writeJSON(w, map[string]bool{"ok": true})
-}
-
 // ---- tiles ----
 
 type tileInput struct {
@@ -276,16 +252,13 @@ func (s *Server) buildTile(in tileInput) (store.Tile, error) {
 	t := in.Tile
 	t.Name = strings.TrimSpace(t.Name)
 	t.URL = strings.TrimSpace(t.URL)
-	t.APIURL = strings.TrimSpace(t.APIURL)
 	if t.Name == "" {
 		return t, errors.New("Name fehlt")
 	}
-	if t.URL != "" && !strings.HasPrefix(t.URL, "http://") && !strings.HasPrefix(t.URL, "https://") {
-		t.URL = "http://" + t.URL
-	}
-	if t.APIURL != "" && !strings.HasPrefix(t.APIURL, "http://") && !strings.HasPrefix(t.APIURL, "https://") {
-		t.APIURL = "http://" + t.APIURL
-	}
+	t.URL = normalizeURL(t.URL, "http://")
+	t.APIURL = normalizeURL(t.APIURL, "http://")
+	// Public addresses usually sit behind a reverse proxy with TLS.
+	t.ExternalURL = normalizeURL(t.ExternalURL, "https://")
 	if t.Integration == "" {
 		t.Integration = "link"
 	}
@@ -329,6 +302,14 @@ func (s *Server) buildTile(in tileInput) (store.Tile, error) {
 	return t, nil
 }
 
+func normalizeURL(u, scheme string) string {
+	u = strings.TrimSpace(u)
+	if u != "" && !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		u = scheme + u
+	}
+	return u
+}
+
 func (s *Server) handleSaveTile(w http.ResponseWriter, r *http.Request) {
 	var in tileInput
 	if err := readJSON(r, &in); err != nil {
@@ -354,11 +335,22 @@ func (s *Server) handleSaveTile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Gruppe fehlt"))
 		return
 	}
+	if t.ID != 0 {
+		if _, code, err := s.accessibleTile(r, t.ID); err != nil {
+			writeErr(w, code, err)
+			return
+		}
+	}
+	if ok, _ := s.groupUnlocked(r, t.GroupID); !ok {
+		writeErr(w, 403, errLocked)
+		return
+	}
 	if err := s.store.SaveTile(&t); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
 	s.forget(t.ID)
+	s.requestCheck(t.ID)
 	writeJSON(w, toDTO(t))
 }
 
@@ -366,6 +358,10 @@ func (s *Server) handleDeleteTile(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
 		writeErr(w, 400, err)
+		return
+	}
+	if _, code, err := s.accessibleTile(r, id); err != nil {
+		writeErr(w, code, err)
 		return
 	}
 	if err := s.store.DeleteTile(id); err != nil {
@@ -417,7 +413,7 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	inst := s.instance(t)
 	start := time.Now()
 	if !integ.Def().HasWidget {
-		st := s.ping(ctx, t)
+		st := ping(ctx, inst.BaseURL, t.Insecure)
 		if !st.Online {
 			writeJSON(w, map[string]any{"ok": false, "error": "Dienst nicht erreichbar"})
 			return
@@ -465,9 +461,9 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.store.Tile(id)
+	t, code, err := s.accessibleTile(r, id)
 	if err != nil {
-		writeErr(w, 404, err)
+		writeErr(w, code, err)
 		return
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
@@ -494,9 +490,9 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.store.Tile(id)
+	t, code, err := s.accessibleTile(r, id)
 	if err != nil {
-		writeErr(w, 404, err)
+		writeErr(w, code, err)
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -515,67 +511,6 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
-// ping treats any HTTP response as "online"; only network errors count as down.
-func (s *Server) ping(ctx context.Context, t store.Tile) Status {
-	target := t.APIURL
-	if target == "" {
-		target = t.URL
-	}
-	if target == "" {
-		return Status{}
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		return Status{}
-	}
-	client := integrations.NewClient(t.Insecure)
-	client.Timeout = 6 * time.Second
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return Status{}
-	}
-	resp.Body.Close()
-	return Status{Online: resp.StatusCode < 500, MS: time.Since(start).Milliseconds()}
-}
-
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	tiles, err := s.store.Tiles()
-	if err != nil {
-		writeErr(w, 500, err)
-		return
-	}
-	out := map[int64]Status{}
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	for _, t := range tiles {
-		if t.URL == "" && t.APIURL == "" {
-			continue
-		}
-		s.mu.Lock()
-		c, ok := s.status[t.ID]
-		s.mu.Unlock()
-		if ok && time.Since(c.at) < statusTTL {
-			out[t.ID] = c.val
-			continue
-		}
-		wg.Add(1)
-		go func(t store.Tile) {
-			defer wg.Done()
-			st := s.ping(r.Context(), t)
-			mu.Lock()
-			out[t.ID] = st
-			mu.Unlock()
-			s.mu.Lock()
-			s.status[t.ID] = cached[Status]{at: time.Now(), val: st}
-			s.mu.Unlock()
-		}(t)
-	}
-	wg.Wait()
-	writeJSON(w, out)
-}
-
 type searchGroup struct {
 	TileID int64               `json:"tileId"`
 	Name   string              `json:"name"`
@@ -590,7 +525,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, []searchGroup{})
 		return
 	}
-	tiles, err := s.store.Tiles()
+	tiles, err := s.accessibleTiles(r)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -677,6 +612,7 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 type exportTile struct {
 	Name        string            `json:"name"`
 	URL         string            `json:"url"`
+	ExternalURL string            `json:"externalUrl,omitempty"`
 	APIURL      string            `json:"apiUrl,omitempty"`
 	Icon        string            `json:"icon,omitempty"`
 	Description string            `json:"description,omitempty"`
@@ -689,10 +625,13 @@ type exportTile struct {
 type exportData struct {
 	Version  int               `json:"version"`
 	Settings map[string]string `json:"settings"`
-	Groups   []struct {
-		Name  string       `json:"name"`
-		Tiles []exportTile `json:"tiles"`
-	} `json:"groups"`
+	Groups   []exportGroup     `json:"groups"`
+}
+
+type exportGroup struct {
+	Name       string       `json:"name"`
+	Visibility string       `json:"visibility,omitempty"`
+	Tiles      []exportTile `json:"tiles"`
 }
 
 // handleExport writes groups, tiles and settings. API keys are left out on purpose.
@@ -704,15 +643,21 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tiles, _ := s.store.Tiles()
+	locked, _ := s.lockedGroups(r)
 	data := exportData{Version: 1, Settings: settings}
 	for _, g := range groups {
-		eg := struct {
-			Name  string       `json:"name"`
-			Tiles []exportTile `json:"tiles"`
-		}{Name: g.Name, Tiles: []exportTile{}}
+		// Locked groups stay out of the backup; protected ones are restored as hidden (no passwords in backups).
+		if locked[g.ID] {
+			continue
+		}
+		eg := exportGroup{Name: g.Name, Tiles: []exportTile{}}
+		if g.Visibility != store.Visible {
+			eg.Visibility = store.Hidden
+		}
 		for _, t := range tiles {
 			if t.GroupID == g.ID {
-				eg.Tiles = append(eg.Tiles, exportTile{t.Name, t.URL, t.APIURL, t.Icon, t.Description, t.Integration, t.Config, t.Insecure, t.ShowWidget})
+				eg.Tiles = append(eg.Tiles, exportTile{Name: t.Name, URL: t.URL, ExternalURL: t.ExternalURL, APIURL: t.APIURL, Icon: t.Icon,
+					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget})
 			}
 		}
 		data.Groups = append(data.Groups, eg)
@@ -743,9 +688,13 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err)
 			return
 		}
+		if eg.Visibility == store.Hidden {
+			g.Visibility = store.Hidden
+			logErr("import group", s.store.UpdateGroup(g))
+		}
 		for _, et := range eg.Tiles {
 			t, err := s.buildTile(tileInput{Tile: store.Tile{
-				GroupID: g.ID, Name: et.Name, URL: et.URL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
+				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
 				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget,
 			}})
 			if err != nil {

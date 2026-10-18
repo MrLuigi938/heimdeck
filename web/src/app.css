@@ -84,7 +84,7 @@ input, select, textarea {
   outline: none;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-input[type='checkbox'] { width: auto; accent-color: var(--accent); }
+input[type='checkbox'], input[type='radio'] { width: auto; accent-color: var(--accent); }
 input[type='color'] { padding: 2px; height: 38px; width: 60px; }
 
 label.field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }

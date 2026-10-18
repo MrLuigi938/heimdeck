@@ -3,10 +3,11 @@
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
+  import { tileHref, rewrite } from './network.svelte.js';
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
   // Jellyseerr, Paperless …) in the background.
-  let { tiles, newTab, searchEngine, hasSearchServices } = $props();
+  let { tiles, newTab, searchEngine, hasSearchServices, local } = $props();
 
   let q = $state('');
   let open = $state(false);
@@ -18,6 +19,7 @@
 
   const engines = {
     duckduckgo: 'https://duckduckgo.com/?q=',
+    brave: 'https://search.brave.com/search?q=',
     google: 'https://www.google.com/search?q=',
     startpage: 'https://www.startpage.com/do/search?q=',
     bing: 'https://www.bing.com/search?q=',
@@ -28,6 +30,9 @@
       ? []
       : tiles.filter((t) => (t.name + ' ' + (t.description || '')).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6),
   );
+
+  let tileById = $derived(Object.fromEntries(tiles.map((t) => [t.id, t])));
+  let noHits = $derived(results.filter((g) => !g.error && !g.items?.length).map((g) => g.name));
 
   function onInput() {
     open = true;
@@ -62,7 +67,7 @@
       open = false;
       input.blur();
     } else if (e.key === 'Enter' && q.trim()) {
-      if (tileHits.length) window.open(tileHits[0].url, newTab ? '_blank' : '_self');
+      if (tileHits.length) window.open(tileHref(tileHits[0], local), newTab ? '_blank' : '_self');
       else webSearch();
     }
   }
@@ -106,13 +111,14 @@
       {#if tileHits.length}
         <div class="section">Kacheln</div>
         {#each tileHits as t}
-          <a class="hit" href={t.url} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
+          <a class="hit" href={tileHref(t, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
             <Icon icon={t.icon} name={t.name} size={24} /> <span>{t.name}</span>
           </a>
         {/each}
       {/if}
 
       {#each results as g}
+        {@const tile = tileById[g.tileId]}
         {#if g.items?.length || g.error}
           <div class="section"><Icon icon={g.icon} name={g.name} size={16} /> {g.name}</div>
           {#if g.error}
@@ -121,8 +127,8 @@
             <div class="remote">
               {#each g.items as it}
                 <div class="remote-item">
-                  {#if it.image}<img src={it.image} alt="" loading="lazy" onerror={(e) => (e.currentTarget.style.visibility = 'hidden')} />{/if}
-                  <div class="grow"><Widget widget={{ items: [it] }} onAction={makeAction(g.tileId)} {newTab} /></div>
+                  {#if it.image}<img src={rewrite(it.image, tile, local)} alt="" loading="lazy" onerror={(e) => (e.currentTarget.style.visibility = 'hidden')} />{/if}
+                  <div class="grow"><Widget widget={{ items: [it] }} onAction={makeAction(g.tileId)} {newTab} compact={false} link={(u) => rewrite(u, tile, local)} /></div>
                 </div>
               {/each}
             </div>
@@ -130,7 +136,11 @@
         {/if}
       {/each}
 
-      {#if loading}<div class="section muted">Suche in deinen Diensten …</div>{/if}
+      {#if loading}
+        <div class="section muted">Suche in deinen Diensten …</div>
+      {:else if noHits.length}
+        <div class="none">Keine Treffer in: {noHits.join(', ')}</div>
+      {/if}
 
       <button class="hit web" onclick={webSearch}>🌐 Im Web suchen: „{q.trim()}“</button>
     </div>
@@ -153,5 +163,6 @@
   .remote-item { display: flex; gap: 10px; align-items: center; }
   .remote-item img { width: 32px; height: 48px; object-fit: cover; border-radius: 4px; flex: none; }
   .grow { flex: 1; min-width: 0; }
+  .none { font-size: 12.5px; color: var(--muted); padding: 8px 8px 2px; }
   .err { font-size: 12.5px; color: var(--bad); padding: 0 8px 6px; }
 </style>

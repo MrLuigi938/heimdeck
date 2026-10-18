@@ -62,14 +62,16 @@ func main() {
 	if dock != nil {
 		log.Print("Docker-Erkennung aktiv")
 	}
+	app := server.New(st, a, dock, web.FS())
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.New(st, a, dock, web.FS()).Handler(),
+		Handler:           app.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go app.Monitor(ctx)
 	go func() {
 		log.Printf("Heimdeck läuft auf %s", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -28,7 +28,10 @@ type Server struct {
 
 	mu      sync.Mutex
 	widgets map[int64]cached[*integrations.Widget]
-	status  map[int64]cached[Status]
+	latest  map[int64]TileStatus
+	recheck chan int64
+	// unlocked holds, per login session, the protected groups opened with their password.
+	unlocked map[string]map[int64]time.Time
 }
 
 type cached[T any] struct {
@@ -37,19 +40,15 @@ type cached[T any] struct {
 	err error
 }
 
-type Status struct {
-	Online bool  `json:"online"`
-	MS     int64 `json:"ms"`
-}
-
 const (
 	widgetTTL = 10 * time.Second
-	statusTTL = 20 * time.Second
+	unlockTTL = 12 * time.Hour
 )
 
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	return &Server{store: s, auth: a, docker: d, web: web,
-		widgets: map[int64]cached[*integrations.Widget]{}, status: map[int64]cached[Status]{}}
+		widgets: map[int64]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{},
+		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -64,7 +63,9 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/settings", s.handleSaveSettings)
 	api.HandleFunc("PUT /api/password", s.handlePassword)
 	api.HandleFunc("POST /api/groups", s.handleCreateGroup)
-	api.HandleFunc("PUT /api/groups/{id}", s.handleRenameGroup)
+	api.HandleFunc("PUT /api/groups/{id}", s.handleUpdateGroup)
+	api.HandleFunc("POST /api/groups/{id}/unlock", s.handleUnlockGroup)
+	api.HandleFunc("POST /api/groups/{id}/lock", s.handleLockGroup)
 	api.HandleFunc("DELETE /api/groups/{id}", s.handleDeleteGroup)
 	api.HandleFunc("POST /api/tiles", s.handleSaveTile)
 	api.HandleFunc("PUT /api/tiles/{id}", s.handleSaveTile)
@@ -74,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/tiles/{id}/action", s.handleAction)
 	api.HandleFunc("PUT /api/layout", s.handleLayout)
 	api.HandleFunc("GET /api/status", s.handleStatus)
+	api.HandleFunc("GET /api/uptime", s.handleUptime)
 	api.HandleFunc("GET /api/search", s.handleSearch)
 	api.HandleFunc("GET /api/discover", s.handleDiscover)
 	api.HandleFunc("GET /api/export", s.handleExport)
@@ -185,7 +187,7 @@ func (s *Server) instance(t store.Tile) *integrations.Instance {
 func (s *Server) forget(id int64) {
 	s.mu.Lock()
 	delete(s.widgets, id)
-	delete(s.status, id)
+	delete(s.latest, id)
 	s.mu.Unlock()
 }
 

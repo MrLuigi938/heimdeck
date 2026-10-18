@@ -2,13 +2,14 @@
   import { put, post, get } from './api.js';
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
+  import { detectLocal } from './network.svelte.js';
 
   let { settings, username, onClose, onSaved } = $props();
 
   // svelte-ignore state_referenced_locally
   let s = $state({
     title: 'Heimdeck', theme: 'auto', accent: '#5b8cff', background: '', searchEngine: 'duckduckgo',
-    openInNewTab: 'true', showGreeting: 'true',
+    openInNewTab: 'true', showGreeting: 'true', showUptime: 'true', localHosts: '',
     ...$state.snapshot(settings),
   });
   let pw = $state({ current: '', new: '' });
@@ -97,10 +98,27 @@
       <span>Websuche</span>
       <select bind:value={s.searchEngine}>
         <option value="duckduckgo">DuckDuckGo</option>
+        <option value="brave">Brave Search</option>
         <option value="startpage">Startpage</option>
         <option value="google">Google</option>
         <option value="bing">Bing</option>
       </select>
+    </label>
+    <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={(e) => (s.showUptime = String(e.target.checked))} /> Verfügbarkeits-Übersicht unten anzeigen</label>
+    <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>Speichern</button></div>
+  </section>
+
+  <section>
+    <h3>Zuhause oder unterwegs</h3>
+    <p class="help">
+      Hat eine Kachel eine öffentliche Adresse, öffnet Heimdeck sie automatisch, wenn du von unterwegs zugreifst.
+      Als „zuhause“ gilt, wenn du das Dashboard über eine lokale Adresse öffnest (z. B. 192.168.…, localhost, *.local).
+      Gerade erkannt: <b>{detectLocal(s.localHosts) ? '🏠 zuhause' : '🌐 unterwegs'}</b> ({location.hostname})
+    </p>
+    <label class="field">
+      <span>Weitere Adressen, die als „zuhause“ gelten (optional)</span>
+      <input bind:value={s.localHosts} placeholder="z. B. dashboard.home, 10.8.0.1" />
+      <span class="help">Mit Komma trennen. Nützlich, wenn du das Dashboard zuhause über einen eigenen Hostnamen öffnest.</span>
     </label>
     <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>Speichern</button></div>
   </section>

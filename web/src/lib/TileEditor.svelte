@@ -10,7 +10,7 @@
   // A fresh copy so cancelling leaves the dashboard untouched.
   // svelte-ignore state_referenced_locally
   let t = $state({
-    id: 0, groupId: groups[0]?.id, name: '', url: '', apiUrl: '', icon: '', description: '',
+    id: 0, groupId: groups[0]?.id, name: '', url: '', externalUrl: '', apiUrl: '', icon: '', description: '',
     integration: '', config: {}, insecure: false, showWidget: true, secretsSet: [],
     ...structuredClone($state.snapshot(tile)),
   });
@@ -118,11 +118,18 @@
         </label>
       </div>
 
-      <label class="field">
-        <span>Adresse</span>
-        <input bind:value={t.url} placeholder="http://192.168.1.10:7878" inputmode="url" />
-        <span class="help">Wird beim Klick auf die Kachel geöffnet.</span>
-      </label>
+      <div class="grid2">
+        <label class="field">
+          <span>Lokale Adresse</span>
+          <input bind:value={t.url} placeholder="http://192.168.1.10:7878" inputmode="url" />
+          <span class="help">Wird zuhause geöffnet.</span>
+        </label>
+        <label class="field">
+          <span>Öffentliche Adresse (optional)</span>
+          <input bind:value={t.externalUrl} placeholder="https://radarr.deinedomain.de" inputmode="url" />
+          <span class="help">Wird unterwegs geöffnet und ebenfalls überwacht.</span>
+        </label>
+      </div>
 
       {#each def?.fields || [] as f}
         <label class="field">

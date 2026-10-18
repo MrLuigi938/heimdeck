@@ -3,8 +3,9 @@
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
+  import { tileHref, rewrite } from './network.svelte.js';
 
-  let { tile, def, status, editMode, newTab, onEdit, dragProps } = $props();
+  let { tile, def, status, editMode, newTab, local, onEdit, dragProps } = $props();
 
   let widget = $state(null);
   let error = $state('');
@@ -28,7 +29,7 @@
 
   $effect(() => {
     if (!live) return;
-    tile.id; tile.apiUrl; tile.url; tile.integration; // reload when the tile is edited
+    tile.id; tile.apiUrl; tile.url; tile.integration; tile.config; tile.secretsSet; // reload when the tile is edited
     loaded = false;
     load();
     const timer = setInterval(() => document.visibilityState === 'visible' && load(), 15000);
@@ -45,11 +46,25 @@
     }
   }
 
-  let dot = $derived(!tile.url && !tile.apiUrl ? '' : status == null ? 'unknown' : status.online ? 'up' : 'down');
+  // Green: reachable. Yellow: reachable at home, but the public address is down. Red: down.
+  let dot = $derived.by(() => {
+    if (!tile.url && !tile.apiUrl) return '';
+    if (status == null) return 'unknown';
+    if (!status.online) return 'down';
+    return status.ext && !status.ext.online ? 'partial' : 'up';
+  });
+  let dotTitle = $derived.by(() => {
+    if (dot === 'unknown') return 'Wird geprüft …';
+    const line = (label, c) => `${label}: ${c.online ? `online · ${c.ms} ms` : 'nicht erreichbar'}`;
+    const parts = [line(status.ext ? 'Intern' : 'Status', status)];
+    if (status.ext) parts.push(line('Öffentlich', status.ext));
+    return parts.join('\n');
+  });
+  let href = $derived(tileHref(tile, local));
 </script>
 
 <div class="tile card" class:wide={live || missing.length > 0 && def?.hasWidget && tile.showWidget} class:editing={editMode} {...dragProps}>
-  <a class="head" href={editMode ? undefined : tile.url || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
+  <a class="head" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
     <Icon icon={tile.icon} name={tile.name} size={live ? 34 : 40} />
     <div class="titles">
@@ -57,7 +72,7 @@
       {#if tile.description}<div class="desc">{tile.description}</div>{/if}
     </div>
     {#if dot}
-      <span class="dot {dot}" title={dot === 'up' ? `Online · ${status.ms} ms` : dot === 'down' ? 'Nicht erreichbar' : 'Prüfe …'}></span>
+      <span class="dot {dot}" title={dotTitle}></span>
     {/if}
     {#if editMode}
       <button class="ghost icon edit" onclick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(); }} aria-label="Bearbeiten">✎</button>
@@ -73,7 +88,7 @@
       {:else if !loaded}
         <div class="skeleton"></div>
       {:else}
-        <Widget {widget} onAction={action} {newTab} />
+        <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} />
       {/if}
     </div>
   {/if}
@@ -92,9 +107,10 @@
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
   .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
   .dot.down { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 22%, transparent); }
+  .dot.partial { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
   .dot.unknown { opacity: .4; }
   .edit { flex: none; }
-  .body { padding: 0 14px 14px; }
+  .body { padding: 0 14px 14px; min-width: 0; }
   .error { font-size: 12.5px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: 10px; }
   .skeleton { height: 54px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   .setup { margin: 0 14px 14px; font-size: 13px; text-align: left; border-style: dashed; }

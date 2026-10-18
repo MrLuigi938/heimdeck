@@ -50,8 +50,17 @@ func (p paperless) Search(ctx context.Context, in *Instance, query string) ([]It
 			Created string `json:"created"`
 		} `json:"results"`
 	}
-	if err := p.get(ctx, in, "/api/documents/", url.Values{"query": {query}, "page_size": {"8"}}, &res); err != nil {
-		return nil, err
+	// Full-text search needs Paperless' search index; if it finds nothing (or the
+	// index is missing), fall back to a plain title/content filter.
+	err := p.get(ctx, in, "/api/documents/", url.Values{"query": {query}, "page_size": {"8"}}, &res)
+	if err != nil || len(res.Results) == 0 {
+		res.Results = nil
+		if err2 := p.get(ctx, in, "/api/documents/", url.Values{"title_content": {query}, "page_size": {"8"}, "ordering": {"-created"}}, &res); err2 != nil {
+			if err != nil {
+				return nil, err
+			}
+			return nil, err2
+		}
 	}
 	out := []Item{}
 	for _, d := range res.Results {
