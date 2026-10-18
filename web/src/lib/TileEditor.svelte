@@ -5,6 +5,7 @@
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
   import { t } from './i18n.svelte.js';
+  import { confirmDialog } from './dialog.svelte.js';
 
   let { tile, groups, integrations, onClose, onSaved } = $props();
 
@@ -43,7 +44,7 @@
   }
 
   function payload() {
-    return { ...$state.snapshot(t), secrets: $state.snapshot(secrets) };
+    return { ...$state.snapshot(form), secrets: $state.snapshot(secrets) };
   }
 
   async function runTest() {
@@ -72,7 +73,7 @@
   }
 
   async function remove() {
-    if (!confirm(t('„{name}“ wirklich löschen?', { name: form.name }))) return;
+    if (!(await confirmDialog(t('„{name}“ wirklich löschen?', { name: form.name }), { danger: true }))) return;
     try {
       await del(`/tiles/${form.id}`);
       toast(t('Gelöscht'));

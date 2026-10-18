@@ -3,14 +3,19 @@
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
   import { t } from './i18n.svelte.js';
+  import { confirmDialog } from './dialog.svelte.js';
 
-  let { group, onClose, onSaved } = $props();
+  let { group, boards = [], onClose, onSaved } = $props();
 
   // svelte-ignore state_referenced_locally
   let name = $state(group.name);
   // svelte-ignore state_referenced_locally
   let visibility = $state(group.visibility || 'visible');
   let password = $state('');
+  // svelte-ignore state_referenced_locally
+  let layout = $state(group.layout || '');
+  // svelte-ignore state_referenced_locally
+  let boardId = $state(group.boardId);
   let saving = $state(false);
   // svelte-ignore state_referenced_locally
   let hadPassword = group.visibility === 'protected';
@@ -25,7 +30,7 @@
     e?.preventDefault();
     saving = true;
     try {
-      await put(`/groups/${group.id}`, { name, visibility, password });
+      await put(`/groups/${group.id}`, { name, visibility, password, layout, boardId });
       toast(t('Gruppe gespeichert'));
       onSaved();
     } catch (err) {
@@ -38,7 +43,7 @@
     const msg = group.tiles.length
       ? t('Gruppe „{name}“ mit {n} Kachel(n) löschen?', { name: group.name, n: group.tiles.length })
       : t('Gruppe „{name}“ löschen?', { name: group.name });
-    if (!confirm(msg)) return;
+    if (!(await confirmDialog(msg, { danger: true }))) return;
     try {
       await del(`/groups/${group.id}`);
       onSaved();
@@ -67,6 +72,22 @@
       <label class="field">
         <span>{hadPassword ? t('Neues Passwort (leer lassen zum Beibehalten)') : t('Passwort für diese Gruppe')}</span>
         <input type="password" bind:value={password} autocomplete="new-password" minlength="4" required={!hadPassword} />
+      </label>
+    {/if}
+    <label class="field">
+      <span>{t('Kachelgröße')}</span>
+      <select bind:value={layout}>
+        <option value="">{t('Wie in den Einstellungen')}</option>
+        <option value="uniform">{t('Einheitlich – alle Kacheln gleich groß')}</option>
+        <option value="auto">{t('Automatisch – Kacheln mit Live-Daten breiter')}</option>
+      </select>
+    </label>
+    {#if boards.length > 1}
+      <label class="field">
+        <span>{t('Dashboard')}</span>
+        <select bind:value={boardId}>
+          {#each boards as b (b.id)}<option value={b.id}>{b.icon} {t(b.name)}</option>{/each}
+        </select>
       </label>
     {/if}
   </form>

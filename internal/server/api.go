@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,7 +68,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 // seed creates starter groups so a fresh dashboard is not empty.
 func (s *Server) seed(lang string) {
 	for _, name := range []string{"Medien", "Downloads", "System"} {
-		s.store.CreateGroup(i18n.T(lang, name))
+		s.store.CreateGroup(i18n.T(lang, name), 0)
 	}
 }
 
@@ -192,9 +193,15 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, groupDTO{Group: g, Locked: locked[g.ID], Tiles: ts})
 	}
+	boards, err := s.store.Boards()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
 	name, _ := s.store.Username(s.auth.UserID(r))
 	writeJSON(w, map[string]any{
 		"settings":     settings,
+		"boards":       boards,
 		"groups":       out,
 		"integrations": integrations.All(langOf(r)),
 		"docker":       s.docker != nil,
@@ -230,13 +237,14 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name string `json:"name"`
+		Name    string `json:"name"`
+		BoardID int64  `json:"boardId"`
 	}
 	if err := readJSON(r, &body); err != nil || strings.TrimSpace(body.Name) == "" {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
-	g, err := s.store.CreateGroup(strings.TrimSpace(body.Name))
+	g, err := s.store.CreateGroup(strings.TrimSpace(body.Name), body.BoardID)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -539,6 +547,21 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	// Only search the dashboard that is currently open.
+	if board, _ := strconv.ParseInt(r.URL.Query().Get("board"), 10, 64); board != 0 {
+		groups, _ := s.store.Groups()
+		onBoard := map[int64]bool{}
+		for _, g := range groups {
+			onBoard[g.ID] = g.BoardID == board
+		}
+		filtered := tiles[:0]
+		for _, t := range tiles {
+			if onBoard[t.GroupID] {
+				filtered = append(filtered, t)
+			}
+		}
+		tiles = filtered
+	}
 	ctx, cancel := timeout(r, 8*time.Second)
 	defer cancel()
 	var mu sync.Mutex
@@ -640,6 +663,8 @@ type exportData struct {
 }
 
 type exportGroup struct {
+	Board      string       `json:"board,omitempty"`
+	Layout     string       `json:"layout,omitempty"`
 	Name       string       `json:"name"`
 	Visibility string       `json:"visibility,omitempty"`
 	Tiles      []exportTile `json:"tiles"`
@@ -655,13 +680,18 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 	tiles, _ := s.store.Tiles()
 	locked, _ := s.lockedGroups(r)
+	boards, _ := s.store.Boards()
+	boardNames := map[int64]string{}
+	for _, b := range boards {
+		boardNames[b.ID] = b.Name
+	}
 	data := exportData{Version: 1, Settings: settings}
 	for _, g := range groups {
 		// Locked groups stay out of the backup; protected ones are restored as hidden (no passwords in backups).
 		if locked[g.ID] {
 			continue
 		}
-		eg := exportGroup{Name: g.Name, Tiles: []exportTile{}}
+		eg := exportGroup{Name: g.Name, Board: boardNames[g.BoardID], Layout: g.Layout, Tiles: []exportTile{}}
 		if g.Visibility != store.Visible {
 			eg.Visibility = store.Hidden
 		}
@@ -693,14 +723,32 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		logErr("import settings", s.store.SaveSettings(data.Settings))
 	}
 	count := 0
+	boards, _ := s.store.Boards()
+	boardIDs := map[string]int64{}
+	for _, b := range boards {
+		boardIDs[b.Name] = b.ID
+	}
 	for _, eg := range data.Groups {
-		g, err := s.store.CreateGroup(eg.Name)
+		boardID := boardIDs[eg.Board]
+		if eg.Board != "" && boardID == 0 {
+			b := store.Board{Name: eg.Board}
+			if err := s.store.SaveBoard(&b); err == nil {
+				boardID = b.ID
+				boardIDs[eg.Board] = b.ID
+			}
+		}
+		g, err := s.store.CreateGroup(eg.Name, boardID)
 		if err != nil {
 			writeErr(w, 500, err)
 			return
 		}
-		if eg.Visibility == store.Hidden {
-			g.Visibility = store.Hidden
+		if eg.Visibility == store.Hidden || eg.Layout == "uniform" || eg.Layout == "auto" {
+			if eg.Visibility == store.Hidden {
+				g.Visibility = store.Hidden
+			}
+			if eg.Layout == "uniform" || eg.Layout == "auto" {
+				g.Layout = eg.Layout
+			}
 			logErr("import group", s.store.UpdateGroup(g))
 		}
 		for _, et := range eg.Tiles {

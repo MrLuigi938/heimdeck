@@ -8,6 +8,7 @@ Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber 
 - **Aktionen**: Jellyseerr-Anfragen genehmigen oder ablehnen, SABnzbd pausieren oder fortsetzen.
 - **Zuhause oder unterwegs**: Jede Kachel kann zusätzlich eine öffentliche Adresse haben. Öffnest du das Dashboard über eine lokale Adresse, werden lokale Links verwendet, sonst die öffentlichen. Umschalten geht oben rechts per Klick.
 - **Verfügbarkeit**: Heimdeck prüft jede Minute alle Dienste (lokal und öffentlich) und zeigt den Verlauf über 24 Stunden oder 3 Tage mit Ausfällen und Antwortzeiten.
+- **Mehrere Dashboards**: z. B. „Privat“ und „Arbeit“ – oben neben dem Titel umschalten. Jeder Browser merkt sich das zuletzt benutzte, per `?board=<id>` lässt sich eines direkt verlinken.
 - **Gruppen ausblenden oder schützen**: Eine Gruppe kann ausgeblendet sein (Anzeige per 👁 für die aktuelle Sitzung) oder ein eigenes Passwort haben.
 - **Gemeinsame Suche** (Taste `/`): Kacheln, Jellyfin-Bibliothek, Jellyseerr (mit Knopf „Anfragen“) und Paperless-Dokumente in einem Suchfeld.
 - **Deutsch und Englisch**: Sprache bei der Einrichtung oder später in den Einstellungen wählen. Auch die Live-Daten und Fehlermeldungen werden übersetzt.
@@ -53,7 +54,7 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken. Fert
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | JDownloader, FRITZ!Box, UniFi, Zoraxy, Anubis, qBittorrent, Portainer, … | Online-Status | | |
 
-Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
+Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten, die Kachelgröße (einheitlich oder automatisch) pro Gruppe einstellen.
 
 ## Tipps
 

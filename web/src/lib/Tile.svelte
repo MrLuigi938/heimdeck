@@ -96,14 +96,16 @@
 </div>
 
 <style>
-  .tile { display: flex; flex-direction: column; min-width: 0; transition: transform .15s, border-color .15s; }
+  /* translateZ gives each tile its own layer: Chrome sometimes skips repainting text inside
+     backdrop-filter elements until hover, which made tile names flicker in on load. */
+  .tile { display: flex; flex-direction: column; min-width: 0; transform: translateZ(0); transition: transform .15s, border-color .15s; }
   .tile.wide { grid-column: span 2; }
   .tile:hover { border-color: var(--border-strong); }
   .tile.editing { cursor: grab; outline: 1px dashed var(--border-strong); outline-offset: 2px; }
   .head { display: flex; align-items: center; gap: 12px; padding: 14px; min-width: 0; }
   .tile:not(.editing) .head[href]:hover .name { color: var(--accent); }
   .titles { flex: 1; min-width: 0; }
-  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .desc { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
   .dot.up { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }

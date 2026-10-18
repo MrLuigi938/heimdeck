@@ -8,7 +8,7 @@
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
   // Jellyseerr, Paperless …) in the background.
-  let { tiles, newTab, searchEngine, hasSearchServices, local } = $props();
+  let { tiles, newTab, searchEngine, hasSearchServices, local, boardId } = $props();
 
   let q = $state('');
   let open = $state(false);
@@ -48,7 +48,7 @@
     timer = setTimeout(async () => {
       const my = ++seq;
       try {
-        const res = await get('/search?q=' + encodeURIComponent(term));
+        const res = await get('/search?q=' + encodeURIComponent(term) + (boardId ? '&board=' + boardId : ''));
         if (my === seq) results = res;
       } catch {
         if (my === seq) results = [];

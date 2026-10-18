@@ -30,10 +30,20 @@ const (
 
 type Group struct {
 	ID           int64  `json:"id"`
+	BoardID      int64  `json:"boardId"`
 	Name         string `json:"name"`
 	Position     int    `json:"position"`
 	Visibility   string `json:"visibility"`
+	Layout       string `json:"layout"` // "" = follow the global setting, "uniform" or "auto"
 	PasswordHash string `json:"-"`
+}
+
+// Board is a separate dashboard, e.g. "Privat" and "Arbeit".
+type Board struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Icon     string `json:"icon"`
+	Position int    `json:"position"`
 }
 
 type Tile struct {
@@ -86,6 +96,12 @@ CREATE TABLE IF NOT EXISTS tiles (
 	show_widget INTEGER NOT NULL DEFAULT 1,
 	position INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS boards (
+	id INTEGER PRIMARY KEY,
+	name TEXT NOT NULL,
+	icon TEXT NOT NULL DEFAULT '',
+	position INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS status_log (
 	tile_id INTEGER NOT NULL,
 	kind TEXT NOT NULL,
@@ -115,12 +131,35 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE groups ADD COLUMN visibility TEXT NOT NULL DEFAULT 'visible'`,
 		`ALTER TABLE groups ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE tiles ADD COLUMN monitor INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE groups ADD COLUMN board_id INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE groups ADD COLUMN layout TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
 		}
 	}
-	return &Store{db: db, box: box}, nil
+	st := &Store{db: db, box: box}
+	if err := st.ensureBoard(); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+// ensureBoard creates the first dashboard and moves groups without one onto it.
+func (s *Store) ensureBoard() error {
+	var id int64
+	err := s.db.QueryRow(`SELECT id FROM boards ORDER BY position, id LIMIT 1`).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		res, err := s.db.Exec(`INSERT INTO boards (name, icon, position) VALUES ('Privat', '🏡', 0)`)
+		if err != nil {
+			return err
+		}
+		id, _ = res.LastInsertId()
+	} else if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`UPDATE groups SET board_id = ? WHERE board_id NOT IN (SELECT id FROM boards)`, id)
+	return err
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -226,7 +265,7 @@ func (s *Store) SaveSettings(m map[string]string) error {
 // ---- groups ----
 
 func (s *Store) Groups() ([]Group, error) {
-	rows, err := s.db.Query(`SELECT id, name, position, visibility, password_hash FROM groups ORDER BY position, id`)
+	rows, err := s.db.Query(`SELECT ` + groupCols + ` FROM groups ORDER BY position, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +273,7 @@ func (s *Store) Groups() ([]Group, error) {
 	out := []Group{}
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.Name, &g.Position, &g.Visibility, &g.PasswordHash); err != nil {
+		if err := rows.Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.PasswordHash); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -242,21 +281,29 @@ func (s *Store) Groups() ([]Group, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) CreateGroup(name string) (Group, error) {
+const groupCols = `id, board_id, name, position, visibility, layout, password_hash`
+
+// CreateGroup adds a group to a board; boardID 0 means the first board.
+func (s *Store) CreateGroup(name string, boardID int64) (Group, error) {
+	if boardID == 0 {
+		s.db.QueryRow(`SELECT id FROM boards ORDER BY position, id LIMIT 1`).Scan(&boardID)
+	} else if _, err := s.Board(boardID); err != nil {
+		return Group{}, err
+	}
 	var pos int
 	s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM groups`).Scan(&pos)
-	res, err := s.db.Exec(`INSERT INTO groups (name, position) VALUES (?, ?)`, name, pos)
+	res, err := s.db.Exec(`INSERT INTO groups (board_id, name, position) VALUES (?, ?, ?)`, boardID, name, pos)
 	if err != nil {
 		return Group{}, err
 	}
 	id, _ := res.LastInsertId()
-	return Group{ID: id, Name: name, Position: pos, Visibility: Visible}, nil
+	return Group{ID: id, BoardID: boardID, Name: name, Position: pos, Visibility: Visible}, nil
 }
 
 func (s *Store) Group(id int64) (Group, error) {
 	var g Group
-	err := s.db.QueryRow(`SELECT id, name, position, visibility, password_hash FROM groups WHERE id = ?`, id).
-		Scan(&g.ID, &g.Name, &g.Position, &g.Visibility, &g.PasswordHash)
+	err := s.db.QueryRow(`SELECT `+groupCols+` FROM groups WHERE id = ?`, id).
+		Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.PasswordHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -264,8 +311,71 @@ func (s *Store) Group(id int64) (Group, error) {
 }
 
 func (s *Store) UpdateGroup(g Group) error {
-	_, err := s.db.Exec(`UPDATE groups SET name = ?, visibility = ?, password_hash = ? WHERE id = ?`, g.Name, g.Visibility, g.PasswordHash, g.ID)
+	_, err := s.db.Exec(`UPDATE groups SET board_id = ?, name = ?, visibility = ?, layout = ?, password_hash = ? WHERE id = ?`,
+		g.BoardID, g.Name, g.Visibility, g.Layout, g.PasswordHash, g.ID)
 	return err
+}
+
+// ---- boards ----
+
+func (s *Store) Boards() ([]Board, error) {
+	rows, err := s.db.Query(`SELECT id, name, icon, position FROM boards ORDER BY position, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Board{}
+	for rows.Next() {
+		var b Board
+		if err := rows.Scan(&b.ID, &b.Name, &b.Icon, &b.Position); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) Board(id int64) (Board, error) {
+	var b Board
+	err := s.db.QueryRow(`SELECT id, name, icon, position FROM boards WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Icon, &b.Position)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return b, err
+}
+
+func (s *Store) SaveBoard(b *Board) error {
+	if b.ID == 0 {
+		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM boards`).Scan(&b.Position)
+		res, err := s.db.Exec(`INSERT INTO boards (name, icon, position) VALUES (?, ?, ?)`, b.Name, b.Icon, b.Position)
+		if err != nil {
+			return err
+		}
+		b.ID, _ = res.LastInsertId()
+		return nil
+	}
+	_, err := s.db.Exec(`UPDATE boards SET name = ?, icon = ? WHERE id = ?`, b.Name, b.Icon, b.ID)
+	return err
+}
+
+// DeleteBoard removes a board together with its groups and tiles.
+func (s *Store) DeleteBoard(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`DELETE FROM status_log WHERE tile_id IN (SELECT t.id FROM tiles t JOIN groups g ON t.group_id = g.id WHERE g.board_id = ?)`,
+		`DELETE FROM tiles WHERE group_id IN (SELECT id FROM groups WHERE board_id = ?)`,
+		`DELETE FROM groups WHERE board_id = ?`,
+		`DELETE FROM boards WHERE id = ?`,
+	} {
+		if _, err := tx.Exec(q, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) DeleteGroup(id int64) error {

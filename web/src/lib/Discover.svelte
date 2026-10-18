@@ -6,7 +6,7 @@
   import { t } from './i18n.svelte.js';
 
   // Lists running Docker containers and turns the selected ones into tiles.
-  let { groups, onClose, onSaved } = $props();
+  let { groups, boardId, onClose, onSaved } = $props();
 
   let items = $state(null);
   let error = $state('');
@@ -38,7 +38,7 @@
         const groupName = s.group || t('Sonstiges');
         let gid = groupIds[groupName.toLowerCase()];
         if (!gid) {
-          gid = (await post('/groups', { name: groupName })).id;
+          gid = (await post('/groups', { name: groupName, boardId })).id;
           groupIds[groupName.toLowerCase()] = gid;
         }
         await post('/tiles', { groupId: gid, name: s.name, url: s.url, icon: s.icon, integration: s.integration, showWidget: true });

@@ -1,5 +1,6 @@
 <script>
   import { t } from './i18n.svelte.js';
+  import { confirmDialog } from './dialog.svelte.js';
   // Renders the generic widget format every integration returns. Long content
   // is folded: one warning (two lines) and three list entries, with an arrow
   // to show the rest.
@@ -18,7 +19,7 @@
 
   async function run(a) {
     if (!onAction) return;
-    if (a.confirm && !confirm(a.confirm)) return;
+    if (a.confirm && !(await confirmDialog(a.confirm, { confirmLabel: a.label, danger: a.tone === 'danger' }))) return;
     busy = keyOf(a);
     try {
       await onAction(a);

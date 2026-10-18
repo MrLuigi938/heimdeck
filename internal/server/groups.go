@@ -98,9 +98,11 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name       string `json:"name"`
-		Visibility string `json:"visibility"`
-		Password   string `json:"password"`
+		Name       string  `json:"name"`
+		Visibility string  `json:"visibility"`
+		Password   string  `json:"password"`
+		BoardID    int64   `json:"boardId"`
+		Layout     *string `json:"layout"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, 400, err)
@@ -117,6 +119,22 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	if name := strings.TrimSpace(body.Name); name != "" {
 		g.Name = name
+	}
+	if body.BoardID != 0 && body.BoardID != g.BoardID {
+		if _, err := s.store.Board(body.BoardID); err != nil {
+			writeErr(w, 400, errors.New("unbekanntes Dashboard"))
+			return
+		}
+		g.BoardID = body.BoardID
+	}
+	if body.Layout != nil {
+		switch *body.Layout {
+		case "", "uniform", "auto":
+			g.Layout = *body.Layout
+		default:
+			writeErr(w, 400, errors.New("unbekannte Kachelgröße"))
+			return
+		}
 	}
 	switch body.Visibility {
 	case "":
@@ -343,4 +361,80 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].TileID < out[j].TileID })
 	writeJSON(w, map[string]any{"start": start, "slot": sec, "rows": out})
+}
+
+// ---- boards ----
+
+type boardInput struct {
+	Name string `json:"name"`
+	Icon string `json:"icon"`
+}
+
+func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
+	var in boardInput
+	if err := readJSON(r, &in); err != nil || strings.TrimSpace(in.Name) == "" {
+		writeErr(w, 400, errors.New("Name fehlt"))
+		return
+	}
+	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon)}
+	if err := s.store.SaveBoard(&b); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, b)
+}
+
+func (s *Server) handleUpdateBoard(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	var in boardInput
+	if err := readJSON(r, &in); err != nil || strings.TrimSpace(in.Name) == "" {
+		writeErr(w, 400, errors.New("Name fehlt"))
+		return
+	}
+	b, err := s.store.Board(id)
+	if err != nil {
+		writeErr(w, 404, err)
+		return
+	}
+	b.Name, b.Icon = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon)
+	if err := s.store.SaveBoard(&b); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, b)
+}
+
+func (s *Server) handleDeleteBoard(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	boards, err := s.store.Boards()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	if len(boards) <= 1 {
+		writeErr(w, 400, errors.New("Das letzte Dashboard kann nicht gelöscht werden"))
+		return
+	}
+	// Protected groups on the board must be unlocked before they can be deleted.
+	groups, _ := s.store.Groups()
+	locked, _ := s.lockedGroups(r)
+	for _, g := range groups {
+		if g.BoardID == id && locked[g.ID] {
+			writeErr(w, 403, errLocked)
+			return
+		}
+	}
+	if err := s.store.DeleteBoard(id); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, map[string]bool{"ok": true})
 }

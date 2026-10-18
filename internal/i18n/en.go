@@ -142,4 +142,8 @@ var en = map[string]string{
 	"Content-Type muss application/json sein":                                    "Content-Type must be application/json",
 	"ungültige Anfrage":                                                          "invalid request",
 	"ungültige ID":                                                               "invalid ID",
+	"nicht gefunden":                                                             "not found",
+	"unbekanntes Dashboard":                                                      "unknown dashboard",
+	"unbekannte Kachelgröße":                                                     "unknown tile size",
+	"Das letzte Dashboard kann nicht gelöscht werden":                            "The last dashboard cannot be deleted",
 }

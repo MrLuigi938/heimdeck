@@ -3,6 +3,7 @@
   import Login from './lib/Login.svelte';
   import Dashboard from './lib/Dashboard.svelte';
   import Toasts from './lib/Toasts.svelte';
+  import Dialogs from './lib/Dialogs.svelte';
   import { t, setLang } from './lib/i18n.svelte.js';
 
   let state = $state(null);
@@ -30,6 +31,7 @@
 {:else}
   <Dashboard />
 {/if}
+<Dialogs />
 <Toasts />
 
 <style>

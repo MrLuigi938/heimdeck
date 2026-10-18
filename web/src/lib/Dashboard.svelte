@@ -10,6 +10,7 @@
   import Uptime from './Uptime.svelte';
   import { network, isLocal, setOverride, detectLocal } from './network.svelte.js';
   import { t, locale } from './i18n.svelte.js';
+  import { promptDialog } from './dialog.svelte.js';
 
   let data = $state(null);
   let status = $state({});
@@ -23,6 +24,32 @@
   let editingGroup = $state(null);
   let unlockPw = $state({});
   let showHidden = $state(readHidden());
+  let boardMenu = $state(false);
+
+  // The open dashboard: ?board=<id> in the address wins (for bookmarks),
+  // otherwise the one last used in this browser.
+  let boardId = $state(readBoard());
+  function readBoard() {
+    const fromUrl = Number(new URLSearchParams(location.search).get('board'));
+    if (fromUrl) return fromUrl;
+    try {
+      return Number(localStorage.getItem('heimdeck-board')) || 0;
+    } catch {
+      return 0;
+    }
+  }
+  function switchBoard(id) {
+    boardId = id;
+    boardMenu = false;
+    try {
+      localStorage.setItem('heimdeck-board', String(id));
+    } catch {
+      /* private mode */
+    }
+    const url = new URL(location.href);
+    url.searchParams.delete('board');
+    history.replaceState(null, '', url);
+  }
 
   function readHidden() {
     try {
@@ -42,13 +69,23 @@
 
   let settings = $derived(data?.settings || {});
   let defs = $derived(Object.fromEntries((data?.integrations || []).map((d) => [d.id, d])));
-  let allTiles = $derived((data?.groups || []).flatMap((g) => g.tiles));
+  let boards = $derived(data?.boards || []);
+  let board = $derived(boards.find((b) => b.id === boardId) || boards[0]);
+  let boardGroups = $derived((data?.groups || []).filter((g) => g.boardId === board?.id));
+  let allTiles = $derived(boardGroups.flatMap((g) => g.tiles));
   let newTab = $derived(settings.openInNewTab !== 'false');
   let hasSearchServices = $derived(allTiles.some((t) => defs[t.integration]?.hasSearch));
-  let openGroups = $derived((data?.groups || []).filter((g) => !g.locked));
-  let hasHidden = $derived((data?.groups || []).some((g) => g.visibility === 'hidden'));
-  let hiddenCount = $derived((data?.groups || []).filter((g) => g.visibility === 'hidden' && g.tiles.length).length);
-  let uniform = $derived(settings.uniformTiles === 'true');
+  // Groups a tile can be moved to; with several dashboards labelled "Dashboard › Group", current one first.
+  let groupOptions = $derived.by(() => {
+    const open = (data?.groups || []).filter((g) => !g.locked);
+    const name = (g) => t(boards.find((b) => b.id === g.boardId)?.name || '');
+    const sorted = [...open.filter((g) => g.boardId === board?.id), ...open.filter((g) => g.boardId !== board?.id)];
+    return boards.length > 1 ? sorted.map((g) => ({ ...g, name: `${name(g)} › ${g.name}` })) : sorted;
+  });
+  let hasHidden = $derived(boardGroups.some((g) => g.visibility === 'hidden'));
+  let hiddenCount = $derived(boardGroups.filter((g) => g.visibility === 'hidden').length);
+  // A group can override the global "uniform tiles" setting.
+  const isUniform = (g) => g.layout === 'uniform' || (g.layout !== 'auto' && settings.uniformTiles === 'true');
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -136,16 +173,19 @@
 
   // ---- groups ----
   async function addGroup() {
-    const name = prompt(t('Name der neuen Gruppe'));
-    if (!name?.trim()) return;
-    await post('/groups', { name });
+    const name = await promptDialog(t('Name der neuen Gruppe'), { title: t('Neue Gruppe'), confirmLabel: t('Anlegen') });
+    if (!name) return;
+    await post('/groups', { name, boardId: board?.id });
     load();
   }
   function moveGroup(i, dir) {
+    const a = boardGroups[i];
+    const b = boardGroups[i + dir];
+    if (!a || !b) return;
     const gs = data.groups;
-    const j = i + dir;
-    if (j < 0 || j >= gs.length) return;
-    [gs[i], gs[j]] = [gs[j], gs[i]];
+    const ia = gs.indexOf(a);
+    const ib = gs.indexOf(b);
+    [gs[ia], gs[ib]] = [gs[ib], gs[ia]];
     saveLayout();
   }
 
@@ -215,16 +255,34 @@
   }
 </script>
 
+<svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} />
+
 {#if data}
   <div class="page">
     <header class="top">
       <div class="brand on-bg">
-        <h1>{settings.title || 'Heimdeck'}</h1>
+        <div class="title-row">
+          <h1>{settings.title || 'Heimdeck'}</h1>
+          {#if boards.length > 1}
+            <div class="boards">
+              <button class="board-btn" onclick={() => (boardMenu = !boardMenu)} aria-expanded={boardMenu} title={t('Dashboard wechseln')}>
+                {board?.icon || '▦'} {t(board?.name || '')} <span class="caret">▾</span>
+              </button>
+              {#if boardMenu}
+                <div class="board-menu card" role="menu">
+                  {#each boards as b (b.id)}
+                    <button role="menuitem" class:on={b.id === board?.id} onclick={() => switchBoard(b.id)}>{b.icon || '▦'} {t(b.name)}</button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </div>
         {#if settings.showGreeting !== 'false'}
           <div class="muted greet">{greeting} · {dateText} · {timeText}</div>
         {/if}
       </div>
-      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} />
+      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} boardId={board?.id} />
       <div class="tools on-bg">
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
@@ -264,16 +322,16 @@
         <p class="muted">{t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.')}</p>
         <div class="row center">
           {#if data.docker}<button class="primary" onclick={() => (showDiscover = true)}>🐳 {t('Container automatisch finden')}</button>{/if}
-          <button class:primary={!data.docker} onclick={() => (editing = { groupId: data.groups[0]?.id })} disabled={!data.groups.length}>+ {t('Kachel hinzufügen')}</button>
+          <button class:primary={!data.docker} onclick={() => (editing = { groupId: boardGroups.find((g) => !g.locked)?.id })} disabled={!boardGroups.some((g) => !g.locked)}>+ {t('Kachel hinzufügen')}</button>
         </div>
         {#if !data.docker}
           <p class="help">{t('Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml).')}</p>
         {/if}
-        {#if !data.groups.length}<button onclick={addGroup}>+ {t('Gruppe anlegen')}</button>{/if}
+        {#if !boardGroups.length}<button onclick={addGroup}>+ {t('Gruppe anlegen')}</button>{/if}
       </div>
     {/if}
 
-    {#each data.groups as group, gi (group.id)}
+    {#each boardGroups as group, gi (group.id)}
       {#if group.locked}
         <form class="locked card" onsubmit={(e) => unlock(e, group)}>
           <span class="lock-name">🔒 {group.name}</span>
@@ -281,7 +339,7 @@
           <input type="password" placeholder={t('Passwort')} bind:value={unlockPw[group.id]} autocomplete="off" aria-label={t('Passwort für {name}', { name: group.name })} />
           <button class="small">{t('Entsperren')}</button>
         </form>
-      {:else if (group.tiles.length || editMode) && (group.visibility !== 'hidden' || showHidden || editMode)}
+      {:else if group.visibility !== 'hidden' || showHidden || editMode}
         <section class="group" aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2 class="on-bg">{group.name}</h2>
@@ -292,15 +350,18 @@
             {#if editMode}
               <div class="group-tools on-bg">
                 <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title={t('Nach oben')}>↑</button>
-                <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === data.groups.length - 1} title={t('Nach unten')}>↓</button>
+                <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === boardGroups.length - 1} title={t('Nach unten')}>↓</button>
                 <button class="ghost small" onclick={() => (editingGroup = group)}>{t('Bearbeiten')}</button>
               </div>
             {/if}
           </div>
-          <div class="grid" class:uniform>
+          <div class="grid" class:uniform={isUniform(group)}>
+            {#if !group.tiles.length && !editMode}
+              <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
+            {/if}
             {#each group.tiles as tile (tile.id)}
               <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
-                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} {uniform}
+                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)}
                   onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
               </div>
             {/each}
@@ -324,16 +385,16 @@
   </div>
 
   {#if editing}
-    <TileEditor tile={editing} groups={openGroups} integrations={data.integrations} onClose={() => (editing = null)} onSaved={saved} />
+    <TileEditor tile={editing} groups={groupOptions} integrations={data.integrations} onClose={() => (editing = null)} onSaved={saved} />
   {/if}
   {#if showDiscover}
-    <Discover groups={openGroups} onClose={() => (showDiscover = false)} onSaved={saved} />
+    <Discover groups={boardGroups.filter((g) => !g.locked)} boardId={board?.id} onClose={() => (showDiscover = false)} onSaved={saved} />
   {/if}
   {#if editingGroup}
-    <GroupEditor group={editingGroup} onClose={() => (editingGroup = null)} onSaved={saved} />
+    <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} username={data.username} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
 {/if}
 
@@ -343,6 +404,14 @@
   .brand { min-width: 0; }
   h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; }
   .greet { font-size: 13.5px; margin-top: 2px; }
+  .title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .boards { position: relative; }
+  .board-btn { padding: 4px 10px; font-size: 13px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center; }
+  .caret { font-size: 10px; color: var(--muted); }
+  .board-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 45; min-width: 180px; padding: 6px; display: grid; gap: 2px; background: var(--surface-solid); }
+  .board-menu button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; }
+  .board-menu button:hover, .board-menu button.on { background: var(--surface-2); }
+  .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
   .tools .on { background: var(--accent); color: #fff; }
   .hidden-hint { justify-self: center; background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 13px; padding: 6px 14px; border-radius: 999px; }
@@ -362,7 +431,7 @@
   /* Uniform: every tile one column of the same width; tiles in a row share the tallest one's height. */
   .grid.uniform { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: stretch; }
   .slot { display: contents; }
-  .slot.drop > :global(.tile) { border-color: var(--accent); transform: scale(1.02); }
+  .slot.drop > :global(.tile) { border-color: var(--accent); transform: translateZ(0) scale(1.02); }
   .slot.dragging > :global(.tile) { opacity: .4; }
   .add { border: 1px dashed var(--border-strong); background: transparent; min-height: 68px; border-radius: var(--radius); color: var(--muted); }
   .empty { padding: 36px 24px; text-align: center; display: grid; gap: 12px; justify-items: center; }

@@ -1,11 +1,50 @@
 <script>
-  import { put, post, get } from './api.js';
+  import { put, post, get, del } from './api.js';
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
   import { detectLocal } from './network.svelte.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
+  import { confirmDialog } from './dialog.svelte.js';
 
-  let { settings, username, onClose, onSaved } = $props();
+  let { settings, boards = [], username, onClose, onSaved, onSwitchBoard } = $props();
+
+  // Editable copy of the dashboards list.
+  // svelte-ignore state_referenced_locally
+  let boardRows = $state(boards.map((b) => ({ ...b, name: t(b.name) })));
+  let newBoard = $state({ name: '', icon: '💼' });
+
+  async function saveBoard(b) {
+    try {
+      await put(`/boards/${b.id}`, { name: b.name, icon: b.icon });
+      toast(t('Gespeichert'));
+      onSaved({ keepOpen: true });
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+  async function addBoard(e) {
+    e.preventDefault();
+    try {
+      const b = await post('/boards', $state.snapshot(newBoard));
+      boardRows.push(b);
+      newBoard = { name: '', icon: '💼' };
+      toast(t('Dashboard „{name}“ angelegt', { name: b.name }));
+      onSaved({ keepOpen: true });
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+  async function removeBoard(b) {
+    const ok = await confirmDialog(t('Dashboard „{name}“ mit allen Gruppen und Kacheln löschen?', { name: b.name }), { danger: true });
+    if (!ok) return;
+    try {
+      await del(`/boards/${b.id}`);
+      boardRows.splice(boardRows.indexOf(b), 1);
+      onSaved({ keepOpen: true });
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
 
   // svelte-ignore state_referenced_locally
   let s = $state({
@@ -114,6 +153,7 @@
       <input bind:value={s.background} placeholder="https://…/wallpaper.jpg" />
     </label>
     <label class="check"><input type="checkbox" checked={flag('uniformTiles')} onchange={setFlag('uniformTiles')} /> {t('Einheitliche Kachelgrößen (alle Kacheln gleich breit, gleiche Höhe pro Reihe)')}</label>
+    <p class="help indent">{t('Gilt für alle Gruppen – außer denen, bei denen du unter „Gruppe bearbeiten“ eine eigene Kachelgröße gewählt hast.')}</p>
     <label class="check"><input type="checkbox" checked={s.showGreeting !== 'false'} onchange={setFlag('showGreeting')} /> {t('Begrüßung, Datum und Uhrzeit anzeigen')}</label>
   </section>
 
@@ -132,6 +172,25 @@
     </label>
     <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={setFlag('showUptime')} /> {t('Verfügbarkeits-Übersicht unten anzeigen')}</label>
     <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>{t('Speichern')}</button></div>
+  </section>
+
+  <section>
+    <h3>{t('Dashboards')}</h3>
+    <p class="help">{t('Lege z. B. ein eigenes Dashboard für die Arbeit an. Gewechselt wird oben neben dem Titel; jeder Browser merkt sich das zuletzt benutzte.')}</p>
+    {#each boardRows as b (b.id)}
+      <div class="board-row">
+        <input class="emoji" bind:value={b.icon} maxlength="4" aria-label={t('Symbol')} />
+        <input bind:value={b.name} aria-label={t('Name')} />
+        <button class="small" onclick={() => saveBoard(b)}>{t('Speichern')}</button>
+        <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
+        {#if boardRows.length > 1}<button class="small danger" onclick={() => removeBoard(b)}>{t('Löschen')}</button>{/if}
+      </div>
+    {/each}
+    <form class="board-row" onsubmit={addBoard}>
+      <input class="emoji" bind:value={newBoard.icon} maxlength="4" aria-label={t('Symbol')} />
+      <input bind:value={newBoard.name} placeholder={t('z. B. Arbeit')} required />
+      <button class="small primary">+ {t('Dashboard anlegen')}</button>
+    </form>
   </section>
 
   <section>
@@ -180,6 +239,14 @@
   .swatch { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
   .swatch.active { border-color: var(--text); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .indent { margin: -6px 0 0 26px; }
+  .board-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; }
+  form.board-row { grid-template-columns: 52px minmax(0, 1fr) auto; }
+  .board-row input.emoji { text-align: center; padding-left: 4px; padding-right: 4px; }
+  @media (max-width: 520px) {
+    .board-row { grid-template-columns: 52px minmax(0, 1fr); }
+    .board-row button { grid-column: span 1; }
+  }
   .button { cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface-2); border-radius: 10px; padding: 8px 14px; }
   .button:hover { border-color: var(--accent); }
   @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
