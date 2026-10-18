@@ -86,7 +86,14 @@
       try {
         await post(`/tiles/${tileId}/action`, { action: a.id, params: a.params || {} });
         toast(t('{action}: erledigt', { action: a.label }));
-        onInput();
+        // Done: empty the search so the next one can start right away.
+        clearTimeout(timer);
+        seq++;
+        q = '';
+        results = [];
+        loading = false;
+        open = false;
+        input.focus();
       } catch (e) {
         toast(e.message, 'bad');
       }
