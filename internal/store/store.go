@@ -1,0 +1,340 @@
+// Package store persists users, sessions, groups, tiles and settings in SQLite.
+package store
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"time"
+
+	_ "modernc.org/sqlite"
+
+	"github.com/heimdeck/heimdeck/internal/secret"
+)
+
+var ErrNotFound = errors.New("nicht gefunden")
+
+type Store struct {
+	db  *sql.DB
+	box *secret.Box
+}
+
+type Group struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+
+type Tile struct {
+	ID          int64             `json:"id"`
+	GroupID     int64             `json:"groupId"`
+	Name        string            `json:"name"`
+	URL         string            `json:"url"`
+	APIURL      string            `json:"apiUrl"`
+	Icon        string            `json:"icon"`
+	Description string            `json:"description"`
+	Integration string            `json:"integration"`
+	Config      map[string]string `json:"config"`
+	Insecure    bool              `json:"insecure"`
+	ShowWidget  bool              `json:"showWidget"`
+	Position    int               `json:"position"`
+	// Secrets never leave the backend; the API only reports which keys are set.
+	Secrets map[string]string `json:"-"`
+}
+
+const schema = `
+CREATE TABLE IF NOT EXISTS users (
+	id INTEGER PRIMARY KEY,
+	username TEXT NOT NULL UNIQUE,
+	password_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+	token TEXT PRIMARY KEY,
+	user_id INTEGER NOT NULL,
+	expires INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS groups (
+	id INTEGER PRIMARY KEY,
+	name TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS tiles (
+	id INTEGER PRIMARY KEY,
+	group_id INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	url TEXT NOT NULL DEFAULT '',
+	api_url TEXT NOT NULL DEFAULT '',
+	icon TEXT NOT NULL DEFAULT '',
+	description TEXT NOT NULL DEFAULT '',
+	integration TEXT NOT NULL DEFAULT '',
+	config TEXT NOT NULL DEFAULT '{}',
+	secrets TEXT NOT NULL DEFAULT '',
+	insecure INTEGER NOT NULL DEFAULT 0,
+	show_widget INTEGER NOT NULL DEFAULT 1,
+	position INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS settings (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+`
+
+func Open(path string, box *secret.Box) (*Store, error) {
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	if _, err := db.Exec(schema); err != nil {
+		return nil, err
+	}
+	return &Store{db: db, box: box}, nil
+}
+
+func (s *Store) Close() error { return s.db.Close() }
+
+// ---- users & sessions ----
+
+func (s *Store) HasUser() (bool, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
+	return n > 0, err
+}
+
+func (s *Store) CreateUser(username, hash string) error {
+	_, err := s.db.Exec(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, username, hash)
+	return err
+}
+
+func (s *Store) UserByName(username string) (id int64, hash string, err error) {
+	err = s.db.QueryRow(`SELECT id, password_hash FROM users WHERE username = ?`, username).Scan(&id, &hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return
+}
+
+func (s *Store) Username(id int64) (name string, err error) {
+	err = s.db.QueryRow(`SELECT username FROM users WHERE id = ?`, id).Scan(&name)
+	return
+}
+
+func (s *Store) FirstUsername() (name string, err error) {
+	err = s.db.QueryRow(`SELECT username FROM users ORDER BY id LIMIT 1`).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return
+}
+
+func (s *Store) SetPassword(username, hash string) error {
+	res, err := s.db.Exec(`UPDATE users SET password_hash = ? WHERE username = ?`, hash, username)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	_, err = s.db.Exec(`DELETE FROM sessions`)
+	return err
+}
+
+func (s *Store) CreateSession(token string, userID int64, expires time.Time) error {
+	_, err := s.db.Exec(`INSERT INTO sessions (token, user_id, expires) VALUES (?, ?, ?)`, token, userID, expires.Unix())
+	return err
+}
+
+func (s *Store) SessionUser(token string) (int64, error) {
+	var id, exp int64
+	err := s.db.QueryRow(`SELECT user_id, expires FROM sessions WHERE token = ?`, token).Scan(&id, &exp)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && exp < time.Now().Unix()) {
+		return 0, ErrNotFound
+	}
+	return id, err
+}
+
+func (s *Store) DeleteSession(token string) error {
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE token = ? OR expires < ?`, token, time.Now().Unix())
+	return err
+}
+
+// ---- settings ----
+
+func (s *Store) Settings() (map[string]string, error) {
+	rows, err := s.db.Query(`SELECT key, value FROM settings`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		out[k] = v
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SaveSettings(m map[string]string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for k, v := range m {
+		if _, err := tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, v); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ---- groups ----
+
+func (s *Store) Groups() ([]Group, error) {
+	rows, err := s.db.Query(`SELECT id, name, position FROM groups ORDER BY position, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Group{}
+	for rows.Next() {
+		var g Group
+		if err := rows.Scan(&g.ID, &g.Name, &g.Position); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateGroup(name string) (Group, error) {
+	var pos int
+	s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM groups`).Scan(&pos)
+	res, err := s.db.Exec(`INSERT INTO groups (name, position) VALUES (?, ?)`, name, pos)
+	if err != nil {
+		return Group{}, err
+	}
+	id, _ := res.LastInsertId()
+	return Group{ID: id, Name: name, Position: pos}, nil
+}
+
+func (s *Store) RenameGroup(id int64, name string) error {
+	_, err := s.db.Exec(`UPDATE groups SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
+func (s *Store) DeleteGroup(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM tiles WHERE group_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM groups WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ---- tiles ----
+
+const tileCols = `id, group_id, name, url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position`
+
+func (s *Store) scanTile(sc interface{ Scan(...any) error }) (Tile, error) {
+	var t Tile
+	var cfg, sec string
+	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Position)
+	if err != nil {
+		return t, err
+	}
+	t.Config = map[string]string{}
+	json.Unmarshal([]byte(cfg), &t.Config)
+	t.Secrets = map[string]string{}
+	if plain, err := s.box.Open(sec); err == nil && plain != nil {
+		json.Unmarshal(plain, &t.Secrets)
+	}
+	return t, nil
+}
+
+func (s *Store) Tiles() ([]Tile, error) {
+	rows, err := s.db.Query(`SELECT ` + tileCols + ` FROM tiles ORDER BY group_id, position, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Tile{}
+	for rows.Next() {
+		t, err := s.scanTile(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) Tile(id int64) (Tile, error) {
+	t, err := s.scanTile(s.db.QueryRow(`SELECT `+tileCols+` FROM tiles WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return t, err
+}
+
+func (s *Store) SaveTile(t *Tile) error {
+	cfg, _ := json.Marshal(t.Config)
+	secJSON, _ := json.Marshal(t.Secrets)
+	sec, err := s.box.Seal(secJSON)
+	if err != nil {
+		return err
+	}
+	if t.ID == 0 {
+		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM tiles WHERE group_id = ?`, t.GroupID).Scan(&t.Position)
+		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.GroupID, t.Name, t.URL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Position)
+		if err != nil {
+			return err
+		}
+		t.ID, _ = res.LastInsertId()
+		return nil
+	}
+	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ? WHERE id = ?`,
+		t.GroupID, t.Name, t.URL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.ID)
+	return err
+}
+
+func (s *Store) DeleteTile(id int64) error {
+	_, err := s.db.Exec(`DELETE FROM tiles WHERE id = ?`, id)
+	return err
+}
+
+// Layout describes the complete order: groups in order, each with its tile ids in order.
+type Layout []struct {
+	GroupID int64   `json:"groupId"`
+	Tiles   []int64 `json:"tiles"`
+}
+
+func (s *Store) SaveLayout(l Layout) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for gi, g := range l {
+		if _, err := tx.Exec(`UPDATE groups SET position = ? WHERE id = ?`, gi, g.GroupID); err != nil {
+			return err
+		}
+		for ti, id := range g.Tiles {
+			if _, err := tx.Exec(`UPDATE tiles SET group_id = ?, position = ? WHERE id = ?`, g.GroupID, ti, id); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}

@@ -1,0 +1,32 @@
+services:
+  heimdeck:
+    image: ghcr.io/heimdeck/heimdeck:latest
+    # Oder selbst bauen: statt "image" die nächste Zeile verwenden
+    # build: .
+    container_name: heimdeck
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+      # Optional: Container automatisch erkennen (nur lesend)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ=Europe/Berlin
+      # Auf "true" setzen, wenn Heimdeck nur über HTTPS (Reverse Proxy) erreichbar ist
+      - HEIMDECK_SECURE_COOKIE=false
+
+# Noch sicherer: Docker-Socket über einen Proxy freigeben, der nur das Auflisten erlaubt.
+# Dann oben den Socket-Eintrag entfernen und Folgendes ergänzen:
+#
+#   heimdeck:
+#     environment:
+#       - DOCKER_HOST=tcp://socket-proxy:2375
+#
+#   socket-proxy:
+#     image: tecnativa/docker-socket-proxy:latest
+#     restart: unless-stopped
+#     environment:
+#       - CONTAINERS=1
+#     volumes:
+#       - /var/run/docker.sock:/var/run/docker.sock:ro

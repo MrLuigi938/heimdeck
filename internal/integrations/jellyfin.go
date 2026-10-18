@@ -1,0 +1,120 @@
+package integrations
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+)
+
+type jellyfin struct{}
+
+func init() { register(jellyfin{}) }
+
+func (jellyfin) Def() Definition {
+	return Definition{
+		ID: "jellyfin", Name: "Jellyfin", Icon: "jellyfin", Category: "Medien",
+		Description: "Wer gerade was schaut, Größe der Bibliothek, Suche",
+		Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
+			Help: "Dashboard → API-Schlüssel → „+“"}},
+		HasWidget: true, HasSearch: true, Images: []string{"jellyfin"}, Port: 8096,
+	}
+}
+
+func (jellyfin) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
+	return in.do(ctx, request{path: path, query: q, headers: map[string]string{
+		"Authorization": fmt.Sprintf(`MediaBrowser Client="Heimdeck", Token="%s"`, in.V("apiKey")),
+	}}, out)
+}
+
+func (j jellyfin) Test(ctx context.Context, in *Instance) error {
+	return j.get(ctx, in, "/System/Info", nil, nil)
+}
+
+func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
+	var sessions []struct {
+		UserName       string `json:"UserName"`
+		DeviceName     string `json:"DeviceName"`
+		NowPlayingItem *struct {
+			Name              string `json:"Name"`
+			SeriesName        string `json:"SeriesName"`
+			ParentIndexNumber int    `json:"ParentIndexNumber"`
+			IndexNumber       int    `json:"IndexNumber"`
+			Type              string `json:"Type"`
+			RunTimeTicks      int64  `json:"RunTimeTicks"`
+		} `json:"NowPlayingItem"`
+		PlayState struct {
+			PositionTicks int64 `json:"PositionTicks"`
+			IsPaused      bool  `json:"IsPaused"`
+		} `json:"PlayState"`
+	}
+	if err := j.get(ctx, in, "/Sessions", url.Values{"activeWithinSeconds": {"960"}}, &sessions); err != nil {
+		return nil, err
+	}
+	var counts struct {
+		MovieCount   int `json:"MovieCount"`
+		SeriesCount  int `json:"SeriesCount"`
+		EpisodeCount int `json:"EpisodeCount"`
+	}
+	j.get(ctx, in, "/Items/Counts", nil, &counts)
+
+	w := &Widget{ItemsTitle: "Läuft gerade"}
+	for _, s := range sessions {
+		np := s.NowPlayingItem
+		if np == nil {
+			continue
+		}
+		title := np.Name
+		if np.SeriesName != "" {
+			title = fmt.Sprintf("%s · S%02dE%02d", np.SeriesName, np.ParentIndexNumber, np.IndexNumber)
+		}
+		it := Item{Title: title, Subtitle: s.UserName + " · " + s.DeviceName, URL: in.Link("/web/#/dashboard")}
+		if np.RunTimeTicks > 0 {
+			it.Progress = pct(float64(s.PlayState.PositionTicks) / float64(np.RunTimeTicks) * 100)
+		}
+		if s.PlayState.IsPaused {
+			it.Badge = "Pausiert"
+		}
+		w.Items = append(w.Items, it)
+	}
+	w.Stats = []Stat{
+		{Label: "Streams", Value: fmt.Sprint(len(w.Items))},
+		{Label: "Filme", Value: num(counts.MovieCount)},
+		{Label: "Serien", Value: num(counts.SeriesCount)},
+		{Label: "Folgen", Value: num(counts.EpisodeCount)},
+	}
+	return w, nil
+}
+
+func (j jellyfin) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
+	var res struct {
+		Items []struct {
+			ID             string `json:"Id"`
+			Name           string `json:"Name"`
+			Type           string `json:"Type"`
+			ProductionYear int    `json:"ProductionYear"`
+		} `json:"Items"`
+	}
+	q := url.Values{
+		"searchTerm":       {query},
+		"Recursive":        {"true"},
+		"IncludeItemTypes": {"Movie,Series"},
+		"Limit":            {"8"},
+	}
+	if err := j.get(ctx, in, "/Items", q, &res); err != nil {
+		return nil, err
+	}
+	out := []Item{}
+	for _, it := range res.Items {
+		kind := map[string]string{"Movie": "Film", "Series": "Serie"}[it.Type]
+		sub := kind
+		if it.ProductionYear > 0 {
+			sub = fmt.Sprintf("%s · %d", kind, it.ProductionYear)
+		}
+		out = append(out, Item{
+			Title: it.Name, Subtitle: sub, Badge: "Vorhanden",
+			URL:   in.Link("/web/#/details?id=" + it.ID),
+			Image: in.Link("/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
+		})
+	}
+	return out, nil
+}
