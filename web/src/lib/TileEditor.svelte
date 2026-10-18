@@ -4,38 +4,40 @@
   import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
+  import { t } from './i18n.svelte.js';
 
   let { tile, groups, integrations, onClose, onSaved } = $props();
 
   // A fresh copy so cancelling leaves the dashboard untouched.
   // svelte-ignore state_referenced_locally
-  let t = $state({
+  let form = $state({
     id: 0, groupId: groups[0]?.id, name: '', url: '', externalUrl: '', apiUrl: '', icon: '', description: '',
-    integration: '', config: {}, insecure: false, showWidget: true, secretsSet: [],
+    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, secretsSet: [],
     ...structuredClone($state.snapshot(tile)),
   });
-  t.config ??= {};
+  form.config ??= {};
   let secrets = $state({});
-  let step = $state(t.integration || t.id ? 'form' : 'pick');
+  let step = $state(form.integration || form.id ? 'form' : 'pick');
   let filter = $state('');
-  let advanced = $state(!!(t.apiUrl || t.insecure));
+  let advanced = $state(!!(form.apiUrl || form.insecure));
   let testing = $state(false);
   let test = $state(null);
   let saving = $state(false);
 
-  let def = $derived(integrations.find((d) => d.id === (t.integration || 'link')));
+  let def = $derived(integrations.find((d) => d.id === (form.integration || 'link')));
+  let general = $derived(t('Allgemein'));
   let categories = $derived.by(() => {
     const f = filter.trim().toLowerCase();
     const list = integrations.filter((d) => !f || d.name.toLowerCase().includes(f) || d.category.toLowerCase().includes(f));
     const out = {};
     for (const d of list) (out[d.category] ??= []).push(d);
-    return Object.entries(out).sort(([a], [b]) => (a === 'Allgemein' ? -1 : b === 'Allgemein' ? 1 : a.localeCompare(b)));
+    return Object.entries(out).sort(([a], [b]) => (a === general ? -1 : b === general ? 1 : a.localeCompare(b)));
   });
 
   function pick(d) {
-    t.integration = d.id;
-    if (!t.name || integrations.some((x) => x.name.split(' /')[0] === t.name)) t.name = d.id === 'link' ? '' : d.name.split(' /')[0];
-    if (!t.icon || integrations.some((x) => x.icon === t.icon)) t.icon = d.icon;
+    form.integration = d.id;
+    if (!form.name || integrations.some((x) => x.name.split(' /')[0] === form.name)) form.name = d.id === 'link' ? '' : d.name.split(' /')[0];
+    if (!form.icon || integrations.some((x) => x.icon === form.icon)) form.icon = d.icon;
     test = null;
     step = 'form';
   }
@@ -59,9 +61,9 @@
     e?.preventDefault();
     saving = true;
     try {
-      if (t.id) await put(`/tiles/${t.id}`, payload());
+      if (form.id) await put(`/tiles/${form.id}`, payload());
       else await post('/tiles', payload());
-      toast(t.id ? 'Gespeichert' : `„${t.name}“ hinzugefügt`);
+      toast(form.id ? t('Gespeichert') : t('„{name}“ hinzugefügt', { name: form.name }));
       onSaved();
     } catch (err) {
       toast(err.message, 'bad');
@@ -70,10 +72,10 @@
   }
 
   async function remove() {
-    if (!confirm(`„${t.name}“ wirklich löschen?`)) return;
+    if (!confirm(t('„{name}“ wirklich löschen?', { name: form.name }))) return;
     try {
-      await del(`/tiles/${t.id}`);
-      toast('Gelöscht');
+      await del(`/tiles/${form.id}`);
+      toast(t('Gelöscht'));
       onSaved();
     } catch (err) {
       toast(err.message, 'bad');
@@ -81,10 +83,10 @@
   }
 </script>
 
-<Modal title={t.id ? `${t.name} bearbeiten` : 'Kachel hinzufügen'} {onClose} wide={step === 'pick'}>
+<Modal title={form.id ? t('{name} bearbeiten', { name: form.name }) : t('Kachel hinzufügen')} {onClose} wide={step === 'pick'}>
   {#if step === 'pick'}
     <!-- svelte-ignore a11y_autofocus -->
-    <input placeholder="Dienst suchen … (z. B. Radarr)" bind:value={filter} autofocus />
+    <input placeholder={t('Dienst suchen … (z. B. Radarr)')} bind:value={filter} autofocus />
     {#each categories as [cat, defs]}
       <div class="cat">{cat}</div>
       <div class="picker">
@@ -92,7 +94,7 @@
           <button class="pick" onclick={() => pick(d)}>
             <Icon icon={d.icon} name={d.name} size={30} />
             <span class="pick-name">{d.name}</span>
-            {#if d.hasWidget}<span class="tag">Live-Daten</span>{/if}
+            {#if d.hasWidget}<span class="tag">{t('Live-Daten')}</span>{/if}
           </button>
         {/each}
       </div>
@@ -105,14 +107,14 @@
           <div><b>{def?.name}</b></div>
           {#if def?.description}<div class="help">{def.description}</div>{/if}
         </div>
-        <span class="muted">ändern</span>
+        <span class="muted">{t('ändern')}</span>
       </button>
 
       <div class="grid2">
-        <label class="field"><span>Name</span><input bind:value={t.name} required /></label>
+        <label class="field"><span>{t('Name')}</span><input bind:value={form.name} required /></label>
         <label class="field">
-          <span>Gruppe</span>
-          <select bind:value={t.groupId}>
+          <span>{t('Gruppe')}</span>
+          <select bind:value={form.groupId}>
             {#each groups as g}<option value={g.id}>{g.name}</option>{/each}
           </select>
         </label>
@@ -120,58 +122,59 @@
 
       <div class="grid2">
         <label class="field">
-          <span>Lokale Adresse</span>
-          <input bind:value={t.url} placeholder="http://192.168.1.10:7878" inputmode="url" />
-          <span class="help">Wird zuhause geöffnet.</span>
+          <span>{t('Lokale Adresse')}</span>
+          <input bind:value={form.url} placeholder="http://192.168.1.10:7878" inputmode="url" />
+          <span class="help">{t('Wird zuhause geöffnet.')}</span>
         </label>
         <label class="field">
-          <span>Öffentliche Adresse (optional)</span>
-          <input bind:value={t.externalUrl} placeholder="https://radarr.deinedomain.de" inputmode="url" />
-          <span class="help">Wird unterwegs geöffnet und ebenfalls überwacht.</span>
+          <span>{t('Öffentliche Adresse (optional)')}</span>
+          <input bind:value={form.externalUrl} placeholder={t('https://radarr.deinedomain.de')} inputmode="url" />
+          <span class="help">{t('Wird unterwegs geöffnet und ebenfalls überwacht.')}</span>
         </label>
       </div>
 
       {#each def?.fields || [] as f}
         <label class="field">
-          <span>{f.label}{f.required ? '' : ' (optional)'}</span>
+          <span>{f.label}{f.required ? '' : ` (${t('optional')})`}</span>
           {#if f.secret}
             <input type="password" bind:value={secrets[f.key]} autocomplete="off"
-              placeholder={t.secretsSet?.includes(f.key) ? '•••••••• gespeichert – leer lassen zum Beibehalten' : ''} />
+              placeholder={form.secretsSet?.includes(f.key) ? '•••••••• ' + t('gespeichert – leer lassen zum Beibehalten') : ''} />
           {:else}
-            <input bind:value={t.config[f.key]} autocomplete="off" />
+            <input bind:value={form.config[f.key]} autocomplete="off" />
           {/if}
           {#if f.help}<span class="help">{f.help}</span>{/if}
         </label>
       {/each}
 
       {#if def?.hasWidget}
-        <label class="check"><input type="checkbox" bind:checked={t.showWidget} /> Live-Daten auf der Kachel anzeigen</label>
+        <label class="check"><input type="checkbox" bind:checked={form.showWidget} /> {t('Live-Daten auf der Kachel anzeigen')}</label>
       {/if}
+      <label class="check"><input type="checkbox" bind:checked={form.monitor} /> {t('Online-Status prüfen und anzeigen')}</label>
 
-      <button type="button" class="ghost small more" onclick={() => (advanced = !advanced)}>{advanced ? '▾' : '▸'} Weitere Optionen</button>
+      <button type="button" class="ghost small more" onclick={() => (advanced = !advanced)}>{advanced ? '▾' : '▸'} {t('Weitere Optionen')}</button>
       {#if advanced}
         <div class="advanced">
           <div class="grid2">
             <label class="field">
-              <span>Icon</span>
-              <div class="row"><Icon icon={t.icon} name={t.name} size={34} /><input bind:value={t.icon} placeholder="radarr, URL oder Emoji" /></div>
-              <span class="help">Name aus <a href="https://dashboardicons.com" target="_blank" rel="noopener noreferrer">dashboardicons.com</a>, Bild-URL oder Emoji</span>
+              <span>{t('Icon')}</span>
+              <div class="row"><Icon icon={form.icon} name={form.name} size={34} /><input bind:value={form.icon} placeholder={t('radarr, URL oder Emoji')} /></div>
+              <span class="help">{t('Name aus')} <a href="https://dashboardicons.com" target="_blank" rel="noopener noreferrer">dashboardicons.com</a>, {t('Bild-URL oder Emoji')}</span>
             </label>
-            <label class="field"><span>Beschreibung</span><input bind:value={t.description} placeholder="z. B. Filme" /></label>
+            <label class="field"><span>{t('Beschreibung')}</span><input bind:value={form.description} placeholder={t('z. B. Filme')} /></label>
           </div>
           <label class="field">
-            <span>Interne Adresse (optional)</span>
-            <input bind:value={t.apiUrl} placeholder="http://radarr:7878" />
-            <span class="help">Falls das Dashboard den Dienst anders erreicht als dein Browser – z. B. über den Containernamen im selben Docker-Netzwerk.</span>
+            <span>{t('Interne Adresse (optional)')}</span>
+            <input bind:value={form.apiUrl} placeholder="http://radarr:7878" />
+            <span class="help">{t('Falls das Dashboard den Dienst anders erreicht als dein Browser – z. B. über den Containernamen im selben Docker-Netzwerk.')}</span>
           </label>
-          <label class="check"><input type="checkbox" bind:checked={t.insecure} /> Zertifikat nicht prüfen (selbstsignierte HTTPS-Zertifikate)</label>
+          <label class="check"><input type="checkbox" bind:checked={form.insecure} /> {t('Zertifikat nicht prüfen (selbstsignierte HTTPS-Zertifikate)')}</label>
         </div>
       {/if}
 
       {#if test}
         <div class="test {test.ok ? 'pass' : 'fail'}">
           {#if test.ok}
-            ✓ Verbindung erfolgreich{test.ms != null ? ` (${test.ms} ms)` : ''}
+            ✓ {t('Verbindung erfolgreich')}{test.ms != null ? ` (${test.ms} ms)` : ''}
             {#if test.widget}<div class="preview"><Widget widget={test.widget} /></div>{/if}
           {:else}
             ✕ {test.error}
@@ -183,12 +186,12 @@
 
   {#snippet footer()}
     {#if step === 'form'}
-      {#if t.id}<button class="danger" onclick={remove}>Löschen</button>{/if}
+      {#if form.id}<button class="danger" onclick={remove}>{t('Löschen')}</button>{/if}
       <span class="spacer"></span>
-      <button onclick={runTest} disabled={testing || (!t.url && !t.apiUrl)}>{testing ? 'Teste …' : 'Verbindung testen'}</button>
-      <button class="primary" type="submit" form="tile-form" disabled={saving}>Speichern</button>
+      <button onclick={runTest} disabled={testing || (!form.url && !form.apiUrl)}>{testing ? t('Teste …') : t('Verbindung testen')}</button>
+      <button class="primary" type="submit" form="tile-form" disabled={saving}>{t('Speichern')}</button>
     {:else}
-      <span class="help">Nicht dabei? Einfach „Nur Link“ wählen – Status-Anzeige gibt es trotzdem.</span>
+      <span class="help">{t("Nicht dabei? Einfach „Nur Link“ wählen – Status-Anzeige gibt es trotzdem.")}</span>
     {/if}
   {/snippet}
 </Modal>

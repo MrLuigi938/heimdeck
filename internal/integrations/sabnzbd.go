@@ -85,40 +85,40 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	kbps, _ := strconv.ParseFloat(q.KBPerSec, 64)
 	mbleft, _ := strconv.ParseFloat(q.MBLeft, 64)
 
-	w := &Widget{ItemsTitle: "Warteschlange"}
-	speed := humanBytes(kbps*1024) + "/s"
+	w := &Widget{ItemsTitle: in.T("Warteschlange")}
+	speed := in.Bytes(kbps*1024) + "/s"
 	if q.Paused {
-		speed = "Pausiert"
+		speed = in.T("Pausiert")
 	}
 	w.Stats = []Stat{
-		{Label: "Tempo", Value: speed, Tone: toneIf(q.Paused, "warn")},
-		{Label: "Downloads", Value: fmt.Sprint(q.Total)},
-		{Label: "Verbleibend", Value: humanBytes(mbleft * 1024 * 1024)},
+		{Label: in.T("Tempo"), Value: speed, Tone: toneIf(q.Paused, "warn")},
+		{Label: in.T("Downloads"), Value: fmt.Sprint(q.Total)},
+		{Label: in.T("Verbleibend"), Value: in.Bytes(mbleft * 1024 * 1024)},
 	}
 	if q.Total > 0 && !q.Paused {
-		w.Stats = append(w.Stats, Stat{Label: "Restzeit", Value: q.Timeleft})
+		w.Stats = append(w.Stats, Stat{Label: in.T("Restzeit"), Value: q.Timeleft})
 	}
 	for _, sl := range q.Slots {
 		p, _ := strconv.ParseFloat(sl.Percentage, 64)
 		mb, _ := strconv.ParseFloat(sl.MB, 64)
 		w.Items = append(w.Items, Item{
 			Title:    strings.ReplaceAll(sl.Filename, ".", " "),
-			Subtitle: fmt.Sprintf("%s · %s · noch %s", sl.Status, humanBytes(mb*1024*1024), sl.Timeleft),
+			Subtitle: in.Status(sl.Status) + " · " + in.Bytes(mb*1024*1024) + " · " + in.T("noch %s", sl.Timeleft),
 			Progress: pct(p),
 			URL:      in.Link("/"),
 		})
 	}
 	if q.Paused {
-		w.Actions = []Action{{ID: "resume", Label: "Fortsetzen", Tone: "primary"}}
+		w.Actions = []Action{{ID: "resume", Label: in.T("Fortsetzen"), Tone: "primary"}}
 	} else {
-		w.Actions = []Action{{ID: "pause", Label: "Pausieren"}}
+		w.Actions = []Action{{ID: "pause", Label: in.T("Pausieren")}}
 	}
 	return w, nil
 }
 
 func (s sabnzbd) Action(ctx context.Context, in *Instance, action string, _ map[string]string) error {
 	if action != "pause" && action != "resume" {
-		return fmt.Errorf("unbekannte Aktion %q", action)
+		return in.Errorf("unbekannte Aktion %q", action)
 	}
 	return s.api(ctx, in, action, nil, nil)
 }

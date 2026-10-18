@@ -46,11 +46,34 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-body.has-bg {
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+/* The background image sits on a fixed layer: background-attachment: fixed
+   is unreliable on phones and in long pages. */
+body.has-bg { background: transparent; }
+body.has-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-image) center / cover no-repeat;
 }
+
+/* Text that sits directly on a background image gets its own surface, so it
+   stays readable in light and dark mode whatever the image looks like. */
+body.has-bg .on-bg {
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+body.has-bg .brand.on-bg { padding: 8px 14px; justify-self: start; }
+body.has-bg .tools.on-bg { padding: 4px; justify-self: end; }
+body.has-bg h2.on-bg, body.has-bg span.on-bg, body.has-bg button.vis.on-bg { padding: 4px 10px; border-radius: 8px; }
+body.has-bg .group-tools.on-bg { padding: 2px; border-radius: 10px; }
+body.has-bg .hidden-hint.on-bg { border-style: solid; }
+body.has-bg .uptime .title.on-bg { padding: 4px 10px; border-radius: 8px; }
+body.has-bg .uptime .seg.on-bg { border-radius: 10px; }
 
 a { color: inherit; text-decoration: none; }
 

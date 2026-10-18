@@ -5,8 +5,6 @@
   let { icon = '', name = '', size = 40 } = $props();
 
   const CDN = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
-  let attempt = $state(0);
-  let loaded = $state(false);
 
   let sources = $derived.by(() => {
     const i = (icon || '').trim();
@@ -20,11 +18,18 @@
   });
   let emoji = $derived(icon && sources.length === 0 ? icon : '');
 
-  $effect(() => {
-    icon;
-    attempt = 0;
-    loaded = false;
-  });
+  // Load state is remembered per URL instead of being reset in an effect:
+  // a cached image can finish loading before an effect runs, which used to
+  // leave the placeholder letter visible for good.
+  let failed = $state({});
+  let loadedSrc = $state('');
+  let src = $derived(sources.find((s) => !failed[s]) || '');
+  let loaded = $derived(src !== '' && loadedSrc === src);
+
+  // Catches images that were already complete when they were inserted.
+  function checkComplete(img) {
+    if (img.complete && img.naturalWidth > 0) loadedSrc = img.getAttribute('src');
+  }
 
   const palette = ['#5b8cff', '#3ecf8e', '#f5b942', '#f2555a', '#a78bfa', '#22c3d6', '#fb7d4b'];
   let color = $derived(palette[[...(name || '?')].reduce((a, c) => a + c.charCodeAt(0), 0) % palette.length]);
@@ -37,8 +42,11 @@
     {#if !loaded}
       <span class="letter" style="background:{color};font-size:{size * 0.45}px">{(name || '?').trim().charAt(0).toUpperCase()}</span>
     {/if}
-    {#if attempt < sources.length}
-      <img src={sources[attempt]} alt="" class:hidden={!loaded} onload={() => (loaded = true)} onerror={() => attempt++} />
+    {#if src}
+      {#key src}
+        <img {src} alt="" class:hidden={!loaded} use:checkComplete
+          onload={() => (loadedSrc = src)} onerror={() => (failed[src] = true)} />
+      {/key}
     {/if}
   {/if}
 </div>

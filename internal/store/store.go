@@ -49,6 +49,7 @@ type Tile struct {
 	Config      map[string]string `json:"config"`
 	Insecure    bool              `json:"insecure"`
 	ShowWidget  bool              `json:"showWidget"`
+	Monitor     bool              `json:"monitor"` // check and show the online status
 	Position    int               `json:"position"`
 	// Secrets never leave the backend; the API only reports which keys are set.
 	Secrets map[string]string `json:"-"`
@@ -113,6 +114,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE tiles ADD COLUMN external_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE groups ADD COLUMN visibility TEXT NOT NULL DEFAULT 'visible'`,
 		`ALTER TABLE groups ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE tiles ADD COLUMN monitor INTEGER NOT NULL DEFAULT 1`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
@@ -283,12 +285,12 @@ func (s *Store) DeleteGroup(id int64) error {
 
 // ---- tiles ----
 
-const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position`
+const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position`
 
 func (s *Store) scanTile(sc interface{ Scan(...any) error }) (Tile, error) {
 	var t Tile
 	var cfg, sec string
-	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Position)
+	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Monitor, &t.Position)
 	if err != nil {
 		return t, err
 	}
@@ -335,17 +337,17 @@ func (s *Store) SaveTile(t *Tile) error {
 	}
 	if t.ID == 0 {
 		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM tiles WHERE group_id = ?`, t.GroupID).Scan(&t.Position)
-		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, position)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Position)
+		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.Position)
 		if err != nil {
 			return err
 		}
 		t.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ? WHERE id = ?`,
-		t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.ID)
+	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ?, monitor = ? WHERE id = ?`,
+		t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.ID)
 	return err
 }
 

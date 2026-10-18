@@ -37,8 +37,8 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		return nil, err
 	}
 	return &Widget{Stats: []Stat{
-		{Label: "Dokumente", Value: num(st.Total)},
-		{Label: "Posteingang", Value: num(st.Inbox), Tone: toneIf(st.Inbox > 0, "warn")},
+		{Label: in.T("Dokumente"), Value: in.Num(st.Total)},
+		{Label: in.T("Posteingang"), Value: in.Num(st.Inbox), Tone: toneIf(st.Inbox > 0, "warn")},
 	}}, nil
 }
 
@@ -68,7 +68,7 @@ func (p paperless) Search(ctx context.Context, in *Instance, query string) ([]It
 		if len(created) >= 10 {
 			created = created[8:10] + "." + created[5:7] + "." + created[:4]
 		}
-		out = append(out, Item{Title: d.Title, Subtitle: "Dokument · " + created, URL: in.Link(fmt.Sprintf("/documents/%d/details", d.ID))})
+		out = append(out, Item{Title: d.Title, Subtitle: in.T("Dokument") + " · " + created, URL: in.Link(fmt.Sprintf("/documents/%d/details", d.ID))})
 	}
 	return out, nil
 }
@@ -112,11 +112,11 @@ func (romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	w := &Widget{}
 	for _, s := range []struct{ label, key string }{{"Plattformen", "platforms"}, {"Spiele", "roms"}, {"Spielstände", "saves"}} {
 		if v, ok := val(s.key); ok {
-			w.Stats = append(w.Stats, Stat{Label: s.label, Value: num(int(v))})
+			w.Stats = append(w.Stats, Stat{Label: in.T(s.label), Value: in.Num(int(v))})
 		}
 	}
 	if v, ok := val("total_filesize_bytes", "filesize", "total_filesize"); ok {
-		w.Stats = append(w.Stats, Stat{Label: "Größe", Value: humanBytes(v)})
+		w.Stats = append(w.Stats, Stat{Label: in.T("Größe"), Value: in.Bytes(v)})
 	}
 	return w, nil
 }
@@ -164,9 +164,9 @@ func (stash) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	s := res.Data.Stats
 	return &Widget{Stats: []Stat{
-		{Label: "Szenen", Value: num(s.Scenes)},
-		{Label: "Bilder", Value: num(s.Images)},
-		{Label: "Größe", Value: humanBytes(s.Size)},
+		{Label: in.T("Szenen"), Value: in.Num(s.Scenes)},
+		{Label: in.T("Bilder"), Value: in.Num(s.Images)},
+		{Label: in.T("Größe"), Value: in.Bytes(s.Size)},
 	}}, nil
 }
 
@@ -207,11 +207,11 @@ func (metube) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	w := &Widget{
 		Stats: []Stat{
-			{Label: "Aktiv", Value: fmt.Sprint(len(res.Queue) + len(res.Pending))},
-			{Label: "Fertig", Value: fmt.Sprint(len(res.Done) - failed)},
-			{Label: "Fehler", Value: fmt.Sprint(failed), Tone: toneIf(failed > 0, "bad")},
+			{Label: in.T("Aktiv"), Value: fmt.Sprint(len(res.Queue) + len(res.Pending))},
+			{Label: in.T("Fertig"), Value: fmt.Sprint(len(res.Done) - failed)},
+			{Label: in.T("Fehler"), Value: fmt.Sprint(failed), Tone: toneIf(failed > 0, "bad")},
 		},
-		ItemsTitle: "Läuft",
+		ItemsTitle: in.T("Läuft"),
 	}
 	for _, q := range append(res.Queue, res.Pending...) {
 		it := Item{Title: q.Title, Subtitle: q.Status, URL: in.Link("/")}

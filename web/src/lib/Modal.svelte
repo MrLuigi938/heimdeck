@@ -1,4 +1,6 @@
 <script>
+  import { t } from './i18n.svelte.js';
+
   let { title, onClose, children, footer, wide = false } = $props();
 
   function onKey(e) {
@@ -12,7 +14,7 @@
   <div class="modal card" class:wide role="dialog" aria-modal="true" aria-label={title}>
     <header>
       <h2>{title}</h2>
-      <button class="ghost icon" onclick={onClose} aria-label="Schließen">✕</button>
+      <button class="ghost icon" onclick={onClose} aria-label={t('Schließen')}>✕</button>
     </header>
     <div class="body">{@render children()}</div>
     {#if footer}<footer>{@render footer()}</footer>{/if}

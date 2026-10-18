@@ -1,6 +1,9 @@
-// Small wrapper around fetch for the JSON API.
+import { i18n, t } from './i18n.svelte.js';
+
+// Small wrapper around fetch for the JSON API. The X-Lang header makes the
+// backend answer (widget texts, error messages) in the selected language.
 export async function api(method, path, body) {
-  const opts = { method, headers: {}, credentials: 'same-origin' };
+  const opts = { method, headers: { 'X-Lang': i18n.lang }, credentials: 'same-origin' };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -17,7 +20,7 @@ export async function api(method, path, body) {
   } catch {
     /* empty body */
   }
-  if (!res.ok) throw new Error(data?.error || `Fehler ${res.status}`);
+  if (!res.ok) throw new Error(data?.error || t('Fehler {code}', { code: res.status }));
   return data;
 }
 

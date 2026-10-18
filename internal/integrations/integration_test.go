@@ -31,10 +31,24 @@ func TestMatch(t *testing.T) {
 }
 
 func TestFormatting(t *testing.T) {
-	if got := humanBytes(5.2 * 1024 * 1024 * 1024); got != "5,2 GB" {
-		t.Errorf("humanBytes = %q", got)
+	de := &Instance{Lang: "de"}
+	en := &Instance{Lang: "en"}
+	if got := de.Bytes(5.2 * 1024 * 1024 * 1024); got != "5,2 GB" {
+		t.Errorf("Bytes(de) = %q", got)
 	}
-	if got := num(11250); got != "11.250" {
-		t.Errorf("num = %q", got)
+	if got := en.Bytes(5.2 * 1024 * 1024 * 1024); got != "5.2 GB" {
+		t.Errorf("Bytes(en) = %q", got)
+	}
+	if got := de.Num(11250); got != "11.250" {
+		t.Errorf("Num(de) = %q", got)
+	}
+	if got := en.Num(11250); got != "11,250" {
+		t.Errorf("Num(en) = %q", got)
+	}
+	if got := en.T("noch %s", "5 min"); got != "5 min left" {
+		t.Errorf("T(en) = %q", got)
+	}
+	if got := en.Status("downloading"); got != "Downloading" {
+		t.Errorf("Status(en) = %q", got)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/auth"
+	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
@@ -23,7 +24,8 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	out := map[string]any{"setup": !hasUser, "authenticated": false}
+	settings, _ := s.store.Settings()
+	out := map[string]any{"setup": !hasUser, "authenticated": false, "language": settings["language"]}
 	if id := s.auth.UserID(r); id != 0 {
 		name, _ := s.store.Username(id)
 		out["authenticated"], out["username"] = true, name
@@ -34,6 +36,7 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Language string `json:"language"`
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
@@ -55,14 +58,16 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	s.seed()
+	lang := i18n.Normalize(c.Language)
+	logErr("Sprache speichern", s.store.SaveSettings(map[string]string{"language": lang}))
+	s.seed(lang)
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // seed creates starter groups so a fresh dashboard is not empty.
-func (s *Server) seed() {
+func (s *Server) seed(lang string) {
 	for _, name := range []string{"Medien", "Downloads", "System"} {
-		s.store.CreateGroup(name)
+		s.store.CreateGroup(i18n.T(lang, name))
 	}
 }
 
@@ -191,7 +196,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"settings":     settings,
 		"groups":       out,
-		"integrations": integrations.All(),
+		"integrations": integrations.All(langOf(r)),
 		"docker":       s.docker != nil,
 		"username":     name,
 	})
@@ -200,7 +205,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
 	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
-	"localHosts": true, "showUptime": true,
+	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -244,12 +249,15 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 type tileInput struct {
 	store.Tile
 	Secrets map[string]string `json:"secrets"`
+	// Monitor is a pointer so a request without the field keeps monitoring on.
+	Monitor *bool `json:"monitor"`
 }
 
 // buildTile merges the submitted form with the stored tile. Empty secret
 // fields keep the stored value, so keys never have to be sent back to the browser.
 func (s *Server) buildTile(in tileInput) (store.Tile, error) {
 	t := in.Tile
+	t.Monitor = in.Monitor == nil || *in.Monitor
 	t.Name = strings.TrimSpace(t.Name)
 	t.URL = strings.TrimSpace(t.URL)
 	if t.Name == "" {
@@ -264,7 +272,7 @@ func (s *Server) buildTile(in tileInput) (store.Tile, error) {
 	}
 	integ, ok := integrations.Get(t.Integration)
 	if !ok {
-		return t, fmt.Errorf("unbekannter Dienst-Typ %q", t.Integration)
+		return t, fmt.Errorf("unbekannter Dienst-Typ: %s", t.Integration)
 	}
 	if t.Config == nil {
 		t.Config = map[string]string{}
@@ -404,13 +412,13 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	integ, _ := integrations.Get(t.Integration)
 	for _, f := range integ.Def().Fields {
 		if f.Required && t.Config[f.Key] == "" && t.Secrets[f.Key] == "" {
-			writeJSON(w, map[string]any{"ok": false, "error": "„" + f.Label + "“ fehlt"})
+			writeJSON(w, map[string]any{"ok": false, "error": tr(r, "„%s“ fehlt", tr(r, f.Label))})
 			return
 		}
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
-	inst := s.instance(t)
+	inst := s.instance(t, langOf(r))
 	start := time.Now()
 	if !integ.Def().HasWidget {
 		st := ping(ctx, inst.BaseURL, t.Insecure)
@@ -437,9 +445,10 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 
 // ---- live data ----
 
-func (s *Server) widget(ctx context.Context, t store.Tile) (*integrations.Widget, error) {
+func (s *Server) widget(ctx context.Context, t store.Tile, lang string) (*integrations.Widget, error) {
+	key := widgetKey(t.ID, lang)
 	s.mu.Lock()
-	c, ok := s.widgets[t.ID]
+	c, ok := s.widgets[key]
 	s.mu.Unlock()
 	if ok && time.Since(c.at) < widgetTTL {
 		return c.val, c.err
@@ -448,9 +457,9 @@ func (s *Server) widget(ctx context.Context, t store.Tile) (*integrations.Widget
 	if !ok {
 		return nil, errors.New("unbekannter Dienst-Typ")
 	}
-	w, err := integ.Fetch(ctx, s.instance(t))
+	w, err := integ.Fetch(ctx, s.instance(t, lang))
 	s.mu.Lock()
-	s.widgets[t.ID] = cached[*integrations.Widget]{at: time.Now(), val: w, err: err}
+	s.widgets[key] = cached[*integrations.Widget]{at: time.Now(), val: w, err: err}
 	s.mu.Unlock()
 	return w, err
 }
@@ -468,7 +477,7 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
-	data, err := s.widget(ctx, t)
+	data, err := s.widget(ctx, t, langOf(r))
 	if err != nil {
 		writeJSON(w, map[string]any{"error": err.Error()})
 		return
@@ -503,7 +512,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
-	if err := actioner.Action(ctx, s.instance(t), body.Action, body.Params); err != nil {
+	if err := actioner.Action(ctx, s.instance(t, langOf(r)), body.Action, body.Params); err != nil {
 		writeErr(w, 502, err)
 		return
 	}
@@ -547,7 +556,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(t store.Tile) {
 			defer wg.Done()
-			items, err := searcher.Search(ctx, s.instance(t), q)
+			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}
 			if err != nil {
 				g.Error = err.Error()
@@ -602,6 +611,7 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []item{}
 	for _, sg := range sugg {
+		sg.Group = tr(r, sg.Group)
 		out = append(out, item{Suggestion: sg, Exists: sg.URL != "" && existing[strings.TrimRight(sg.URL, "/")]})
 	}
 	writeJSON(w, out)
@@ -620,6 +630,7 @@ type exportTile struct {
 	Config      map[string]string `json:"config,omitempty"`
 	Insecure    bool              `json:"insecure,omitempty"`
 	ShowWidget  bool              `json:"showWidget"`
+	NoMonitor   bool              `json:"noMonitor,omitempty"`
 }
 
 type exportData struct {
@@ -657,7 +668,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, t := range tiles {
 			if t.GroupID == g.ID {
 				eg.Tiles = append(eg.Tiles, exportTile{Name: t.Name, URL: t.URL, ExternalURL: t.ExternalURL, APIURL: t.APIURL, Icon: t.Icon,
-					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget})
+					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor})
 			}
 		}
 		data.Groups = append(data.Groups, eg)
@@ -693,10 +704,11 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			logErr("import group", s.store.UpdateGroup(g))
 		}
 		for _, et := range eg.Tiles {
+			monitor := !et.NoMonitor
 			t, err := s.buildTile(tileInput{Tile: store.Tile{
 				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
 				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget,
-			}})
+			}, Monitor: &monitor})
 			if err != nil {
 				continue
 			}

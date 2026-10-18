@@ -4,6 +4,7 @@
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
   import { tileHref, rewrite } from './network.svelte.js';
+  import { t } from './i18n.svelte.js';
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
   // Jellyseerr, Paperless …) in the background.
@@ -28,7 +29,7 @@
   let tileHits = $derived(
     q.trim().length === 0
       ? []
-      : tiles.filter((t) => (t.name + ' ' + (t.description || '')).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6),
+      : tiles.filter((tile) => (tile.name + ' ' + (tile.description || '')).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6),
   );
 
   let tileById = $derived(Object.fromEntries(tiles.map((t) => [t.id, t])));
@@ -84,7 +85,7 @@
     return async (a) => {
       try {
         await post(`/tiles/${tileId}/action`, { action: a.id, params: a.params || {} });
-        toast(`${a.label}: erledigt`);
+        toast(t('{action}: erledigt', { action: a.label }));
         onInput();
       } catch (e) {
         toast(e.message, 'bad');
@@ -103,16 +104,16 @@
     oninput={onInput}
     onfocus={() => (open = q.length > 0)}
     onkeydown={onKey}
-    placeholder={hasSearchServices ? 'Suchen in Diensten, Filmen, Serien, Dokumenten …  ( / )' : 'Dienste suchen oder im Web suchen …  ( / )'}
-    aria-label="Suche"
+    placeholder={hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') + '  ( / )' : t('Dienste suchen oder im Web suchen …') + '  ( / )'}
+    aria-label={t('Suche')}
   />
   {#if open && q.trim()}
     <div class="panel card" tabindex="-1">
       {#if tileHits.length}
-        <div class="section">Kacheln</div>
-        {#each tileHits as t}
-          <a class="hit" href={tileHref(t, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
-            <Icon icon={t.icon} name={t.name} size={24} /> <span>{t.name}</span>
+        <div class="section">{t('Kacheln')}</div>
+        {#each tileHits as hit}
+          <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
+            <Icon icon={hit.icon} name={hit.name} size={24} /> <span>{hit.name}</span>
           </a>
         {/each}
       {/if}
@@ -137,12 +138,12 @@
       {/each}
 
       {#if loading}
-        <div class="section muted">Suche in deinen Diensten …</div>
+        <div class="section muted">{t('Suche in deinen Diensten …')}</div>
       {:else if noHits.length}
-        <div class="none">Keine Treffer in: {noHits.join(', ')}</div>
+        <div class="none">{t('Keine Treffer in')}: {noHits.join(', ')}</div>
       {/if}
 
-      <button class="hit web" onclick={webSearch}>🌐 Im Web suchen: „{q.trim()}“</button>
+      <button class="hit web" onclick={webSearch}>🌐 {t('Im Web suchen: „{q}“', { q: q.trim() })}</button>
     </div>
   {/if}
 </div>

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/heimdeck/heimdeck/internal/auth"
 	"github.com/heimdeck/heimdeck/internal/docker"
+	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
@@ -27,7 +29,7 @@ type Server struct {
 	web    fs.FS
 
 	mu      sync.Mutex
-	widgets map[int64]cached[*integrations.Widget]
+	widgets map[string]cached[*integrations.Widget] // key: tile id + language
 	latest  map[int64]TileStatus
 	recheck chan int64
 	// unlocked holds, per login session, the protected groups opened with their password.
@@ -47,7 +49,7 @@ const (
 
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	return &Server{store: s, auth: a, docker: d, web: web,
-		widgets: map[int64]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{},
+		widgets: map[string]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
 }
 
@@ -83,7 +85,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/api/", s.auth.Require(api))
 
 	mux.Handle("/", s.spa())
-	return securityHeaders(requireJSON(mux))
+	return securityHeaders(withLang(requireJSON(mux)))
 }
 
 // spa serves the built frontend and falls back to index.html for client routes.
@@ -119,6 +121,45 @@ func requireJSON(next http.Handler) http.Handler {
 	})
 }
 
+// langWriter carries the request's language so error messages written
+// anywhere below can be translated.
+type langWriter struct {
+	http.ResponseWriter
+	lang string
+}
+
+type langKey struct{}
+
+// withLang picks the language from the X-Lang header the web interface
+// sends, falling back to the browser's Accept-Language.
+func withLang(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lang := r.Header.Get("X-Lang")
+		if lang == "" {
+			lang = r.Header.Get("Accept-Language")
+		}
+		lang = i18n.Normalize(lang)
+		ctx := context.WithValue(r.Context(), langKey{}, lang)
+		next.ServeHTTP(&langWriter{ResponseWriter: w, lang: lang}, r.WithContext(ctx))
+	})
+}
+
+func langOf(r *http.Request) string {
+	if l, ok := r.Context().Value(langKey{}).(string); ok {
+		return l
+	}
+	return i18n.DE
+}
+
+func tr(r *http.Request, s string, args ...any) string { return i18n.T(langOf(r), s, args...) }
+
+func translate(w http.ResponseWriter, msg string) string {
+	if lw, ok := w.(*langWriter); ok {
+		return i18n.T(lw.lang, msg)
+	}
+	return msg
+}
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -132,6 +173,11 @@ func securityHeaders(next http.Handler) http.Handler {
 // ---- helpers ----
 
 func writeJSON(w http.ResponseWriter, v any) {
+	if m, ok := v.(map[string]any); ok {
+		if e, ok := m["error"].(string); ok {
+			m["error"] = translate(w, e)
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
 }
@@ -139,7 +185,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 func writeErr(w http.ResponseWriter, code int, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	json.NewEncoder(w).Encode(map[string]string{"error": translate(w, err.Error())})
 }
 
 func readJSON(r *http.Request, v any) error {
@@ -169,7 +215,7 @@ func requestHost(r *http.Request) string {
 	return host
 }
 
-func (s *Server) instance(t store.Tile) *integrations.Instance {
+func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 	vals := map[string]string{}
 	for k, v := range t.Config {
 		vals[k] = v
@@ -181,15 +227,19 @@ func (s *Server) instance(t store.Tile) *integrations.Instance {
 	if base == "" {
 		base = t.URL
 	}
-	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClient(t.Insecure)}
+	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClient(t.Insecure), Lang: lang}
 }
 
 func (s *Server) forget(id int64) {
 	s.mu.Lock()
-	delete(s.widgets, id)
+	for _, lang := range []string{i18n.DE, i18n.EN} {
+		delete(s.widgets, widgetKey(id, lang))
+	}
 	delete(s.latest, id)
 	s.mu.Unlock()
 }
+
+func widgetKey(id int64, lang string) string { return fmt.Sprintf("%d:%s", id, lang) }
 
 func logErr(what string, err error) {
 	if err != nil {

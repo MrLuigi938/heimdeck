@@ -4,8 +4,9 @@
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
   import { tileHref, rewrite } from './network.svelte.js';
+  import { t, i18n } from './i18n.svelte.js';
 
-  let { tile, def, status, editMode, newTab, local, onEdit, dragProps } = $props();
+  let { tile, def, status, editMode, newTab, local, uniform = false, onEdit, dragProps } = $props();
 
   let widget = $state(null);
   let error = $state('');
@@ -29,7 +30,7 @@
 
   $effect(() => {
     if (!live) return;
-    tile.id; tile.apiUrl; tile.url; tile.integration; tile.config; tile.secretsSet; // reload when the tile is edited
+    tile.id; tile.apiUrl; tile.url; tile.integration; tile.config; tile.secretsSet; i18n.lang; // reload when the tile or language changes
     loaded = false;
     load();
     const timer = setInterval(() => document.visibilityState === 'visible' && load(), 15000);
@@ -39,7 +40,7 @@
   async function action(a) {
     try {
       await post(`/tiles/${tile.id}/action`, { action: a.id, params: a.params || {} });
-      toast(`${a.label}: erledigt`);
+      toast(t('{action}: erledigt', { action: a.label }));
       await load();
     } catch (e) {
       toast(e.message, 'bad');
@@ -48,22 +49,22 @@
 
   // Green: reachable. Yellow: reachable at home, but the public address is down. Red: down.
   let dot = $derived.by(() => {
-    if (!tile.url && !tile.apiUrl) return '';
+    if ((!tile.url && !tile.apiUrl) || tile.monitor === false) return '';
     if (status == null) return 'unknown';
     if (!status.online) return 'down';
     return status.ext && !status.ext.online ? 'partial' : 'up';
   });
   let dotTitle = $derived.by(() => {
-    if (dot === 'unknown') return 'Wird geprüft …';
-    const line = (label, c) => `${label}: ${c.online ? `online · ${c.ms} ms` : 'nicht erreichbar'}`;
-    const parts = [line(status.ext ? 'Intern' : 'Status', status)];
-    if (status.ext) parts.push(line('Öffentlich', status.ext));
+    if (dot === 'unknown') return t('Wird geprüft …');
+    const line = (label, c) => `${label}: ${c.online ? `online · ${c.ms} ms` : t('nicht erreichbar')}`;
+    const parts = [line(status.ext ? t('Lokal') : t('Status'), status)];
+    if (status.ext) parts.push(line(t('Öffentlich'), status.ext));
     return parts.join('\n');
   });
   let href = $derived(tileHref(tile, local));
 </script>
 
-<div class="tile card" class:wide={live || missing.length > 0 && def?.hasWidget && tile.showWidget} class:editing={editMode} {...dragProps}>
+<div class="tile card" class:wide={!uniform && (live || (missing.length > 0 && def?.hasWidget && tile.showWidget))} class:uniform class:editing={editMode} {...dragProps}>
   <a class="head" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
     <Icon icon={tile.icon} name={tile.name} size={live ? 34 : 40} />
@@ -75,12 +76,12 @@
       <span class="dot {dot}" title={dotTitle}></span>
     {/if}
     {#if editMode}
-      <button class="ghost icon edit" onclick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(); }} aria-label="Bearbeiten">✎</button>
+      <button class="ghost icon edit" onclick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(); }} aria-label={t('Bearbeiten')}>✎</button>
     {/if}
   </a>
 
   {#if def?.hasWidget && tile.showWidget && missing.length > 0}
-    <button class="setup" onclick={onEdit}>🔑 {missing.map((f) => f.label).join(', ')} fehlt – jetzt einrichten</button>
+    <button class="setup" onclick={onEdit}>🔑 {t('{fields} fehlt – jetzt einrichten', { fields: missing.map((f) => f.label).join(', ') })}</button>
   {:else if live}
     <div class="body">
       {#if error}

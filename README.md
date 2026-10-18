@@ -10,6 +10,7 @@ Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber 
 - **Verfügbarkeit**: Heimdeck prüft jede Minute alle Dienste (lokal und öffentlich) und zeigt den Verlauf über 24 Stunden oder 3 Tage mit Ausfällen und Antwortzeiten.
 - **Gruppen ausblenden oder schützen**: Eine Gruppe kann ausgeblendet sein (Anzeige per 👁 für die aktuelle Sitzung) oder ein eigenes Passwort haben.
 - **Gemeinsame Suche** (Taste `/`): Kacheln, Jellyfin-Bibliothek, Jellyseerr (mit Knopf „Anfragen“) und Paperless-Dokumente in einem Suchfeld.
+- **Deutsch und Englisch**: Sprache bei der Einrichtung oder später in den Einstellungen wählen. Auch die Live-Daten und Fehlermeldungen werden übersetzt.
 - **Login-Schutz**: Passwörter werden mit bcrypt gespeichert, API-Keys verschlüsselt (AES-256). Keys gelangen nie in den Browser.
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).
 
@@ -52,7 +53,7 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken. Fert
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | JDownloader, FRITZ!Box, UniFi, Zoraxy, Anubis, qBittorrent, Portainer, … | Online-Status | | |
 
-Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist.
+Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
 
 ## Tipps
 

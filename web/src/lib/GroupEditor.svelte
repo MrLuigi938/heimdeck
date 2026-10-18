@@ -2,6 +2,7 @@
   import { put, del } from './api.js';
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
+  import { t } from './i18n.svelte.js';
 
   let { group, onClose, onSaved } = $props();
 
@@ -14,18 +15,18 @@
   // svelte-ignore state_referenced_locally
   let hadPassword = group.visibility === 'protected';
 
-  const options = [
-    { id: 'visible', label: 'Immer sichtbar', help: 'Ganz normal auf dem Dashboard.' },
-    { id: 'hidden', label: 'Ausgeblendet', help: 'Erscheint erst nach Klick auf 👁 oben rechts – gilt nur für diese Browser-Sitzung.' },
-    { id: 'protected', label: 'Mit Passwort geschützt', help: 'Zeigt nur eine gesperrte Leiste. Nach Eingabe des Passworts bleibt die Gruppe 12 Stunden bzw. bis zum Abmelden offen.' },
-  ];
+  let options = $derived([
+    { id: 'visible', label: t('Immer sichtbar'), help: t('Ganz normal auf dem Dashboard.') },
+    { id: 'hidden', label: t('Ausgeblendet'), help: t('Erscheint erst nach Klick auf 👁 oben rechts – gilt nur für diese Browser-Sitzung.') },
+    { id: 'protected', label: t('Mit Passwort geschützt'), help: t('Zeigt nur eine gesperrte Leiste. Nach Eingabe des Passworts bleibt die Gruppe 12 Stunden bzw. bis zum Abmelden offen.') },
+  ]);
 
   async function save(e) {
     e?.preventDefault();
     saving = true;
     try {
       await put(`/groups/${group.id}`, { name, visibility, password });
-      toast('Gruppe gespeichert');
+      toast(t('Gruppe gespeichert'));
       onSaved();
     } catch (err) {
       toast(err.message, 'bad');
@@ -34,7 +35,10 @@
   }
 
   async function remove() {
-    if (!confirm(`Gruppe „${group.name}“${group.tiles.length ? ` mit ${group.tiles.length} Kachel(n)` : ''} löschen?`)) return;
+    const msg = group.tiles.length
+      ? t('Gruppe „{name}“ mit {n} Kachel(n) löschen?', { name: group.name, n: group.tiles.length })
+      : t('Gruppe „{name}“ löschen?', { name: group.name });
+    if (!confirm(msg)) return;
     try {
       await del(`/groups/${group.id}`);
       onSaved();
@@ -44,11 +48,11 @@
   }
 </script>
 
-<Modal title="Gruppe bearbeiten" {onClose}>
+<Modal title={t('Gruppe bearbeiten')} {onClose}>
   <form id="group-form" class="form" onsubmit={save}>
-    <label class="field"><span>Name</span><input bind:value={name} required /></label>
+    <label class="field"><span>{t('Name')}</span><input bind:value={name} required /></label>
     <div class="field">
-      <span>Sichtbarkeit</span>
+      <span>{t('Sichtbarkeit')}</span>
       {#each options as o}
         <label class="opt" class:on={visibility === o.id}>
           <input type="radio" name="vis" value={o.id} bind:group={visibility} />
@@ -61,17 +65,17 @@
     </div>
     {#if visibility === 'protected'}
       <label class="field">
-        <span>{hadPassword ? 'Neues Passwort (leer lassen zum Beibehalten)' : 'Passwort für diese Gruppe'}</span>
+        <span>{hadPassword ? t('Neues Passwort (leer lassen zum Beibehalten)') : t('Passwort für diese Gruppe')}</span>
         <input type="password" bind:value={password} autocomplete="new-password" minlength="4" required={!hadPassword} />
       </label>
     {/if}
   </form>
 
   {#snippet footer()}
-    <button class="danger" onclick={remove}>Löschen</button>
+    <button class="danger" onclick={remove}>{t('Löschen')}</button>
     <span class="spacer"></span>
-    <button onclick={onClose}>Abbrechen</button>
-    <button class="primary" type="submit" form="group-form" disabled={saving}>Speichern</button>
+    <button onclick={onClose}>{t('Abbrechen')}</button>
+    <button class="primary" type="submit" form="group-form" disabled={saving}>{t('Speichern')}</button>
   {/snippet}
 </Modal>
 

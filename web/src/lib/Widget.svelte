@@ -1,4 +1,5 @@
 <script>
+  import { t } from './i18n.svelte.js';
   // Renders the generic widget format every integration returns. Long content
   // is folded: one warning (two lines) and three list entries, with an arrow
   // to show the rest.
@@ -80,7 +81,7 @@
 
     {#if foldable}
       <button class="fold" onclick={() => (expanded = !expanded)} aria-expanded={expanded}>
-        {#if expanded}▴ weniger anzeigen{:else}▾ {hiddenItems + hiddenAlerts > 0 ? `${hiddenItems + hiddenAlerts} weitere anzeigen` : 'alles anzeigen'}{/if}
+        {#if expanded}▴ {t('weniger anzeigen')}{:else}▾ {hiddenItems + hiddenAlerts > 0 ? t('{n} weitere anzeigen', { n: hiddenItems + hiddenAlerts }) : t('alles anzeigen')}{/if}
       </button>
     {/if}
 

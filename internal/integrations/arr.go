@@ -45,7 +45,7 @@ func (a *arr) Test(ctx context.Context, in *Instance) error {
 		return err
 	}
 	if status.AppName != "" && !strings.EqualFold(status.AppName, a.def.Name) {
-		return fmt.Errorf("unter dieser Adresse läuft %s, nicht %s", status.AppName, a.def.Name)
+		return in.Errorf("unter dieser Adresse läuft %s, nicht %s", status.AppName, a.def.Name)
 	}
 	return nil
 }
@@ -93,7 +93,7 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var health arrHealth
 	a.get(ctx, in, "/health", nil, &health)
 
-	w := &Widget{ItemsTitle: "Warteschlange"}
+	w := &Widget{ItemsTitle: in.T("Warteschlange")}
 	for _, r := range queue.Records {
 		title := r.Title
 		if r.Movie != nil {
@@ -108,13 +108,13 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		if r.Size > 0 {
 			it.Progress = pct((r.Size - r.Sizeleft) / r.Size * 100)
 		}
-		sub := []string{statusDE(r.Status)}
+		sub := []string{in.Status(r.Status)}
 		if r.Timeleft != "" {
-			sub = append(sub, "noch "+r.Timeleft)
+			sub = append(sub, in.T("noch %s", r.Timeleft))
 		}
 		it.Subtitle = strings.Join(sub, " · ")
 		if r.State == "importPending" || r.State == "failedPending" || r.Status == "warning" {
-			it.Badge = "Prüfen"
+			it.Badge = in.T("Prüfen")
 		}
 		w.Items = append(w.Items, it)
 		if len(w.Items) == 5 {
@@ -124,16 +124,16 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 
 	upcoming, err := a.upcoming(ctx, in)
 	if err == nil && len(upcoming) > 0 {
-		label := "Neue Folgen (7 Tage)"
+		label := in.T("Neue Folgen (7 Tage)")
 		if a.movie {
-			label = "Releases (30 Tage)"
+			label = in.T("Releases (30 Tage)")
 		}
 		w.Stats = append(w.Stats, Stat{Label: label, Value: fmt.Sprint(len(upcoming))})
 	}
-	w.Stats = append([]Stat{{Label: "In Warteschlange", Value: fmt.Sprint(queue.TotalRecords)}}, w.Stats...)
+	w.Stats = append([]Stat{{Label: in.T("In Warteschlange"), Value: fmt.Sprint(queue.TotalRecords)}}, w.Stats...)
 
 	if len(w.Items) == 0 && len(upcoming) > 0 {
-		w.ItemsTitle = "Demnächst"
+		w.ItemsTitle = in.T("Demnächst")
 		w.Items = upcoming
 		if len(w.Items) > 5 {
 			w.Items = w.Items[:5]
@@ -149,7 +149,7 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		}
 	}
 	if len(health) > 0 {
-		w.Stats = append(w.Stats, Stat{Label: "Warnungen", Value: fmt.Sprint(len(health)), Tone: map[bool]string{true: "bad", false: "warn"}[errs > 0]})
+		w.Stats = append(w.Stats, Stat{Label: in.T("Warnungen"), Value: fmt.Sprint(len(health)), Tone: map[bool]string{true: "bad", false: "warn"}[errs > 0]})
 	}
 	return w, nil
 }
@@ -189,9 +189,9 @@ func (a *arr) upcoming(ctx context.Context, in *Instance) ([]Item, error) {
 				kind, date = "Disc", m.PhysicalRelease
 			}
 			if date == "" {
-				kind, date = "Kino", m.InCinemas
+				kind, date = in.T("Kino"), m.InCinemas
 			}
-			items = append(items, Item{Title: m.Title, Subtitle: kind + " · " + shortDate(date), URL: in.Link("/calendar")})
+			items = append(items, Item{Title: m.Title, Subtitle: kind + " · " + in.Date(date), URL: in.Link("/calendar")})
 		}
 	} else {
 		var eps []struct {
@@ -214,43 +214,10 @@ func (a *arr) upcoming(ctx context.Context, in *Instance) ([]Item, error) {
 			}
 			items = append(items, Item{
 				Title:    fmt.Sprintf("%s · S%02dE%02d", e.Series.Title, e.SeasonNumber, e.EpisodeNumber),
-				Subtitle: e.Title + " · " + shortDate(e.AirDateUtc),
+				Subtitle: e.Title + " · " + in.Date(e.AirDateUtc),
 				URL:      in.Link("/calendar"),
 			})
 		}
 	}
 	return items, nil
-}
-
-func shortDate(iso string) string {
-	t, err := time.Parse(time.RFC3339, iso)
-	if err != nil {
-		return iso
-	}
-	t = t.Local()
-	days := []string{"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"}
-	if t.Hour() == 0 && t.Minute() == 0 {
-		return fmt.Sprintf("%s %02d.%02d.", days[t.Weekday()], t.Day(), t.Month())
-	}
-	return fmt.Sprintf("%s %02d.%02d. %02d:%02d", days[t.Weekday()], t.Day(), t.Month(), t.Hour(), t.Minute())
-}
-
-func statusDE(s string) string {
-	switch strings.ToLower(s) {
-	case "downloading":
-		return "Lädt"
-	case "queued":
-		return "Wartet"
-	case "paused":
-		return "Pausiert"
-	case "completed":
-		return "Fertig"
-	case "delay":
-		return "Verzögert"
-	case "warning":
-		return "Warnung"
-	case "failed":
-		return "Fehlgeschlagen"
-	}
-	return s
 }

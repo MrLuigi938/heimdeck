@@ -9,13 +9,15 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/heimdeck/heimdeck/internal/i18n"
 )
 
 // Field is one input in the "add tile" form.
@@ -51,9 +53,34 @@ type Instance struct {
 	PublicURL string            // opened in the browser, used for links
 	Values    map[string]string // config and secrets merged
 	Client    *http.Client
+	Lang      string // "de" or "en", for texts shown to the user
 }
 
 func (i *Instance) V(key string) string { return strings.TrimSpace(i.Values[key]) }
+
+// T translates a user-facing text into the instance's language.
+func (i *Instance) T(s string, args ...any) string { return i18n.T(i.Lang, s, args...) }
+
+func (i *Instance) Num(n int) string         { return i18n.Num(i.Lang, n) }
+func (i *Instance) Bytes(b float64) string   { return i18n.Bytes(i.Lang, b) }
+func (i *Instance) Date(iso string) string   { return i18n.Date(i.Lang, iso) }
+func (i *Instance) Since(t time.Time) string { return i18n.Since(i.Lang, t) }
+func (i *Instance) Errorf(s string, args ...any) error {
+	return errors.New(i.T(s, args...))
+}
+
+// Status translates the download states used by the *arr apps and SABnzbd.
+func (i *Instance) Status(s string) string {
+	de := map[string]string{
+		"downloading": "Lädt", "queued": "Wartet", "paused": "Pausiert", "completed": "Fertig",
+		"delay": "Verzögert", "warning": "Warnung", "failed": "Fehlgeschlagen", "idle": "Bereit",
+		"fetching": "Lädt", "grabbing": "Lädt", "extracting": "Entpackt", "verifying": "Prüft", "repairing": "Repariert",
+	}[strings.ToLower(s)]
+	if de == "" {
+		return s
+	}
+	return i.T(de)
+}
 
 // Link builds a browser link below the public URL.
 func (i *Instance) Link(path string) string { return strings.TrimRight(i.PublicURL, "/") + path }
@@ -119,13 +146,29 @@ func Get(id string) (Integration, bool) {
 	return i, ok
 }
 
-func All() []Definition {
+// All returns every definition with its texts translated into lang.
+func All(lang string) []Definition {
 	out := make([]Definition, 0, len(registry))
 	for _, i := range registry {
-		out = append(out, i.Def())
+		out = append(out, Localize(i.Def(), lang))
 	}
 	sort.Slice(out, func(a, b int) bool { return strings.ToLower(out[a].Name) < strings.ToLower(out[b].Name) })
 	return out
+}
+
+// Localize translates the user-facing texts of a definition.
+func Localize(d Definition, lang string) Definition {
+	d.Name = i18n.T(lang, d.Name)
+	d.Category = i18n.T(lang, d.Category)
+	d.Description = i18n.T(lang, d.Description)
+	fields := make([]Field, len(d.Fields))
+	for i, f := range d.Fields {
+		f.Label = i18n.T(lang, f.Label)
+		f.Help = i18n.T(lang, f.Help)
+		fields[i] = f
+	}
+	d.Fields = fields
+	return d
 }
 
 // Match finds the integration for a Docker image name.
@@ -160,16 +203,17 @@ func NewClient(insecure bool) *http.Client {
 type HTTPError struct {
 	Status int
 	Body   string
+	Lang   string
 }
 
 func (e *HTTPError) Error() string {
 	switch e.Status {
 	case 401, 403:
-		return fmt.Sprintf("Zugriff verweigert (%d) – API-Key bzw. Zugangsdaten prüfen", e.Status)
+		return i18n.T(e.Lang, "Zugriff verweigert (%d) – API-Key bzw. Zugangsdaten prüfen", e.Status)
 	case 404:
-		return "Adresse nicht gefunden (404) – stimmt die URL bzw. der Dienst-Typ?"
+		return i18n.T(e.Lang, "Adresse nicht gefunden (404) – stimmt die URL bzw. der Dienst-Typ?")
 	}
-	msg := fmt.Sprintf("Dienst antwortet mit Status %d", e.Status)
+	msg := i18n.T(e.Lang, "Dienst antwortet mit Status %d", e.Status)
 	if e.Body != "" {
 		msg += ": " + e.Body
 	}
@@ -215,34 +259,34 @@ func (in *Instance) do(ctx context.Context, r request, out any) error {
 	}
 	resp, err := in.Client.Do(req)
 	if err != nil {
-		return friendlyNetErr(err)
+		return friendlyNetErr(in.Lang, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return &HTTPError{Status: resp.StatusCode, Body: strings.TrimSpace(string(b))}
+		return &HTTPError{Status: resp.StatusCode, Body: strings.TrimSpace(string(b)), Lang: in.Lang}
 	}
 	if out == nil {
 		io.Copy(io.Discard, resp.Body)
 		return nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("unerwartete Antwort (kein gültiges JSON) – stimmt der Dienst-Typ? (%v)", err)
+		return in.Errorf("unerwartete Antwort (kein gültiges JSON) – stimmt der Dienst-Typ? (%v)", err)
 	}
 	return nil
 }
 
-func friendlyNetErr(err error) error {
+func friendlyNetErr(lang string, err error) error {
 	s := err.Error()
 	switch {
 	case strings.Contains(s, "connection refused"):
-		return fmt.Errorf("Verbindung abgelehnt – läuft der Dienst und stimmt der Port?")
+		return errors.New(i18n.T(lang, "Verbindung abgelehnt – läuft der Dienst und stimmt der Port?"))
 	case strings.Contains(s, "no such host"):
-		return fmt.Errorf("Hostname nicht gefunden – stimmt die Adresse?")
+		return errors.New(i18n.T(lang, "Hostname nicht gefunden – stimmt die Adresse?"))
 	case strings.Contains(s, "certificate"):
-		return fmt.Errorf("Zertifikatsfehler – bei selbstsignierten Zertifikaten „Zertifikat nicht prüfen“ aktivieren")
+		return errors.New(i18n.T(lang, "Zertifikatsfehler – bei selbstsignierten Zertifikaten „Zertifikat nicht prüfen“ aktivieren"))
 	case strings.Contains(s, "Client.Timeout") || strings.Contains(s, "deadline exceeded"):
-		return fmt.Errorf("Zeitüberschreitung – Dienst nicht erreichbar")
+		return errors.New(i18n.T(lang, "Zeitüberschreitung – Dienst nicht erreichbar"))
 	}
 	return err
 }
@@ -257,34 +301,6 @@ func pct(v float64) *float64 {
 		v = 100
 	}
 	return &v
-}
-
-func humanBytes(b float64) string {
-	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
-	i := 0
-	for b >= 1024 && i < len(units)-1 {
-		b /= 1024
-		i++
-	}
-	if i == 0 {
-		return fmt.Sprintf("%.0f %s", b, units[i])
-	}
-	return strings.Replace(fmt.Sprintf("%.1f %s", b, units[i]), ".", ",", 1)
-}
-
-func num(n int) string {
-	s := fmt.Sprint(n)
-	if n < 1000 && n > -1000 {
-		return s
-	}
-	var out []byte
-	for i, c := range []byte(s) {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			out = append(out, '.')
-		}
-		out = append(out, c)
-	}
-	return string(out)
 }
 
 func toneIf(bad bool, tone string) string {

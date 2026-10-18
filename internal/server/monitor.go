@@ -86,7 +86,7 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 		if internal == "" {
 			internal = t.URL
 		}
-		if internal == "" {
+		if internal == "" || !t.Monitor {
 			continue
 		}
 		wg.Add(1)

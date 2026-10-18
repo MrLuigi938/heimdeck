@@ -57,7 +57,7 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	j.get(ctx, in, "/Items/Counts", nil, &counts)
 
-	w := &Widget{ItemsTitle: "Läuft gerade"}
+	w := &Widget{ItemsTitle: in.T("Läuft gerade")}
 	for _, s := range sessions {
 		np := s.NowPlayingItem
 		if np == nil {
@@ -72,15 +72,15 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			it.Progress = pct(float64(s.PlayState.PositionTicks) / float64(np.RunTimeTicks) * 100)
 		}
 		if s.PlayState.IsPaused {
-			it.Badge = "Pausiert"
+			it.Badge = in.T("Pausiert")
 		}
 		w.Items = append(w.Items, it)
 	}
 	w.Stats = []Stat{
-		{Label: "Streams", Value: fmt.Sprint(len(w.Items))},
-		{Label: "Filme", Value: num(counts.MovieCount)},
-		{Label: "Serien", Value: num(counts.SeriesCount)},
-		{Label: "Folgen", Value: num(counts.EpisodeCount)},
+		{Label: in.T("Streams"), Value: fmt.Sprint(len(w.Items))},
+		{Label: in.T("Filme"), Value: in.Num(counts.MovieCount)},
+		{Label: in.T("Serien"), Value: in.Num(counts.SeriesCount)},
+		{Label: in.T("Folgen"), Value: in.Num(counts.EpisodeCount)},
 	}
 	return w, nil
 }
@@ -105,13 +105,13 @@ func (j jellyfin) Search(ctx context.Context, in *Instance, query string) ([]Ite
 	}
 	out := []Item{}
 	for _, it := range res.Items {
-		kind := map[string]string{"Movie": "Film", "Series": "Serie"}[it.Type]
+		kind := in.T(map[string]string{"Movie": "Film", "Series": "Serie"}[it.Type])
 		sub := kind
 		if it.ProductionYear > 0 {
 			sub = fmt.Sprintf("%s · %d", kind, it.ProductionYear)
 		}
 		out = append(out, Item{
-			Title: it.Name, Subtitle: sub, Badge: "Vorhanden",
+			Title: it.Name, Subtitle: sub, Badge: in.T("Vorhanden"),
 			URL:   in.Link("/web/#/details?id=" + it.ID),
 			Image: in.Link("/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
 		})

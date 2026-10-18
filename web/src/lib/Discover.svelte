@@ -3,6 +3,7 @@
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
+  import { t } from './i18n.svelte.js';
 
   // Lists running Docker containers and turns the selected ones into tiles.
   let { groups, onClose, onSaved } = $props();
@@ -34,7 +35,7 @@
       for (const it of items) {
         const s = it.suggestion;
         if (!selected[s.container.id]) continue;
-        const groupName = s.group || 'Sonstiges';
+        const groupName = s.group || t('Sonstiges');
         let gid = groupIds[groupName.toLowerCase()];
         if (!gid) {
           gid = (await post('/groups', { name: groupName })).id;
@@ -43,7 +44,7 @@
         await post('/tiles', { groupId: gid, name: s.name, url: s.url, icon: s.icon, integration: s.integration, showWidget: true });
         added++;
       }
-      toast(`${added} Kachel(n) hinzugefügt – API-Keys kannst du direkt auf den Kacheln nachtragen`);
+      toast(t('{n} Kachel(n) hinzugefügt – API-Keys kannst du direkt auf den Kacheln nachtragen', { n: added }));
       onSaved();
     } catch (e) {
       toast(e.message, 'bad');
@@ -53,15 +54,15 @@
   }
 </script>
 
-<Modal title="Container automatisch finden" {onClose} wide>
+<Modal title={t('Container automatisch finden')} {onClose} wide>
   {#if error}
     <p class="bad">{error}</p>
   {:else if !items}
-    <p class="muted">Suche Container …</p>
+    <p class="muted">{t('Suche Container …')}</p>
   {:else if items.length === 0}
-    <p class="muted">Keine Container gefunden.</p>
+    <p class="muted">{t('Keine Container gefunden.')}</p>
   {:else}
-    <p class="help">Erkannte Dienste sind bereits vorausgewählt. Adresse und Name kannst du danach jederzeit ändern.</p>
+    <p class="help">{t('Erkannte Dienste sind bereits vorausgewählt. Adresse und Name kannst du danach jederzeit ändern.')}</p>
     <div class="list">
       {#each items as it (it.suggestion.container.id)}
         {@const s = it.suggestion}
@@ -71,12 +72,12 @@
           <div class="grow">
             <div class="row">
               <b>{s.name}</b>
-              {#if s.integration !== 'link'}<span class="tag">erkannt</span>{/if}
-              {#if it.exists}<span class="tag muted">schon vorhanden</span>{/if}
+              {#if s.integration !== 'link'}<span class="tag">{t('erkannt')}</span>{/if}
+              {#if it.exists}<span class="tag muted">{t('schon vorhanden')}</span>{/if}
             </div>
-            <div class="help">{s.container.image} · {s.url || 'kein Port freigegeben'}</div>
+            <div class="help">{s.container.image} · {s.url || t('kein Port freigegeben')}</div>
           </div>
-          <span class="state {s.container.state}">{s.container.state === 'running' ? 'läuft' : s.container.state}</span>
+          <span class="state {s.container.state}">{s.container.state === 'running' ? t('läuft') : s.container.state}</span>
         </label>
       {/each}
     </div>
@@ -84,8 +85,8 @@
 
   {#snippet footer()}
     <span class="spacer"></span>
-    <button onclick={onClose}>Abbrechen</button>
-    <button class="primary" disabled={!count || busy} onclick={add}>{count} hinzufügen</button>
+    <button onclick={onClose}>{t('Abbrechen')}</button>
+    <button class="primary" disabled={!count || busy} onclick={add}>{t('{n} hinzufügen', { n: count })}</button>
   {/snippet}
 </Modal>
 

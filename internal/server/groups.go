@@ -293,6 +293,9 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 	rows := map[string]*uptimeRow{}
 	out := []*uptimeRow{}
 	for _, t := range tiles {
+		if !t.Monitor {
+			continue
+		}
 		internal := t.APIURL
 		if internal == "" {
 			internal = t.URL

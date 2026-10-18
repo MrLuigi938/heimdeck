@@ -80,12 +80,12 @@ func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			title := j.title(ctx, in, r.Media.MediaType, r.Media.TmdbID)
 			sub := r.RequestedBy.DisplayName
 			if r.Media.MediaType == "tv" && len(r.Seasons) > 0 {
-				sub += fmt.Sprintf(" · %d Staffel(n)", len(r.Seasons))
+				sub += " · " + in.T("%d Staffel(n)", len(r.Seasons))
 			}
 			if t, err := time.Parse(time.RFC3339, r.CreatedAt); err == nil {
-				sub += " · " + relTime(t)
+				sub += " · " + in.Since(t)
 			}
-			badge := map[string]string{"movie": "Film", "tv": "Serie"}[r.Media.MediaType]
+			badge := in.T(map[string]string{"movie": "Film", "tv": "Serie"}[r.Media.MediaType])
 			if r.Is4k {
 				badge += " 4K"
 			}
@@ -94,8 +94,8 @@ func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				Title: title, Subtitle: sub, Badge: badge,
 				URL: in.Link(fmt.Sprintf("/%s/%d", r.Media.MediaType, r.Media.TmdbID)),
 				Actions: []Action{
-					{ID: "approve", Label: "Genehmigen", Tone: "primary", Params: map[string]string{"id": id}},
-					{ID: "decline", Label: "Ablehnen", Tone: "danger", Params: map[string]string{"id": id}, Confirm: "Anfrage für „" + title + "“ ablehnen?"},
+					{ID: "approve", Label: in.T("Genehmigen"), Tone: "primary", Params: map[string]string{"id": id}},
+					{ID: "decline", Label: in.T("Ablehnen"), Tone: "danger", Params: map[string]string{"id": id}, Confirm: in.T("Anfrage für „%s“ ablehnen?", title)},
 				},
 			}
 		}(i, r)
@@ -104,11 +104,11 @@ func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 
 	return &Widget{
 		Stats: []Stat{
-			{Label: "Offen", Value: fmt.Sprint(counts.Pending), Tone: toneIf(counts.Pending > 0, "warn")},
-			{Label: "In Arbeit", Value: fmt.Sprint(counts.Processing)},
-			{Label: "Verfügbar", Value: fmt.Sprint(counts.Available)},
+			{Label: in.T("Offen"), Value: fmt.Sprint(counts.Pending), Tone: toneIf(counts.Pending > 0, "warn")},
+			{Label: in.T("In Arbeit"), Value: fmt.Sprint(counts.Processing)},
+			{Label: in.T("Verfügbar"), Value: fmt.Sprint(counts.Available)},
 		},
-		ItemsTitle: "Offene Anfragen",
+		ItemsTitle: in.T("Offene Anfragen"),
 		Items:      items,
 	}, nil
 }
@@ -144,13 +144,13 @@ func (j *jellyseerr) Action(ctx context.Context, in *Instance, action string, p 
 	switch action {
 	case "approve", "decline":
 		if _, err := strconv.Atoi(p["id"]); err != nil {
-			return fmt.Errorf("ungültige Anfrage-ID")
+			return in.Errorf("ungültige Anfrage-ID")
 		}
 		return j.call(ctx, in, "POST", "/request/"+p["id"]+"/"+action, nil, nil, nil)
 	case "request":
 		id, err := strconv.Atoi(p["tmdbId"])
 		if err != nil || (p["mediaType"] != "movie" && p["mediaType"] != "tv") {
-			return fmt.Errorf("ungültiger Titel")
+			return in.Errorf("ungültiger Titel")
 		}
 		body := map[string]any{"mediaType": p["mediaType"], "mediaId": id}
 		if p["mediaType"] == "tv" {
@@ -158,7 +158,7 @@ func (j *jellyseerr) Action(ctx context.Context, in *Instance, action string, p 
 		}
 		return j.call(ctx, in, "POST", "/request", nil, body, nil)
 	}
-	return fmt.Errorf("unbekannte Aktion %q", action)
+	return in.Errorf("unbekannte Aktion %q", action)
 }
 
 func (j *jellyseerr) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
@@ -186,7 +186,7 @@ func (j *jellyseerr) Search(ctx context.Context, in *Instance, query string) ([]
 			continue
 		}
 		title := r.Title + r.Name
-		sub := map[string]string{"movie": "Film", "tv": "Serie"}[r.MediaType]
+		sub := in.T(map[string]string{"movie": "Film", "tv": "Serie"}[r.MediaType])
 		if d := r.ReleaseDate + r.FirstAir; len(d) >= 4 {
 			sub += " · " + d[:4]
 		}
@@ -200,13 +200,13 @@ func (j *jellyseerr) Search(ctx context.Context, in *Instance, query string) ([]
 		}
 		switch status {
 		case 5:
-			it.Badge = "Vorhanden"
+			it.Badge = in.T("Vorhanden")
 		case 4:
-			it.Badge = "Teilweise"
+			it.Badge = in.T("Teilweise")
 		case 2, 3:
-			it.Badge = "Angefragt"
+			it.Badge = in.T("Angefragt")
 		default:
-			it.Actions = []Action{{ID: "request", Label: "Anfragen", Tone: "primary",
+			it.Actions = []Action{{ID: "request", Label: in.T("Anfragen"), Tone: "primary",
 				Params: map[string]string{"tmdbId": strconv.Itoa(r.ID), "mediaType": r.MediaType}}}
 		}
 		out = append(out, it)
@@ -215,17 +215,4 @@ func (j *jellyseerr) Search(ctx context.Context, in *Instance, query string) ([]
 		}
 	}
 	return out, nil
-}
-
-func relTime(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Hour:
-		return fmt.Sprintf("vor %d Min.", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("vor %d Std.", int(d.Hours()))
-	case d < 48*time.Hour:
-		return "gestern"
-	}
-	return fmt.Sprintf("vor %d Tagen", int(d.Hours()/24))
 }

@@ -52,15 +52,15 @@ func (p prowlarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	w := &Widget{
 		Stats: []Stat{
-			{Label: "Indexer aktiv", Value: fmt.Sprintf("%d / %d", enabled, len(indexers))},
-			{Label: "Gestört", Value: fmt.Sprint(len(status)), Tone: toneIf(len(status) > 0, "bad")},
+			{Label: in.T("Indexer aktiv"), Value: fmt.Sprintf("%d / %d", enabled, len(indexers))},
+			{Label: in.T("Gestört"), Value: fmt.Sprint(len(status)), Tone: toneIf(len(status) > 0, "bad")},
 		},
-		ItemsTitle: "Gestörte Indexer",
+		ItemsTitle: in.T("Gestörte Indexer"),
 	}
 	for _, s := range status {
 		sub := ""
 		if s.DisabledTill != "" {
-			sub = "deaktiviert bis " + shortDate(s.DisabledTill)
+			sub = in.T("deaktiviert bis %s", in.Date(s.DisabledTill))
 		}
 		w.Items = append(w.Items, Item{Title: names[s.IndexerID], Subtitle: sub, URL: in.Link("/")})
 	}

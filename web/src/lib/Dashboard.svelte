@@ -9,6 +9,7 @@
   import GroupEditor from './GroupEditor.svelte';
   import Uptime from './Uptime.svelte';
   import { network, isLocal, setOverride, detectLocal } from './network.svelte.js';
+  import { t, locale } from './i18n.svelte.js';
 
   let data = $state(null);
   let status = $state({});
@@ -46,6 +47,8 @@
   let hasSearchServices = $derived(allTiles.some((t) => defs[t.integration]?.hasSearch));
   let openGroups = $derived((data?.groups || []).filter((g) => !g.locked));
   let hasHidden = $derived((data?.groups || []).some((g) => g.visibility === 'hidden'));
+  let hiddenCount = $derived((data?.groups || []).filter((g) => g.visibility === 'hidden' && g.tiles.length).length);
+  let uniform = $derived(settings.uniformTiles === 'true');
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -111,10 +114,10 @@
     root.style.setProperty('--accent', settings.accent || '#5b8cff');
     document.title = settings.title || 'Heimdeck';
     if (settings.background) {
-      document.body.style.backgroundImage = `url("${settings.background.replace(/"/g, '%22')}")`;
+      document.body.style.setProperty('--bg-image', `url("${settings.background.replace(/"/g, '%22')}")`);
       document.body.classList.add('has-bg');
     } else {
-      document.body.style.backgroundImage = '';
+      document.body.style.removeProperty('--bg-image');
       document.body.classList.remove('has-bg');
     }
     return () => media.removeEventListener('change', apply);
@@ -123,17 +126,17 @@
   let greeting = $derived.by(() => {
     const h = now.getHours();
     const who = data?.username ? `, ${data.username}` : '';
-    if (h < 5) return `Gute Nacht${who}`;
-    if (h < 11) return `Guten Morgen${who}`;
-    if (h < 18) return `Hallo${who}`;
-    return `Guten Abend${who}`;
+    if (h < 5) return t('Gute Nacht') + who;
+    if (h < 11) return t('Guten Morgen') + who;
+    if (h < 18) return t('Hallo') + who;
+    return t('Guten Abend') + who;
   });
-  let dateText = $derived(now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }));
-  let timeText = $derived(now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+  let dateText = $derived(now.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));
+  let timeText = $derived(now.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }));
 
   // ---- groups ----
   async function addGroup() {
-    const name = prompt('Name der neuen Gruppe');
+    const name = prompt(t('Name der neuen Gruppe'));
     if (!name?.trim()) return;
     await post('/groups', { name });
     load();
@@ -199,11 +202,13 @@
     dropTarget = null;
   }
 
-  function saved() {
-    editing = null;
-    editingGroup = null;
-    showDiscover = false;
-    showSettings = false;
+  function saved(opts) {
+    if (!opts?.keepOpen) {
+      editing = null;
+      editingGroup = null;
+      showDiscover = false;
+      showSettings = false;
+    }
     load().then(loadStatus);
     // The server re-checks a saved tile right away; pick the result up shortly after.
     setTimeout(loadStatus, 4000);
@@ -213,52 +218,58 @@
 {#if data}
   <div class="page">
     <header class="top">
-      <div class="brand">
+      <div class="brand on-bg">
         <h1>{settings.title || 'Heimdeck'}</h1>
         {#if settings.showGreeting !== 'false'}
           <div class="muted greet">{greeting} · {dateText} · {timeText}</div>
         {/if}
       </div>
       <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} />
-      <div class="tools">
+      <div class="tools on-bg">
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
-            title={`${local ? 'Zuhause: lokale Adressen werden geöffnet' : 'Unterwegs: öffentliche Adressen werden geöffnet'}${network.override ? ' (manuell gewählt)' : ' (automatisch erkannt)'} – klicken zum Umschalten`}>
-            {local ? '🏠' : '🌐'}<span class="net-label">{local ? 'Zuhause' : 'Unterwegs'}</span>{#if network.override}<span class="manual">•</span>{/if}
+            title={`${local ? t('Zuhause: lokale Adressen werden geöffnet') : t('Unterwegs: öffentliche Adressen werden geöffnet')} (${network.override ? t('manuell gewählt') : t('automatisch erkannt')}) – ${t('klicken zum Umschalten')}`}>
+            {local ? '🏠' : '🌐'}<span class="net-label">{local ? t('Zuhause') : t('Unterwegs')}</span>{#if network.override}<span class="manual">•</span>{/if}
           </button>
         {/if}
         {#if hasHidden}
-          <button class="ghost icon" class:on={showHidden} title={showHidden ? 'Ausgeblendete Gruppen verbergen' : 'Ausgeblendete Gruppen anzeigen'} onclick={toggleHidden}>👁</button>
+          <button class="ghost icon" class:on={showHidden} title={showHidden ? t('Ausgeblendete Gruppen verbergen') : t('Ausgeblendete Gruppen anzeigen')} aria-label={t('Ausgeblendete Gruppen anzeigen')} onclick={toggleHidden}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+          </button>
         {/if}
         {#if data.docker}
-          <button class="ghost icon" title="Container automatisch finden" onclick={() => (showDiscover = true)}>🐳</button>
+          <button class="ghost icon" title={t('Container automatisch finden')} aria-label={t('Container automatisch finden')} onclick={() => (showDiscover = true)}>🐳</button>
         {/if}
-        <button class="ghost icon" class:on={editMode} title="Anordnen & bearbeiten" onclick={() => (editMode = !editMode)}>✎</button>
-        <button class="ghost icon" title="Einstellungen" onclick={() => (showSettings = true)}>⚙</button>
+        <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+        </button>
+        <button class="ghost icon" title={t('Einstellungen')} aria-label={t('Einstellungen')} onclick={() => (showSettings = true)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        </button>
       </div>
     </header>
 
     {#if editMode}
       <div class="editbar card">
-        <span>✎ Bearbeitungsmodus: Kacheln per Drag & Drop verschieben, anklicken zum Bearbeiten.</span>
+        <span>✎ {t('Bearbeitungsmodus: Kacheln per Drag & Drop verschieben, anklicken zum Bearbeiten.')}</span>
         <span class="spacer"></span>
-        <button class="small" onclick={addGroup}>+ Gruppe</button>
-        <button class="small primary" onclick={() => (editMode = false)}>Fertig</button>
+        <button class="small" onclick={addGroup}>+ {t('Gruppe')}</button>
+        <button class="small primary" onclick={() => (editMode = false)}>{t('Fertig')}</button>
       </div>
     {/if}
 
     {#if allTiles.length === 0}
       <div class="empty card">
-        <h2>Los geht's 👋</h2>
-        <p class="muted">Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.</p>
+        <h2>{t("Los geht's")} 👋</h2>
+        <p class="muted">{t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.')}</p>
         <div class="row center">
-          {#if data.docker}<button class="primary" onclick={() => (showDiscover = true)}>🐳 Container automatisch finden</button>{/if}
-          <button class:primary={!data.docker} onclick={() => (editing = { groupId: data.groups[0]?.id })} disabled={!data.groups.length}>+ Kachel hinzufügen</button>
+          {#if data.docker}<button class="primary" onclick={() => (showDiscover = true)}>🐳 {t('Container automatisch finden')}</button>{/if}
+          <button class:primary={!data.docker} onclick={() => (editing = { groupId: data.groups[0]?.id })} disabled={!data.groups.length}>+ {t('Kachel hinzufügen')}</button>
         </div>
         {#if !data.docker}
-          <p class="help">Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml).</p>
+          <p class="help">{t('Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml).')}</p>
         {/if}
-        {#if !data.groups.length}<button onclick={addGroup}>+ Gruppe anlegen</button>{/if}
+        {#if !data.groups.length}<button onclick={addGroup}>+ {t('Gruppe anlegen')}</button>{/if}
       </div>
     {/if}
 
@@ -267,39 +278,45 @@
         <form class="locked card" onsubmit={(e) => unlock(e, group)}>
           <span class="lock-name">🔒 {group.name}</span>
           <span class="spacer"></span>
-          <input type="password" placeholder="Passwort" bind:value={unlockPw[group.id]} autocomplete="off" aria-label="Passwort für {group.name}" />
-          <button class="small">Entsperren</button>
+          <input type="password" placeholder={t('Passwort')} bind:value={unlockPw[group.id]} autocomplete="off" aria-label={t('Passwort für {name}', { name: group.name })} />
+          <button class="small">{t('Entsperren')}</button>
         </form>
       {:else if (group.tiles.length || editMode) && (group.visibility !== 'hidden' || showHidden || editMode)}
         <section class="group" aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
-            <h2>{group.name}</h2>
-            {#if group.visibility === 'hidden'}<span class="vis" title="Ausgeblendete Gruppe">👁 ausgeblendet</span>{/if}
+            <h2 class="on-bg">{group.name}</h2>
+            {#if group.visibility === 'hidden'}<span class="vis on-bg" title={t('Ausgeblendete Gruppe')}>👁 {t('ausgeblendet')}</span>{/if}
             {#if group.visibility === 'protected'}
-              <button class="ghost small vis" title="Gruppe wieder sperren" onclick={() => lock(group)}>🔓 sperren</button>
+              <button class="ghost small vis on-bg" title={t('Gruppe wieder sperren')} onclick={() => lock(group)}>🔓 {t('sperren')}</button>
             {/if}
             {#if editMode}
-              <div class="group-tools">
-                <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title="Nach oben">↑</button>
-                <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === data.groups.length - 1} title="Nach unten">↓</button>
-                <button class="ghost small" onclick={() => (editingGroup = group)}>Bearbeiten</button>
+              <div class="group-tools on-bg">
+                <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title={t('Nach oben')}>↑</button>
+                <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === data.groups.length - 1} title={t('Nach unten')}>↓</button>
+                <button class="ghost small" onclick={() => (editingGroup = group)}>{t('Bearbeiten')}</button>
               </div>
             {/if}
           </div>
-          <div class="grid">
+          <div class="grid" class:uniform>
             {#each group.tiles as tile (tile.id)}
               <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
-                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local}
+                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} {uniform}
                   onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
               </div>
             {/each}
             {#if editMode}
-              <button class="add" onclick={() => (editing = { groupId: group.id })}>+ Kachel</button>
+              <button class="add" onclick={() => (editing = { groupId: group.id })}>+ {t('Kachel')}</button>
             {/if}
           </div>
         </section>
       {/if}
     {/each}
+
+    {#if hiddenCount && !showHidden && !editMode}
+      <button class="hidden-hint on-bg" onclick={toggleHidden}>
+        👁 {hiddenCount === 1 ? t('1 ausgeblendete Gruppe – anzeigen') : t('{n} ausgeblendete Gruppen – anzeigen', { n: hiddenCount })}
+      </button>
+    {/if}
 
     {#if allTiles.length && settings.showUptime !== 'false'}
       <Uptime tiles={allTiles} {status} />
@@ -328,6 +345,8 @@
   .greet { font-size: 13.5px; margin-top: 2px; }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
   .tools .on { background: var(--accent); color: #fff; }
+  .hidden-hint { justify-self: center; background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 13px; padding: 6px 14px; border-radius: 999px; }
+
   .editbar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14px; flex-wrap: wrap; }
   .group { display: grid; gap: 12px; }
   .group-head { display: flex; align-items: center; gap: 8px; min-height: 30px; }
@@ -340,6 +359,8 @@
   .net { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
   .manual { color: var(--accent); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }
+  /* Uniform: every tile one column of the same width; tiles in a row share the tallest one's height. */
+  .grid.uniform { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: stretch; }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: scale(1.02); }
   .slot.dragging > :global(.tile) { opacity: .4; }
@@ -357,5 +378,6 @@
     .net-label { display: none; }
     .page { padding: 16px 16px 60px; gap: 22px; }
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .grid.uniform { grid-template-columns: minmax(0, 1fr); }
   }
 </style>
