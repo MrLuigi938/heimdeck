@@ -15,7 +15,7 @@
 
   async function saveBoard(b) {
     try {
-      await put(`/boards/${b.id}`, { name: b.name, icon: b.icon });
+      await put(`/boards/${b.id}`, { name: b.name, icon: b.icon, background: b.background });
       toast(t('Gespeichert'));
       onSaved({ keepOpen: true });
     } catch (e) {
@@ -176,11 +176,12 @@
 
   <section>
     <h3>{t('Dashboards')}</h3>
-    <p class="help">{t('Lege z. B. ein eigenes Dashboard für die Arbeit an. Gewechselt wird oben neben dem Titel; jeder Browser merkt sich das zuletzt benutzte.')}</p>
+    <p class="help">{t('Lege z. B. ein eigenes Dashboard für die Arbeit an. Gewechselt wird oben neben dem Titel; jeder Browser merkt sich das zuletzt benutzte.')} {t('Ohne eigenes Hintergrundbild wird das allgemeine aus „Aussehen“ verwendet.')}</p>
     {#each boardRows as b (b.id)}
       <div class="board-row">
         <input class="emoji" bind:value={b.icon} maxlength="4" aria-label={t('Symbol')} />
         <input bind:value={b.name} aria-label={t('Name')} />
+        <input class="board-bg" bind:value={b.background} placeholder={t('Eigenes Hintergrundbild (URL, optional)')} aria-label={t('Hintergrundbild')} />
         <div class="board-actions">
           <button class="small" onclick={() => saveBoard(b)}>{t('Speichern')}</button>
           <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
@@ -245,6 +246,9 @@
   .board-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
   .board-row input.emoji { text-align: center; padding-left: 4px; padding-right: 4px; }
   .board-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  /* Background URL gets its own line under icon and name. */
+  .board-bg { grid-column: 1 / -1; grid-row: 2; font-size: 13px; }
+  .board-row:not(form) { margin-bottom: 8px; }
   /* On phones the buttons get their own line below icon and name. */
   @media (max-width: 560px) {
     .board-row { grid-template-columns: 52px minmax(0, 1fr); margin-bottom: 6px; }

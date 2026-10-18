@@ -237,4 +237,7 @@ export const en = {
   'Dashboard anlegen': 'Create dashboard',
   'Dashboard „{name}“ angelegt': 'Dashboard “{name}” created',
   'Dashboard „{name}“ mit allen Gruppen und Kacheln löschen?': 'Delete dashboard “{name}” with all its groups and tiles?',
+  'Eigenes Hintergrundbild (URL, optional)': 'Own background image (URL, optional)',
+  'Hintergrundbild': 'Background image',
+  'Ohne eigenes Hintergrundbild wird das allgemeine aus „Aussehen“ verwendet.': 'Without its own background image, the general one from “Appearance” is used.',
 };

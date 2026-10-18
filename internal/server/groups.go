@@ -366,8 +366,9 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 // ---- boards ----
 
 type boardInput struct {
-	Name string `json:"name"`
-	Icon string `json:"icon"`
+	Name       string `json:"name"`
+	Icon       string `json:"icon"`
+	Background string `json:"background"`
 }
 
 func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
@@ -376,7 +377,7 @@ func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
-	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon)}
+	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon), Background: strings.TrimSpace(in.Background)}
 	if err := s.store.SaveBoard(&b); err != nil {
 		writeErr(w, 500, err)
 		return
@@ -400,7 +401,7 @@ func (s *Server) handleUpdateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, err)
 		return
 	}
-	b.Name, b.Icon = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon)
+	b.Name, b.Icon, b.Background = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon), strings.TrimSpace(in.Background)
 	if err := s.store.SaveBoard(&b); err != nil {
 		writeErr(w, 500, err)
 		return

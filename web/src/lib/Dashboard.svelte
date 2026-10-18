@@ -150,8 +150,10 @@
     media.addEventListener('change', apply);
     root.style.setProperty('--accent', settings.accent || '#5b8cff');
     document.title = settings.title || 'Heimdeck';
-    if (settings.background) {
-      document.body.style.setProperty('--bg-image', `url("${settings.background.replace(/"/g, '%22')}")`);
+    // A dashboard can have its own background; otherwise the global one is used.
+    const background = board?.background || settings.background;
+    if (background) {
+      document.body.style.setProperty('--bg-image', `url("${background.replace(/"/g, '%22')}")`);
       document.body.classList.add('has-bg');
     } else {
       document.body.style.removeProperty('--bg-image');
@@ -279,7 +281,10 @@
           {/if}
         </div>
         {#if settings.showGreeting !== 'false'}
-          <div class="muted greet">{greeting}<span class="greet-date">{' · ' + dateText}</span> · {timeText}</div>
+          <div class="muted greet">
+            <div>{greeting}</div>
+            <div class="when">{dateText} · {timeText}</div>
+          </div>
         {/if}
       </div>
       <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} boardId={board?.id} />
@@ -405,7 +410,8 @@
   /* The brand block (with the dashboard menu) sits above the icons and search next to it. */
   .brand { min-width: 0; position: relative; z-index: 2; }
   h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; }
-  .greet { font-size: 13.5px; margin-top: 2px; }
+  .greet { font-size: 13.5px; margin-top: 2px; line-height: 1.35; }
+  .when { white-space: nowrap; }
   .title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .boards { position: relative; }
   .board-btn { padding: 4px 10px; font-size: 13px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center; }

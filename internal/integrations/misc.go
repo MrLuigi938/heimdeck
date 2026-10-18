@@ -3,9 +3,11 @@ package integrations
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // ---- Paperless-ngx ----
@@ -82,19 +84,23 @@ func init() { register(romm{}) }
 func (romm) Def() Definition {
 	return Definition{
 		ID: "romm", Name: "RomM", Icon: "romm", Category: "Spiele",
-		Description: "Plattformen, Spiele und Speicherstände",
+		Description: "Plattformen, Spiele und Speicherstände, Suche nach Spielen",
 		Fields: []Field{
 			{Key: "username", Label: "Benutzername", Type: "text", Required: true},
 			{Key: "password", Label: "Passwort", Type: "password", Required: true, Secret: true},
 		},
-		HasWidget: true, Images: []string{"romm"}, Port: 8080,
+		HasWidget: true, HasSearch: true, Images: []string{"romm"}, Port: 8080,
 	}
 }
 
-func (romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
+func (romm) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
 	auth := base64.StdEncoding.EncodeToString([]byte(in.V("username") + ":" + in.Values["password"]))
+	return in.do(ctx, request{path: path, query: q, headers: map[string]string{"Authorization": "Basic " + auth}}, out)
+}
+
+func (r romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var st map[string]any
-	if err := in.do(ctx, request{path: "/api/stats", headers: map[string]string{"Authorization": "Basic " + auth}}, &st); err != nil {
+	if err := r.get(ctx, in, "/api/stats", nil, &st); err != nil {
 		return nil, err
 	}
 	// RomM uses upper-case keys (PLATFORMS, ROMS, ...); read case-insensitively.
@@ -119,6 +125,95 @@ func (romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Größe"), Value: in.Bytes(v)})
 	}
 	return w, nil
+}
+
+type rommRom struct {
+	ID                  int    `json:"id"`
+	Name                string `json:"name"`
+	FsName              string `json:"fs_name"`
+	PlatformName        string `json:"platform_name"`
+	PlatformDisplayName string `json:"platform_display_name"`
+	FirstReleaseDate    *int64 `json:"first_release_date"` // milliseconds
+	URLCover            string `json:"url_cover"`
+	PathCoverSmall      string `json:"path_cover_small"` // RomM 4
+	PathCoverS          string `json:"path_cover_s"`     // RomM 3
+}
+
+// Search finds platforms by name and games via RomM's own search.
+func (r romm) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
+	out := []Item{}
+	q := strings.ToLower(query)
+
+	var platforms []struct {
+		ID          int    `json:"id"`
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+		RomCount    int    `json:"rom_count"`
+	}
+	if err := r.get(ctx, in, "/api/platforms", nil, &platforms); err == nil {
+		for _, p := range platforms {
+			name := p.DisplayName
+			if name == "" {
+				name = p.Name
+			}
+			if strings.Contains(strings.ToLower(name), q) && len(out) < 3 {
+				out = append(out, Item{Title: name, Subtitle: in.T("%d Spiele", p.RomCount),
+					Badge: in.T("Plattform"), URL: in.Link(fmt.Sprintf("/platform/%d", p.ID))})
+			}
+		}
+	}
+
+	// Depending on the RomM version the list is either plain or wrapped in {"items": [...]}.
+	var raw json.RawMessage
+	if err := r.get(ctx, in, "/api/roms", url.Values{"search_term": {query}, "limit": {"8"}}, &raw); err != nil {
+		if len(out) > 0 {
+			return out, nil
+		}
+		return nil, err
+	}
+	var roms []rommRom
+	if err := json.Unmarshal(raw, &roms); err != nil {
+		var page struct {
+			Items []rommRom `json:"items"`
+		}
+		if err := json.Unmarshal(raw, &page); err != nil {
+			return out, nil
+		}
+		roms = page.Items
+	}
+	for i, rom := range roms {
+		if i == 8 {
+			break
+		}
+		name := rom.Name
+		if name == "" {
+			name = rom.FsName
+		}
+		sub := rom.PlatformDisplayName
+		if sub == "" {
+			sub = rom.PlatformName
+		}
+		if rom.FirstReleaseDate != nil && *rom.FirstReleaseDate > 0 {
+			year := time.UnixMilli(*rom.FirstReleaseDate).Year()
+			if sub != "" {
+				sub += " · "
+			}
+			sub += fmt.Sprint(year)
+		}
+		it := Item{Title: name, Subtitle: sub, URL: in.Link(fmt.Sprintf("/rom/%d", rom.ID))}
+		// Prefer RomM's own copy of the cover; IGDB's address is the fallback.
+		if p := rom.PathCoverSmall + rom.PathCoverS; p != "" {
+			p = strings.TrimLeft(p, "/")
+			if !strings.HasPrefix(p, "assets/") {
+				p = "assets/romm/resources/" + p
+			}
+			it.Image = in.Link("/" + p)
+		} else if rom.URLCover != "" {
+			it.Image = rom.URLCover
+		}
+		out = append(out, it)
+	}
+	return out, nil
 }
 
 // ---- Stash ----

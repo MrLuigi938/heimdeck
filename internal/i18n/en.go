@@ -146,4 +146,7 @@ var en = map[string]string{
 	"unbekanntes Dashboard":                                                      "unknown dashboard",
 	"unbekannte Kachelgröße":                                                     "unknown tile size",
 	"Das letzte Dashboard kann nicht gelöscht werden":                            "The last dashboard cannot be deleted",
+	"Plattform": "Platform",
+	"%d Spiele": "%d games",
+	"Plattformen, Spiele und Speicherstände, Suche nach Spielen": "Platforms, games and save files, game search",
 }
