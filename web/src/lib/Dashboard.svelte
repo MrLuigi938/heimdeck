@@ -279,7 +279,7 @@
           {/if}
         </div>
         {#if settings.showGreeting !== 'false'}
-          <div class="muted greet">{greeting}<span class="greet-date"> · {dateText}</span> · {timeText}</div>
+          <div class="muted greet">{greeting}<span class="greet-date">{' · ' + dateText}</span> · {timeText}</div>
         {/if}
       </div>
       <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} boardId={board?.id} />
@@ -402,7 +402,8 @@
   .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; }
   /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
   .top { display: grid; grid-template-columns: 1fr minmax(0, 620px) 1fr; gap: 16px; align-items: center; position: relative; z-index: 30; }
-  .brand { min-width: 0; }
+  /* The brand block (with the dashboard menu) sits above the icons and search next to it. */
+  .brand { min-width: 0; position: relative; z-index: 2; }
   h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; }
   .greet { font-size: 13.5px; margin-top: 2px; }
   .title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -446,9 +447,9 @@
   }
   @media (max-width: 640px) {
     .net-label { display: none; }
-    .board-name, .greet-date { display: none; }
-    .title-row { flex-wrap: nowrap; }
-    .brand { justify-self: stretch !important; }
+    /* Icons in a compact block (3 + 2) that matches the height of the title block. */
+    .tools { display: grid; grid-template-columns: repeat(3, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }
+    .tools :global(button) { width: 38px; height: 38px; padding: 0; justify-content: center; }
     .locked { display: grid; grid-template-columns: minmax(0, 1fr); }
     .locked .spacer { display: none; }
     .locked input { width: 100%; }
