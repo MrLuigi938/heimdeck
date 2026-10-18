@@ -1,6 +1,6 @@
 services:
   heimdeck:
-    image: ghcr.io/heimdeck/heimdeck:latest
+    image: ghcr.io/mrluigi938/heimdeck:latest
     # Oder selbst bauen: statt "image" die nächste Zeile verwenden
     # build: .
     container_name: heimdeck

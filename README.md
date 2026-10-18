@@ -15,7 +15,7 @@ Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber 
 ```yaml
 services:
   heimdeck:
-    image: ghcr.io/heimdeck/heimdeck:latest
+    image: ghcr.io/mrluigi938/heimdeck:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
