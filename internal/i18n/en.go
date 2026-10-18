@@ -149,4 +149,7 @@ var en = map[string]string{
 	"Plattform": "Platform",
 	"%d Spiele": "%d games",
 	"Plattformen, Spiele und Speicherstände, Suche nach Spielen": "Platforms, games and save files, game search",
+	"Empfohlen: in RomM unter Administration → Client API Tokens erstellen (Rechte roms.read und platforms.read). Dann bleiben Benutzername und Passwort leer.": "Recommended: create one in RomM under Administration → Client API Tokens (scopes roms.read and platforms.read). Leave username and password empty then.",
+	"Bitte einen API-Token oder Benutzername und Passwort eintragen":                                                                                            "Please enter an API token or username and password",
+	"RomM lehnt die Anmeldung ab (%d) – am besten einen API-Token mit den Rechten roms.read und platforms.read verwenden":                                       "RomM rejected the login (%d) – best use an API token with the scopes roms.read and platforms.read",
 }

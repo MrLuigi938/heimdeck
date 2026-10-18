@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -86,16 +87,32 @@ func (romm) Def() Definition {
 		ID: "romm", Name: "RomM", Icon: "romm", Category: "Spiele",
 		Description: "Plattformen, Spiele und Speicherstände, Suche nach Spielen",
 		Fields: []Field{
-			{Key: "username", Label: "Benutzername", Type: "text", Required: true},
-			{Key: "password", Label: "Passwort", Type: "password", Required: true, Secret: true},
+			{Key: "apiKey", Label: "API-Token", Type: "password", Secret: true,
+				Help: "Empfohlen: in RomM unter Administration → Client API Tokens erstellen (Rechte roms.read und platforms.read). Dann bleiben Benutzername und Passwort leer."},
+			{Key: "username", Label: "Benutzername", Type: "text"},
+			{Key: "password", Label: "Passwort", Type: "password", Secret: true},
 		},
 		HasWidget: true, HasSearch: true, Images: []string{"romm"}, Port: 8080,
 	}
 }
 
+// get authenticates with a Client API Token (RomM 4.x) or, as fallback, username and password.
 func (romm) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
-	auth := base64.StdEncoding.EncodeToString([]byte(in.V("username") + ":" + in.Values["password"]))
-	return in.do(ctx, request{path: path, query: q, headers: map[string]string{"Authorization": "Basic " + auth}}, out)
+	var auth string
+	switch {
+	case in.V("apiKey") != "":
+		auth = "Bearer " + in.V("apiKey")
+	case in.V("username") != "":
+		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(in.V("username")+":"+in.Values["password"]))
+	default:
+		return in.Errorf("Bitte einen API-Token oder Benutzername und Passwort eintragen")
+	}
+	err := in.do(ctx, request{path: path, query: q, headers: map[string]string{"Authorization": auth}}, out)
+	var he *HTTPError
+	if errors.As(err, &he) && (he.Status == 401 || he.Status == 403) {
+		return in.Errorf("RomM lehnt die Anmeldung ab (%d) – am besten einen API-Token mit den Rechten roms.read und platforms.read verwenden", he.Status)
+	}
+	return err
 }
 
 func (r romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {

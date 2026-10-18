@@ -49,7 +49,7 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken. Fert
 | Prowlarr | aktive und gestörte Indexer | | |
 | SABnzbd | Tempo, Warteschlange, Restzeit | | pausieren, fortsetzen |
 | Paperless-ngx | Dokumente, Posteingang | ✓ | |
-| RomM | Plattformen, Spiele, Spielstände | ✓ | |
+| RomM (API-Token oder Benutzer/Passwort) | Plattformen, Spiele, Spielstände | ✓ | |
 | Stash | Szenen, Bilder, Größe | | |
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | JDownloader, FRITZ!Box, UniFi, Zoraxy, Anubis, qBittorrent, Portainer, … | Online-Status | | |
