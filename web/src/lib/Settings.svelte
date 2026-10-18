@@ -181,15 +181,17 @@
       <div class="board-row">
         <input class="emoji" bind:value={b.icon} maxlength="4" aria-label={t('Symbol')} />
         <input bind:value={b.name} aria-label={t('Name')} />
-        <button class="small" onclick={() => saveBoard(b)}>{t('Speichern')}</button>
-        <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
-        {#if boardRows.length > 1}<button class="small danger" onclick={() => removeBoard(b)}>{t('Löschen')}</button>{/if}
+        <div class="board-actions">
+          <button class="small" onclick={() => saveBoard(b)}>{t('Speichern')}</button>
+          <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
+          {#if boardRows.length > 1}<button class="small danger" onclick={() => removeBoard(b)}>{t('Löschen')}</button>{/if}
+        </div>
       </div>
     {/each}
     <form class="board-row" onsubmit={addBoard}>
       <input class="emoji" bind:value={newBoard.icon} maxlength="4" aria-label={t('Symbol')} />
       <input bind:value={newBoard.name} placeholder={t('z. B. Arbeit')} required />
-      <button class="small primary">+ {t('Dashboard anlegen')}</button>
+      <div class="board-actions"><button class="small primary">+ {t('Dashboard anlegen')}</button></div>
     </form>
   </section>
 
@@ -240,12 +242,14 @@
   .swatch.active { border-color: var(--text); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .indent { margin: -6px 0 0 26px; }
-  .board-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 6px; align-items: center; }
-  form.board-row { grid-template-columns: 52px minmax(0, 1fr) auto; }
+  .board-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
   .board-row input.emoji { text-align: center; padding-left: 4px; padding-right: 4px; }
-  @media (max-width: 520px) {
-    .board-row { grid-template-columns: 52px minmax(0, 1fr); }
-    .board-row button { grid-column: span 1; }
+  .board-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  /* On phones the buttons get their own line below icon and name. */
+  @media (max-width: 560px) {
+    .board-row { grid-template-columns: 52px minmax(0, 1fr); margin-bottom: 6px; }
+    .board-actions { grid-column: 1 / -1; }
+    .board-actions button { flex: 1; }
   }
   .button { cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface-2); border-radius: 10px; padding: 8px 14px; }
   .button:hover { border-color: var(--accent); }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -60,22 +61,24 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var res struct {
 		Error string `json:"error"`
 		Queue struct {
-			Status   string `json:"status"`
 			Paused   bool   `json:"paused"`
 			KBPerSec string `json:"kbpersec"`
 			MBLeft   string `json:"mbleft"`
 			Timeleft string `json:"timeleft"`
 			Total    int    `json:"noofslots_total"`
 			Slots    []struct {
+				ID         string `json:"nzo_id"`
 				Filename   string `json:"filename"`
 				Percentage string `json:"percentage"`
 				Timeleft   string `json:"timeleft"`
 				MB         string `json:"mb"`
+				MBLeft     string `json:"mbleft"`
 				Status     string `json:"status"`
 			} `json:"slots"`
 		} `json:"queue"`
 	}
-	if err := s.api(ctx, in, "queue", url.Values{"limit": {"5"}}, &res); err != nil {
+	// Load the whole queue so paused jobs and the remaining size can be counted.
+	if err := s.api(ctx, in, "queue", url.Values{"limit": {"100"}}, &res); err != nil {
 		return nil, err
 	}
 	if res.Error != "" {
@@ -85,40 +88,80 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	kbps, _ := strconv.ParseFloat(q.KBPerSec, 64)
 	mbleft, _ := strconv.ParseFloat(q.MBLeft, 64)
 
+	// Jobs can be paused one by one while the queue itself keeps running;
+	// SABnzbd then reports "not paused", 0 jobs and 0 MB left.
+	var pausedIDs []string
+	slotsLeft := 0.0
+	for _, sl := range q.Slots {
+		if strings.EqualFold(sl.Status, "Paused") {
+			pausedIDs = append(pausedIDs, sl.ID)
+		}
+		l, _ := strconv.ParseFloat(sl.MBLeft, 64)
+		slotsLeft += l
+	}
+	allJobsPaused := len(q.Slots) > 0 && len(pausedIDs) == len(q.Slots)
+	paused := q.Paused || allJobsPaused
+	total := max(q.Total, len(q.Slots))
+	if mbleft == 0 {
+		mbleft = slotsLeft
+	}
+
 	w := &Widget{ItemsTitle: in.T("Warteschlange")}
 	speed := in.Bytes(kbps*1024) + "/s"
-	if q.Paused {
+	if paused {
 		speed = in.T("Pausiert")
 	}
 	w.Stats = []Stat{
-		{Label: in.T("Tempo"), Value: speed, Tone: toneIf(q.Paused, "warn")},
-		{Label: in.T("Downloads"), Value: fmt.Sprint(q.Total)},
+		{Label: in.T("Tempo"), Value: speed, Tone: toneIf(paused, "warn")},
+		{Label: in.T("Downloads"), Value: fmt.Sprint(total)},
 		{Label: in.T("Verbleibend"), Value: in.Bytes(mbleft * 1024 * 1024)},
 	}
-	if q.Total > 0 && !q.Paused {
+	if total > 0 && !paused && q.Timeleft != "" && q.Timeleft != "0:00:00" {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Restzeit"), Value: q.Timeleft})
 	}
-	for _, sl := range q.Slots {
+	for i, sl := range q.Slots {
+		if i == 5 {
+			break
+		}
 		p, _ := strconv.ParseFloat(sl.Percentage, 64)
 		mb, _ := strconv.ParseFloat(sl.MB, 64)
+		sub := in.Status(sl.Status) + " · " + in.Bytes(mb*1024*1024)
+		if sl.Timeleft != "" && sl.Timeleft != "0:00:00" {
+			sub += " · " + in.T("noch %s", sl.Timeleft)
+		}
 		w.Items = append(w.Items, Item{
 			Title:    strings.ReplaceAll(sl.Filename, ".", " "),
-			Subtitle: in.Status(sl.Status) + " · " + in.Bytes(mb*1024*1024) + " · " + in.T("noch %s", sl.Timeleft),
+			Subtitle: sub,
 			Progress: pct(p),
 			URL:      in.Link("/"),
 		})
 	}
-	if q.Paused {
+	switch {
+	case q.Paused:
 		w.Actions = []Action{{ID: "resume", Label: in.T("Fortsetzen"), Tone: "primary"}}
-	} else {
+	case allJobsPaused:
+		w.Actions = []Action{{ID: "resume_jobs", Label: in.T("Fortsetzen"), Tone: "primary",
+			Params: map[string]string{"ids": strings.Join(pausedIDs, ",")}}}
+	case total > 0:
 		w.Actions = []Action{{ID: "pause", Label: in.T("Pausieren")}}
 	}
 	return w, nil
 }
 
-func (s sabnzbd) Action(ctx context.Context, in *Instance, action string, _ map[string]string) error {
-	if action != "pause" && action != "resume" {
-		return in.Errorf("unbekannte Aktion %q", action)
+var nzoID = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+func (s sabnzbd) Action(ctx context.Context, in *Instance, action string, p map[string]string) error {
+	switch action {
+	case "pause", "resume":
+		return s.api(ctx, in, action, nil, nil)
+	case "resume_jobs":
+		ids := strings.Split(p["ids"], ",")
+		for _, id := range ids {
+			if !nzoID.MatchString(id) {
+				return in.Errorf("ungültige Anfrage-ID")
+			}
+		}
+		return s.api(ctx, in, "queue", url.Values{"name": {"resume"}, "value": {strings.Join(ids, ",")}}, nil)
 	}
-	return s.api(ctx, in, action, nil, nil)
+	return in.Errorf("unbekannte Aktion %q", action)
 }

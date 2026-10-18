@@ -266,7 +266,7 @@
           {#if boards.length > 1}
             <div class="boards">
               <button class="board-btn" onclick={() => (boardMenu = !boardMenu)} aria-expanded={boardMenu} title={t('Dashboard wechseln')}>
-                {board?.icon || '▦'} {t(board?.name || '')} <span class="caret">▾</span>
+                <span>{board?.icon || '▦'}</span><span class="board-name">{t(board?.name || '')}</span><span class="caret">▾</span>
               </button>
               {#if boardMenu}
                 <div class="board-menu card" role="menu">
@@ -279,7 +279,7 @@
           {/if}
         </div>
         {#if settings.showGreeting !== 'false'}
-          <div class="muted greet">{greeting} · {dateText} · {timeText}</div>
+          <div class="muted greet">{greeting}<span class="greet-date"> · {dateText}</span> · {timeText}</div>
         {/if}
       </div>
       <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} boardId={board?.id} />
@@ -400,7 +400,8 @@
 
 <style>
   .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; }
-  .top { display: grid; grid-template-columns: 1fr minmax(0, 620px) 1fr; gap: 16px; align-items: center; }
+  /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
+  .top { display: grid; grid-template-columns: 1fr minmax(0, 620px) 1fr; gap: 16px; align-items: center; position: relative; z-index: 30; }
   .brand { min-width: 0; }
   h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; }
   .greet { font-size: 13.5px; margin-top: 2px; }
@@ -445,6 +446,12 @@
   }
   @media (max-width: 640px) {
     .net-label { display: none; }
+    .board-name, .greet-date { display: none; }
+    .title-row { flex-wrap: nowrap; }
+    .brand { justify-self: stretch !important; }
+    .locked { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .locked .spacer { display: none; }
+    .locked input { width: 100%; }
     .page { padding: 16px 16px 60px; gap: 22px; }
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .grid.uniform { grid-template-columns: minmax(0, 1fr); }
