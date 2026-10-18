@@ -152,4 +152,20 @@ var en = map[string]string{
 	"Empfohlen: in RomM unter Administration → Client API Tokens erstellen (Rechte roms.read und platforms.read). Dann bleiben Benutzername und Passwort leer.": "Recommended: create one in RomM under Administration → Client API Tokens (scopes roms.read and platforms.read). Leave username and password empty then.",
 	"Bitte einen API-Token oder Benutzername und Passwort eintragen":                                                                                            "Please enter an API token or username and password",
 	"RomM lehnt die Anmeldung ab (%d) – am besten einen API-Token mit den Rechten roms.read und platforms.read verwenden":                                       "RomM rejected the login (%d) – best use an API token with the scopes roms.read and platforms.read",
+
+	// ---- Tubesy ----
+	"Video-Downloads (yt-dlp): Warteschlange, Tempo, Bibliothekssuche, URLs aus der Suche herunterladen": "Video downloads (yt-dlp): queue, speed, library search, download URLs from the search",
+	"API-Schlüssel": "API key",
+	"In Tubesy: Konto → API-Schlüssel → Neuer Schlüssel. „Nur lesen“ genügt für die Anzeige, für Aktionen „Lesen & Downloads“ wählen.": "In Tubesy: Account → API keys → New key. “Read only” is enough for the tile; choose “Read & downloads” for actions.",
+	"Tubesy lehnt den API-Schlüssel ab – in Tubesy unter Konto → API-Schlüssel einen neuen erstellen":                                  "Tubesy rejected the API key – create a new one in Tubesy under Account → API keys",
+	"Der API-Schlüssel darf nur lesen – für Aktionen einen Schlüssel mit „Lesen & Downloads“ erstellen":                                "This API key is read-only – create a key with “Read & downloads” for actions",
+	"Heute fertig":                          "Done today",
+	"Frei":                                  "Free",
+	"Verarbeitung":                          "Processing",
+	"Abbrechen":                             "Cancel",
+	"Download „%s“ abbrechen?":              "Cancel download “%s”?",
+	"Herunterladen":                         "Download",
+	"Mit dem Standard-Preset herunterladen": "Download with the default preset",
+	"ungültige Download-ID":                 "invalid download ID",
+	"ungültige URL":                         "invalid URL",
 }

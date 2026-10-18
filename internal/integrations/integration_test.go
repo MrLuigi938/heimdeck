@@ -14,6 +14,7 @@ func TestMatch(t *testing.T) {
 		"stashapp/stash:latest":                      "stash",
 		"zoraxy/zoraxy:latest":                       "zoraxy",
 		"localhost:5000/prowlarr":                    "prowlarr",
+		"ghcr.io/mrluigi938/tubesy:latest":           "tubesy",
 	}
 	for image, want := range cases {
 		in, ok := Match(image)
