@@ -6,8 +6,9 @@
   import { t, i18n, setLang } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
   import { importFile } from './importFile.js';
+  import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
 
-  let { settings, boards = [], boardId, username, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, username, onClose, onSaved, onSwitchBoard } = $props();
 
   // Editable copy of the dashboards list.
   // svelte-ignore state_referenced_locally
@@ -51,6 +52,7 @@
   let s = $state({
     title: 'Heimdeck', theme: 'auto', accent: '#5b8cff', background: '', searchEngine: 'duckduckgo',
     openInNewTab: 'true', showGreeting: 'true', showUptime: 'true', localHosts: '', uniformTiles: 'false',
+    ntfyUrl: '', notifyAfter: '2', notifyRecovery: 'true', notifyExternal: 'true',
     ...$state.snapshot(settings),
   });
   let pw = $state({ current: '', new: '' });
@@ -78,6 +80,58 @@
       onSaved();
     } catch (e) {
       toast(e.message, 'bad');
+    }
+  }
+
+  // Notification channels. The Discord webhook and the ntfy token are secrets:
+  // the server only says whether they are set.
+  // svelte-ignore state_referenced_locally
+  let nf = $state({ discordWebhook: '', ntfyToken: '', discordSet: !!notify.discord, ntfyTokenSet: !!notify.ntfyToken });
+  let testing = $state(false);
+
+  async function saveNotify() {
+    try {
+      await put('/settings', { ntfyUrl: s.ntfyUrl || '', notifyAfter: s.notifyAfter || '2', notifyRecovery: s.notifyRecovery || 'true', notifyExternal: s.notifyExternal || 'true' });
+      const body = {};
+      if (nf.discordWebhook) body.discordWebhook = nf.discordWebhook;
+      if (nf.ntfyToken) body.ntfyToken = nf.ntfyToken;
+      const res = await put('/notify', body);
+      nf = { discordWebhook: '', ntfyToken: '', discordSet: res.discord, ntfyTokenSet: res.ntfyToken };
+      toast(t('Gespeichert'));
+      onSaved({ keepOpen: true });
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+
+  async function removeSecret(key) {
+    try {
+      const res = await put('/notify', { [key]: '' });
+      nf.discordSet = res.discord;
+      nf.ntfyTokenSet = res.ntfyToken;
+      onSaved({ keepOpen: true });
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+
+  async function testNotify() {
+    testing = true;
+    try {
+      await saveNotify();
+      const res = await post('/notify/test');
+      toast(t('Testnachricht gesendet ({n} Kanal/Kanäle)', { n: res.sent }));
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+    testing = false;
+  }
+
+  async function toggleBrowser(e) {
+    const ok = await setBrowserNotify(e.target.checked);
+    if (!ok) {
+      e.target.checked = browserNotify.on;
+      toast(t('Der Browser hat Benachrichtigungen nicht erlaubt'), 'bad');
     }
   }
 
@@ -205,6 +259,58 @@
   </section>
 
   <section>
+    <h3>{t('Benachrichtigungen')}</h3>
+    <p class="help">{t('Heimdeck meldet sich, wenn ein Dienst ausfällt (nur Kacheln mit Online-Prüfung) und wenn er wieder erreichbar ist.')}</p>
+    <label class="field">
+      <span>Discord-Webhook</span>
+      <div class="secret-row">
+        <input type="password" bind:value={nf.discordWebhook} autocomplete="off" placeholder={nf.discordSet ? '•••••••• ' + t('gespeichert – leer lassen zum Beibehalten') : 'https://discord.com/api/webhooks/…'} />
+        {#if nf.discordSet}<button class="small" onclick={() => removeSecret('discordWebhook')}>{t('Entfernen')}</button>{/if}
+      </div>
+      <span class="help">{t('In Discord: Servereinstellungen → Integrationen → Webhooks → Neuer Webhook → Webhook-URL kopieren.')}</span>
+    </label>
+    <div class="grid2">
+      <label class="field">
+        <span>{t('ntfy-Thema (Adresse)')}</span>
+        <input bind:value={s.ntfyUrl} placeholder="https://ntfy.sh/mein-heimdeck" />
+      </label>
+      <label class="field">
+        <span>{t('ntfy-Token (optional)')}</span>
+        <div class="secret-row">
+          <input type="password" bind:value={nf.ntfyToken} autocomplete="off" placeholder={nf.ntfyTokenSet ? '•••••••• ' + t('gespeichert') : 'tk_… ' + t('oder Benutzer:Passwort')} />
+          {#if nf.ntfyTokenSet}<button class="small" onclick={() => removeSecret('ntfyToken')}>{t('Entfernen')}</button>{/if}
+        </div>
+      </label>
+    </div>
+    <span class="help">{t('ntfy: App installieren, ein Thema abonnieren und dessen Adresse hier eintragen. Eigener ntfy-Server geht genauso.')}</span>
+    <label class="field">
+      <span>{t('Melden, wenn ein Dienst so lange nicht antwortet')}</span>
+      <select bind:value={s.notifyAfter}>
+        <option value="1">1 {t('Minute')}</option>
+        <option value="2">2 {t('Minuten')}</option>
+        <option value="5">5 {t('Minuten')}</option>
+        <option value="10">10 {t('Minuten')}</option>
+        <option value="30">30 {t('Minuten')}</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" checked={s.notifyRecovery !== 'false'} onchange={setFlag('notifyRecovery')} /> {t('Melden, wenn der Dienst wieder erreichbar ist')}</label>
+    <label class="check"><input type="checkbox" checked={s.notifyExternal !== 'false'} onchange={setFlag('notifyExternal')} /> {t('Auch Ausfälle der öffentlichen Adressen melden')}</label>
+    <label class="check">
+      <input type="checkbox" checked={browserNotify.on} onchange={toggleBrowser} disabled={!notifySupported()} />
+      {t('Browser-Benachrichtigungen in diesem Browser')}
+    </label>
+    <p class="help indent">
+      {notifySupported()
+        ? t('Funktioniert, solange ein Heimdeck-Tab offen ist – auch im Hintergrund.')
+        : t('Nur über HTTPS (z. B. hinter deinem Reverse Proxy) oder localhost möglich – Browser erlauben Benachrichtigungen sonst nicht.')}
+    </p>
+    <div class="row"><span class="spacer"></span>
+      <button onclick={testNotify} disabled={testing}>{t('Test senden')}</button>
+      <button class="primary" onclick={saveNotify}>{t('Speichern')}</button>
+    </div>
+  </section>
+
+  <section>
     <h3>{t('Zugang')} ({username})</h3>
     <div class="grid2">
       <input type="password" placeholder={t('Aktuelles Passwort')} bind:value={pw.current} autocomplete="current-password" />
@@ -229,6 +335,8 @@
 </Modal>
 
 <style>
+  .secret-row { display: flex; gap: 8px; }
+  .secret-row input { flex: 1; min-width: 0; }
   section { display: grid; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
   section:last-child { border-bottom: 0; padding-bottom: 0; }
   h3 { margin: 4px 0 0; font-size: 14px; }

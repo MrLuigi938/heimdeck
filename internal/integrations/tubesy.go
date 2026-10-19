@@ -173,8 +173,10 @@ func shortDuration(sec int) string {
 		return fmt.Sprintf("%d s", sec)
 	case sec < 3600:
 		return fmt.Sprintf("%d min", (sec+30)/60)
+	case sec < 2*86400:
+		return fmt.Sprintf("%d:%02d h", sec/3600, sec%3600/60)
 	}
-	return fmt.Sprintf("%d:%02d h", sec/3600, sec%3600/60)
+	return fmt.Sprintf("%d d %d h", sec/86400, sec%86400/3600)
 }
 
 func (t tubesy) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {

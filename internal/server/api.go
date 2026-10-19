@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -168,6 +169,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	settings = publicSettings(settings)
+	ns := s.notifySecrets()
 	groups, err := s.store.Groups()
 	if err != nil {
 		writeErr(w, 500, err)
@@ -217,6 +220,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"docker":       s.docker != nil,
 		"proxmox":      hasProxmox,
 		"proxmoxHint":  proxmoxHint(),
+		"notify":       map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != ""},
 		"username":     name,
 	})
 }
@@ -225,6 +229,7 @@ var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
 	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true,
+	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +242,13 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		if !allowedSettings[k] {
 			delete(m, k)
 		}
+	}
+	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {
+		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" || len(strings.Trim(p.Path, "/")) == 0 {
+			writeErr(w, 400, errors.New("ntfy: bitte die vollständige Themen-Adresse angeben, z. B. https://ntfy.sh/mein-thema"))
+			return
+		}
+		m["ntfyUrl"] = u
 	}
 	if err := s.store.SaveSettings(m); err != nil {
 		writeErr(w, 500, err)
@@ -637,6 +649,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		go func(t store.Tile) {
 			defer wg.Done()
 			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
+			if errors.Is(err, integrations.ErrNoSearch) {
+				return
+			}
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}
 			if err != nil {
 				g.Error = err.Error()
@@ -792,6 +807,7 @@ type exportGroup struct {
 // handleExport writes groups, tiles and settings. API keys are left out on purpose.
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	settings, _ := s.store.Settings()
+	settings = publicSettings(settings)
 	groups, err := s.store.Groups()
 	if err != nil {
 		writeErr(w, 500, err)
@@ -950,4 +966,15 @@ func proxmoxHint() string {
 		return "https://127.0.0.1:8006"
 	}
 	return ""
+}
+
+// publicSettings drops internal entries (prefixed with "_") such as the
+// encrypted notification secrets.
+func publicSettings(m map[string]string) map[string]string {
+	for k := range m {
+		if strings.HasPrefix(k, "_") {
+			delete(m, k)
+		}
+	}
+	return m
 }

@@ -250,6 +250,11 @@ func (s *Store) Settings() (map[string]string, error) {
 	return out, rows.Err()
 }
 
+// SealSecret and OpenSecret encrypt values that are stored outside of tiles
+// (e.g. notification webhooks) with the same key as the tile secrets.
+func (s *Store) SealSecret(plain []byte) (string, error) { return s.box.Seal(plain) }
+func (s *Store) OpenSecret(enc string) ([]byte, error)   { return s.box.Open(enc) }
+
 func (s *Store) SaveSettings(m map[string]string) error {
 	tx, err := s.db.Begin()
 	if err != nil {

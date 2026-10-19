@@ -31,6 +31,7 @@ type Server struct {
 	mu      sync.Mutex
 	widgets map[string]cached[*integrations.Widget] // key: tile id + language
 	latest  map[int64]TileStatus
+	outages map[string]*outage // key: tile id + "int"/"ext"
 	recheck chan int64
 	// unlocked holds, per login session, the protected groups opened with their password.
 	unlocked map[string]map[int64]time.Time
@@ -49,7 +50,7 @@ const (
 
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	return &Server{store: s, auth: a, docker: d, web: web,
-		widgets: map[string]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{},
+		widgets: map[string]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
 }
 
@@ -64,6 +65,8 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/dashboard", s.handleDashboard)
 	api.HandleFunc("PUT /api/settings", s.handleSaveSettings)
 	api.HandleFunc("PUT /api/password", s.handlePassword)
+	api.HandleFunc("PUT /api/notify", s.handleSaveNotify)
+	api.HandleFunc("POST /api/notify/test", s.handleTestNotify)
 	api.HandleFunc("POST /api/boards", s.handleCreateBoard)
 	api.HandleFunc("PUT /api/boards/{id}", s.handleUpdateBoard)
 	api.HandleFunc("DELETE /api/boards/{id}", s.handleDeleteBoard)

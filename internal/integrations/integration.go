@@ -25,10 +25,12 @@ import (
 type Field struct {
 	Key      string `json:"key"`
 	Label    string `json:"label"`
-	Type     string `json:"type"` // text | password | checkbox ("true" or "")
+	Type     string `json:"type"` // text | password | textarea | select | checkbox ("true" or "")
 	Help     string `json:"help,omitempty"`
 	Required bool   `json:"required"`
 	Secret   bool   `json:"secret"`
+	// Options are the choices of a select field; the first is the default.
+	Options []string `json:"options,omitempty"`
 }
 
 // Definition describes a service: how to recognise it, which icon it uses and

@@ -6,6 +6,7 @@
   import TileEditor from './TileEditor.svelte';
   import Discover from './Discover.svelte';
   import { importFile } from './importFile.js';
+  import { browserNotify, checkAlerts } from './browserNotify.svelte.js';
   import Settings from './Settings.svelte';
   import GroupEditor from './GroupEditor.svelte';
   import Uptime from './Uptime.svelte';
@@ -128,6 +129,7 @@
   async function loadStatus() {
     try {
       status = await get('/status');
+      checkAlerts(status, (data?.groups || []).flatMap((g) => g.tiles || []));
     } catch {
       /* ignore, retried */
     }
@@ -135,7 +137,8 @@
 
   load().then(loadStatus);
   $effect(() => {
-    const s = setInterval(() => document.visibilityState === 'visible' && loadStatus(), 30000);
+    // With browser notifications on, keep polling in background tabs too.
+    const s = setInterval(() => (document.visibilityState === 'visible' || browserNotify.on) && loadStatus(), 30000);
     const c = setInterval(() => (now = new Date()), 15000);
     return () => { clearInterval(s); clearInterval(c); };
   });
@@ -426,7 +429,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} notify={data.notify} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
 {/if}
 

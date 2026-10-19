@@ -144,9 +144,18 @@
         {:else}
         <label class="field">
           <span>{f.label}{f.required ? '' : ` (${t('optional')})`}</span>
-          {#if f.secret}
+          {#if f.secret && f.type === 'textarea'}
+            <textarea rows="2" bind:value={secrets[f.key]} autocomplete="off" spellcheck="false"
+              placeholder={form.secretsSet?.includes(f.key) ? '•••••••• ' + t('gespeichert – leer lassen zum Beibehalten') : ''}></textarea>
+          {:else if f.secret}
             <input type="password" bind:value={secrets[f.key]} autocomplete="off"
               placeholder={form.secretsSet?.includes(f.key) ? '•••••••• ' + t('gespeichert – leer lassen zum Beibehalten') : ''} />
+          {:else if f.type === 'textarea'}
+            <textarea rows="3" bind:value={form.config[f.key]} autocomplete="off" spellcheck="false"></textarea>
+          {:else if f.type === 'select'}
+            <select bind:value={form.config[f.key]}>
+              {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
+            </select>
           {:else}
             <input bind:value={form.config[f.key]} autocomplete="off" />
           {/if}
@@ -219,6 +228,7 @@
   .advanced { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
   .help a { color: var(--accent); }
   .check-help { display: block; margin: -4px 0 4px 26px; }
+  textarea { width: 100%; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5; }
   .test { padding: 12px; border-radius: 12px; font-size: 14px; }
   .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
   .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

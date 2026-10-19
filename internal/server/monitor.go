@@ -24,6 +24,8 @@ type TileStatus struct {
 	Online bool   `json:"online"`
 	MS     int64  `json:"ms"`
 	Ext    *Check `json:"ext,omitempty"`
+	// Alert lists the addresses with a confirmed outage ("int", "ext").
+	Alert string `json:"alert,omitempty"`
 }
 
 type Check struct {
@@ -111,11 +113,15 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 	if ctx.Err() != nil {
 		return
 	}
+	if only == nil {
+		s.trackOutages(tiles, latest, now)
+	}
 	s.mu.Lock()
 	if only == nil {
 		s.latest = latest
 	} else {
 		for id, st := range latest {
+			st.Alert = s.latest[id].Alert // keep until the next full round decides
 			s.latest[id] = st
 		}
 	}
