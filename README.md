@@ -147,7 +147,7 @@ Für alles ohne eigene Integration: Kachel „Eigene API“ wählen, Adresse ein
 Werte:
   CPU = cpu | anteil
   Belegt = disk.used | bytes
-  Online = devices[online=true].#   (warn<1)
+  Online = devices[online=true].# | zahl warn<1
 Liste:          devices
 Listeneintrag:  title = name
                 badge = online | janein
