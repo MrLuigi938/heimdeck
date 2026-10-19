@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -528,6 +529,51 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
+// handleImage passes covers and thumbnails through, so the browser never needs
+// the service's API key.
+func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	t, code, err := s.accessibleTile(r, id)
+	if err != nil {
+		writeErr(w, code, err)
+		return
+	}
+	integ, _ := integrations.Get(t.Integration)
+	src, ok := integ.(integrations.ImageSource)
+	if !ok {
+		writeErr(w, 404, errors.New("nicht gefunden"))
+		return
+	}
+	ctx, cancel := timeout(r, 15*time.Second)
+	defer cancel()
+	resp, err := integrations.FetchImage(ctx, src, s.instance(t, langOf(r)), r.URL.Query().Get("p"))
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+	io.Copy(w, io.LimitReader(resp.Body, 10<<20))
+}
+
+// configured reports whether all required fields of a tile are filled in.
+// Tiles created as plain links before their service got an integration are not.
+func configured(integ integrations.Integration, t store.Tile) bool {
+	for _, f := range integ.Def().Fields {
+		if f.Required && t.Config[f.Key] == "" && t.Secrets[f.Key] == "" {
+			return false
+		}
+	}
+	return true
+}
+
 type searchGroup struct {
 	TileID int64               `json:"tileId"`
 	Name   string              `json:"name"`
@@ -573,7 +619,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		searcher, ok := integ.(integrations.Searcher)
-		if !ok {
+		if !ok || !configured(integ, t) {
 			continue
 		}
 		wg.Add(1)

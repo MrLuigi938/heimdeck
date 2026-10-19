@@ -145,7 +145,7 @@ func (t tubesy) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				parts = append(parts, in.Bytes(*d.Speed)+"/s")
 			}
 			if d.ETA != nil && *d.ETA > 0 {
-				parts = append(parts, in.T("noch %s", tubesyDuration(int(*d.ETA))))
+				parts = append(parts, in.T("noch %s", shortDuration(int(*d.ETA))))
 			}
 		case "processing":
 			stage := d.Stage
@@ -167,7 +167,7 @@ func (t tubesy) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	return w, nil
 }
 
-func tubesyDuration(sec int) string {
+func shortDuration(sec int) string {
 	switch {
 	case sec < 60:
 		return fmt.Sprintf("%d s", sec)

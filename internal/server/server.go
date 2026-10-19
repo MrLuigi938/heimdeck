@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/tiles/test", s.handleTestTile)
 	api.HandleFunc("GET /api/tiles/{id}/widget", s.handleWidget)
 	api.HandleFunc("POST /api/tiles/{id}/action", s.handleAction)
+	api.HandleFunc("GET /api/tiles/{id}/image", s.handleImage)
 	api.HandleFunc("PUT /api/layout", s.handleLayout)
 	api.HandleFunc("GET /api/status", s.handleStatus)
 	api.HandleFunc("GET /api/uptime", s.handleUptime)
@@ -230,7 +231,7 @@ func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 	if base == "" {
 		base = t.URL
 	}
-	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClient(t.Insecure), Lang: lang}
+	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClient(t.Insecure), Lang: lang, TileID: t.ID}
 }
 
 func (s *Server) forget(id int64) {

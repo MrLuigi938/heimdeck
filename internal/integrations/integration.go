@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -54,6 +55,7 @@ type Instance struct {
 	Values    map[string]string // config and secrets merged
 	Client    *http.Client
 	Lang      string // "de" or "en", for texts shown to the user
+	TileID    int64
 }
 
 func (i *Instance) V(key string) string { return strings.TrimSpace(i.Values[key]) }
@@ -80,6 +82,12 @@ func (i *Instance) Status(s string) string {
 		return s
 	}
 	return i.T(de)
+}
+
+// Proxy returns a dashboard URL that loads an image from the service through
+// Heimdeck, for covers and thumbnails that need the API key.
+func (i *Instance) Proxy(path string) string {
+	return fmt.Sprintf("/api/tiles/%d/image?p=%s", i.TileID, url.QueryEscape(path))
 }
 
 // Link builds a browser link below the public URL.
@@ -135,6 +143,50 @@ type Actioner interface {
 
 type Searcher interface {
 	Search(ctx context.Context, in *Instance, query string) ([]Item, error)
+}
+
+// ImageSource is implemented by integrations that hand out Proxy URLs. It
+// returns the auth headers for an image path, or an error if the path is not
+// one the integration serves images from.
+type ImageSource interface {
+	ImageHeaders(ctx context.Context, in *Instance, path string) (map[string]string, error)
+}
+
+// FetchImage loads an image through an ImageSource. The caller closes the body.
+func FetchImage(ctx context.Context, src ImageSource, in *Instance, path string) (*http.Response, error) {
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.Contains(path, "..") {
+		return nil, errors.New("invalid image path")
+	}
+	headers, err := src.ImageHeaders(ctx, in, path)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(in.BaseURL, "/")+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := in.Client.Do(req)
+	if err != nil {
+		return nil, friendlyNetErr(in.Lang, err)
+	}
+	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
+		resp.Body.Close()
+		return nil, &HTTPError{Status: resp.StatusCode, Lang: in.Lang}
+	}
+	return resp, nil
+}
+
+// hasPrefix reports whether path starts with one of the prefixes.
+func hasPrefix(path string, prefixes ...string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
 }
 
 var registry = map[string]Integration{}
@@ -323,19 +375,12 @@ func init() {
 	for _, d := range []Definition{
 		{ID: "link", Name: "Nur Link", Icon: "", Category: "Allgemein", Description: "Einfache Verknüpfung ohne Integration"},
 		{ID: "zoraxy", Name: "Zoraxy", Icon: "zoraxy", Category: "Netzwerk", Images: []string{"zoraxy"}, Port: 8000},
-		{ID: "anubis", Name: "Anubis", Icon: "anubis", Category: "Netzwerk", Images: []string{"anubis"}},
-		{ID: "unifi", Name: "UniFi", Icon: "ubiquiti-unifi", Category: "Netzwerk", Images: []string{"unifi"}, Port: 8443},
 		{ID: "fritzbox", Name: "FRITZ!Box", Icon: "fritzbox", Category: "Netzwerk", Description: "Router-Oberfläche (Integration folgt)"},
 		{ID: "jdownloader", Name: "JDownloader", Icon: "jdownloader", Category: "Downloads", Images: []string{"jdownloader"}, Port: 5800},
 		{ID: "portainer", Name: "Portainer", Icon: "portainer", Category: "System", Images: []string{"portainer"}, Port: 9000},
 		{ID: "dockge", Name: "Dockge", Icon: "dockge", Category: "System", Images: []string{"dockge"}, Port: 5001},
-		{ID: "bazarr", Name: "Bazarr", Icon: "bazarr", Category: "Medien", Images: []string{"bazarr"}, Port: 6767},
-		{ID: "lidarr", Name: "Lidarr", Icon: "lidarr", Category: "Medien", Images: []string{"lidarr"}, Port: 8686},
 		{ID: "qbittorrent", Name: "qBittorrent", Icon: "qbittorrent", Category: "Downloads", Images: []string{"qbittorrent"}, Port: 8080},
-		{ID: "home-assistant", Name: "Home Assistant", Icon: "home-assistant", Category: "Smart Home", Images: []string{"home-assistant"}, Port: 8123},
 		{ID: "vaultwarden", Name: "Vaultwarden", Icon: "vaultwarden", Category: "Sonstiges", Images: []string{"vaultwarden"}, Port: 80},
-		{ID: "nextcloud", Name: "Nextcloud", Icon: "nextcloud", Category: "Sonstiges", Images: []string{"nextcloud"}, Port: 80},
-		{ID: "immich", Name: "Immich", Icon: "immich", Category: "Medien", Images: []string{"immich-server"}, Port: 2283},
 	} {
 		register(linkOnly{def: d})
 	}
