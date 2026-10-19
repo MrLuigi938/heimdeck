@@ -4,13 +4,28 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
 )
 
-type jellyfin struct{}
+// jellyfin also covers Emby, which shares the API (below /emby, with its own
+// token header and web links).
+type jellyfin struct{ emby bool }
 
-func init() { register(jellyfin{}) }
+func init() {
+	register(jellyfin{})
+	register(jellyfin{emby: true})
+}
 
-func (jellyfin) Def() Definition {
+func (j jellyfin) Def() Definition {
+	if j.emby {
+		return Definition{
+			ID: "emby", Name: "Emby", Icon: "emby", Category: "Medien",
+			Description: "Wer gerade was schaut, Größe der Bibliothek, Suche",
+			Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
+				Help: "Einstellungen → Erweitert → API-Schlüssel → Neuer API-Schlüssel"}},
+			HasWidget: true, HasSearch: true, Images: []string{"emby"}, Port: 8096,
+		}
+	}
 	return Definition{
 		ID: "jellyfin", Name: "Jellyfin", Icon: "jellyfin", Category: "Medien",
 		Description: "Wer gerade was schaut, Größe der Bibliothek, Suche",
@@ -20,7 +35,10 @@ func (jellyfin) Def() Definition {
 	}
 }
 
-func (jellyfin) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
+func (j jellyfin) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
+	if j.emby {
+		return in.do(ctx, request{path: "/emby" + path, query: q, headers: map[string]string{"X-Emby-Token": in.V("apiKey")}}, out)
+	}
 	return in.do(ctx, request{path: path, query: q, headers: map[string]string{
 		"Authorization": fmt.Sprintf(`MediaBrowser Client="Heimdeck", Token="%s"`, in.V("apiKey")),
 	}}, out)
@@ -67,7 +85,7 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		if np.SeriesName != "" {
 			title = fmt.Sprintf("%s · S%02dE%02d", np.SeriesName, np.ParentIndexNumber, np.IndexNumber)
 		}
-		it := Item{Title: title, Subtitle: s.UserName + " · " + s.DeviceName, URL: in.Link("/web/#/dashboard")}
+		it := Item{Title: title, Subtitle: s.UserName + " · " + s.DeviceName, URL: j.link(ctx, in, "")}
 		if np.RunTimeTicks > 0 {
 			it.Progress = pct(float64(s.PlayState.PositionTicks) / float64(np.RunTimeTicks) * 100)
 		}
@@ -112,9 +130,37 @@ func (j jellyfin) Search(ctx context.Context, in *Instance, query string) ([]Ite
 		}
 		out = append(out, Item{
 			Title: it.Name, Subtitle: sub, Badge: in.T("Vorhanden"),
-			URL:   in.Link("/web/#/details?id=" + it.ID),
-			Image: in.Link("/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
+			URL:   j.link(ctx, in, it.ID),
+			Image: in.Link(map[bool]string{true: "/emby", false: ""}[j.emby] + "/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
 		})
 	}
 	return out, nil
+}
+
+var embyServerIDs sync.Map // BaseURL → server id
+
+// link opens an item (or the dashboard when id is empty) in the web client.
+func (j jellyfin) link(ctx context.Context, in *Instance, id string) string {
+	if !j.emby {
+		if id == "" {
+			return in.Link("/web/#/dashboard")
+		}
+		return in.Link("/web/#/details?id=" + id)
+	}
+	if id == "" {
+		return in.Link("/web/index.html#!/dashboard")
+	}
+	server, ok := embyServerIDs.Load(in.BaseURL)
+	if !ok {
+		var info struct {
+			ID string `json:"Id"`
+		}
+		if j.get(ctx, in, "/System/Info/Public", nil, &info) == nil && info.ID != "" {
+			server = info.ID
+			embyServerIDs.Store(in.BaseURL, info.ID)
+		} else {
+			server = ""
+		}
+	}
+	return in.Link("/web/index.html#!/item?id=" + id + "&serverId=" + server.(string))
 }

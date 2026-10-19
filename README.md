@@ -9,6 +9,8 @@ Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber 
 - **Aktionen**: Jellyseerr-Anfragen genehmigen oder ablehnen, SABnzbd pausieren, AdGuard-Schutz pausieren, Lademodus in evcc wechseln, Lichter und Schalter in Home Assistant oder ioBroker umschalten, UniFi-Geräte neu starten, Speedtest starten …
 - **Zuhause oder unterwegs**: Jede Kachel kann zusätzlich eine öffentliche Adresse haben. Öffnest du das Dashboard über eine lokale Adresse, werden lokale Links verwendet, sonst die öffentlichen. Umschalten geht oben rechts per Klick.
 - **Verfügbarkeit**: Heimdeck prüft jede Minute alle Dienste (lokal und öffentlich) und zeigt den Verlauf über 24 Stunden oder 3 Tage mit Ausfällen und Antwortzeiten.
+- **Benachrichtigungen**: Fällt ein Dienst aus (und wenn er wieder da ist), kommt eine Nachricht per Discord, ntfy oder als Browser-Benachrichtigung.
+- **Eigene API**: Jede JSON-Schnittstelle wird zur Live-Kachel – mit eigenen Werten, Liste, Knöpfen und Suche.
 - **Mehrere Dashboards**: z. B. „Privat“ und „Arbeit“ – oben neben dem Titel umschalten, jedes auf Wunsch mit eigenem Hintergrundbild. Jeder Browser merkt sich das zuletzt benutzte, per `?board=<id>` lässt sich eines direkt verlinken.
 - **Gruppen ausblenden oder schützen**: Eine Gruppe kann ausgeblendet sein (Anzeige per 👁 für die aktuelle Sitzung) oder ein eigenes Passwort haben.
 - **Gemeinsame Suche** (Taste `/`): Kacheln, Jellyfin-Bibliothek, Jellyseerr (mit Knopf „Anfragen“), Paperless-Dokumente, RomM-Spiele, Tubesy-Videos, Immich-Fotos und -Personen, Hörbücher, Comics, Nextcloud-Dateien, Home-Assistant-Geräte, UniFi-Clients, DNS-Abfragen in AdGuard und mehr in einem Suchfeld – Cover und Vorschaubilder inklusive. Eine eingefügte Video-URL lässt sich direkt an Tubesy schicken.
@@ -86,8 +88,15 @@ Proxmox-Kachel anlegen (Startseite → **Proxmox verbinden**) mit einem API-Toke
 | Komga | Serien, Bücher, angefangene Bücher | ✓ mit Covern | |
 | Stash | Szenen, Bilder, Größe | | |
 | RomM (API-Token oder Benutzer/Passwort) | Plattformen, Spiele, Spielstände | ✓ | |
+| Plex | Streams, Filme/Serien/Musik | ✓ mit Covern | |
+| Emby | Streams, Bibliotheksgröße | ✓ | |
+| Navidrome | läuft gerade, Titelanzahl, Scan | ✓ Künstler, Alben, Titel mit Covern | |
+| Readarr / Bookshelf | Warteschlange, neue und fehlende Bücher | ✓ Autoren | fehlende Bücher suchen |
+| Tdarr | Dateien, Transcodes, Warteschlange, gesparter Speicher, laufende Worker | | |
 | **Downloads** | | | |
 | SABnzbd | Tempo, Warteschlange, Restzeit | | pausieren, fortsetzen |
+| NZBGet | Tempo, Warteschlange, Restgröße, Restzeit | | pausieren, fortsetzen |
+| qBittorrent, Transmission, Deluge | ↓/↑-Tempo, lädt/seedet, aktive Torrents mit Fortschritt | ✓ Torrents | alle pausieren/fortsetzen |
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
 | **Dokumente** | | | |
@@ -95,19 +104,57 @@ Proxmox-Kachel anlegen (Startseite → **Proxmox verbinden**) mit einem API-Toke
 | Nextcloud (App-Passwort) | Dateien, Benutzer, aktive Nutzer, freier Speicher (ohne Admin: eigener Speicher) | ✓ Dateien, Kalender, Kontakte, Talk, Notizen, Deck … | |
 | **Netzwerk** | | | |
 | AdGuard Home | DNS-Anfragen, Blockierquote, Antwortzeit, meistblockierte Domains | ✓ Abfrage-Log | Schutz pausieren/ausschalten, Domain sperren oder freigeben |
+| Pi-hole (v6 mit App-Passwort, v5 mit API-Token) | DNS-Anfragen, Blockierquote, Clients | ✓ Abfrage-Log (v6) | Blockieren pausieren, Domain sperren oder freigeben |
+| OPNsense (API-Key + Secret) | WAN-Datenrate, RAM, Last, Laufzeit, Gateways, Updates | | |
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
+| Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
 | Proxmox VE (API-Token) | CPU, RAM, Gäste aktiv, Nodes bzw. gestoppte Gäste | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
 | ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |
 | evcc | PV, Haus, Netz, Batterie, Ladepunkte | | Lademodus wechseln (Aus, PV, Min+PV, Schnell) |
 | **Sonstige** | | | |
-| JDownloader, FRITZ!Box, Zoraxy, qBittorrent, Portainer, … | Online-Status | | |
+| Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
+| JDownloader, FRITZ!Box, Zoraxy, Portainer, … | Online-Status | | |
 
 Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten, die Kachelgröße (einheitlich oder automatisch) pro Gruppe einstellen.
+
+## Benachrichtigungen
+
+Einstellungen → Benachrichtigungen:
+
+- **Discord**: In Discord unter Servereinstellungen → Integrationen → Webhooks einen Webhook anlegen und die URL eintragen.
+- **ntfy**: Ein Thema in der ntfy-App abonnieren und dessen Adresse eintragen (z. B. `https://ntfy.sh/mein-heimdeck` oder dein eigener ntfy-Server), optional mit Token.
+- **Browser**: Pro Browser einschaltbar. Funktioniert, solange ein Heimdeck-Tab offen ist, und nur über HTTPS (z. B. hinter dem Reverse Proxy) oder `localhost`.
+
+Gemeldet wird, wenn ein Dienst die eingestellte Zeit (Standard 2 Minuten) nicht antwortet, und wenn er wieder erreichbar ist. Nur Kacheln mit Online-Prüfung.
+
+## Docker-Kachel
+
+Zeigt laufende und gestoppte Container. In den Einstellungen unter „Docker“ lassen sich zwei Dinge einschalten (beide standardmäßig aus):
+
+- **Nach Container-Updates suchen**: alle 6 Stunden wird das Image jedes Containers mit der Registry verglichen (nur lesen, es wird nichts aktualisiert).
+- **Container starten, stoppen und neu starten**: Knöpfe auf der Kachel und in der Suche. Achtung: Jeder, der im Dashboard angemeldet ist, kann dann deine Container steuern. Mit einem Socket-Proxy braucht es dafür `POST=1` und `CONTAINERS=1`.
+
+## Eigene API
+
+Für alles ohne eigene Integration: Kachel „Eigene API“ wählen, Adresse eintragen und beschreiben, was angezeigt werden soll. Beispiel für eine Antwort wie `{"cpu": 0.42, "disk": {"used": 550000000000}, "devices": [{"name": "NAS", "online": true}]}`:
+
+```
+Werte:
+  CPU = cpu | anteil
+  Belegt = disk.used | bytes
+  Online = devices[online=true].#   (warn<1)
+Liste:          devices
+Listeneintrag:  title = name
+                badge = online | janein
+Knöpfe:         Neu starten = POST /api/restart
+```
+
+Pfade: `a.b.c`, `liste[0]`, `liste[-1]` (letztes), `liste.#` (Anzahl), `liste[feld=wert]` (filtern, auch `!=`, `>`, `<`). Formate: `text`, `zahl[:Nachkommastellen]`, `bytes`, `prozent`, `anteil` (0–1 → %), `dauer` (Sekunden), `datum`, `seit`, `janein`. Dahinter eine Einheit (`zahl:1 °C`) und Farben (`ok=up`, `warn>80`, `bad<10`). Header wie `Authorization: Bearer …` werden verschlüsselt gespeichert. Ohne eingetragene Werte zeigt die Kachel die Antwort an – praktisch, um die Pfade zu finden.
 
 ## Tipps
 

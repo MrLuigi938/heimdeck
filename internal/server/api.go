@@ -663,7 +663,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	// Libraries you already own first (Jellyfin), then request services, then the rest.
-	rank := map[string]int{"jellyfin": 0, "jellyseerr": 1}
+	rank := map[string]int{"jellyfin": 0, "plex": 0, "emby": 0, "jellyseerr": 1}
 	kind := map[int64]string{}
 	for _, t := range tiles {
 		kind[t.ID] = t.Integration
