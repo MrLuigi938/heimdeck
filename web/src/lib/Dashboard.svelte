@@ -9,6 +9,7 @@
   import Settings from './Settings.svelte';
   import GroupEditor from './GroupEditor.svelte';
   import Uptime from './Uptime.svelte';
+  import Credit from './Credit.svelte';
   import { network, isLocal, setOverride, detectLocal } from './network.svelte.js';
   import { t, locale } from './i18n.svelte.js';
   import { promptDialog } from './dialog.svelte.js';
@@ -412,6 +413,7 @@
     {#if allTiles.length && settings.showUptime !== 'false'}
       <Uptime tiles={allTiles} {status} />
     {/if}
+    <Credit app />
   </div>
 
   {#if editing}

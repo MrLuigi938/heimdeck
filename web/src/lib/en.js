@@ -252,4 +252,8 @@ export const en = {
   'Heimdall: Einstellungen → Exportieren lädt eine HeimdallExport.json herunter. Bekannte Dienste werden samt API-Key als Live-Kachel übernommen, Tags werden zu Gruppen.': 'Heimdall: Settings → Export downloads a HeimdallExport.json. Known services are imported as live tiles including their API key, tags become groups.',
   'Importieren nimmt auch einen Heimdall-Export (Heimdall → Einstellungen → Exportieren). Die Kacheln landen im geöffneten Dashboard, bekannte Dienste werden samt API-Key als Live-Kachel übernommen.': 'Import also accepts a Heimdall export (Heimdall → Settings → Export). The tiles go to the open dashboard, known services are imported as live tiles including their API key.',
   '{n} Kachel(n) aus Heimdall übernommen, {m} davon mit Live-Daten': '{n} tile(s) imported from Heimdall, {m} of them with live data',
+  'Erdacht mit': 'Dreamed up with',
+  'Liebe': 'love',
+  'von': 'by',
+  'gebaut mit KI': 'built with AI',
 };

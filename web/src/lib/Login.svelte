@@ -1,4 +1,5 @@
 <script>
+  import Credit from './Credit.svelte';
   import { post } from './api.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
 
@@ -59,10 +60,11 @@
     {#if error}<p class="bad">{error}</p>{/if}
     <button class="primary" disabled={busy}>{setup ? t('Zugang anlegen') : t('Anmelden')}</button>
   </form>
+  <Credit />
 </div>
 
 <style>
-  .wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+  .wrap { min-height: 100vh; display: grid; place-items: center; align-content: center; padding: 16px; }
   .box { width: min(380px, 100%); padding: 32px; display: grid; gap: 16px; }
   h1 { margin: 0; font-size: 24px; }
   .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

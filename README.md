@@ -137,3 +137,7 @@ go test ./...
 ```
 
 Eine neue Integration ist eine einzelne Datei in `internal/integrations/`: `Def()` beschreibt Felder und Icon, `Fetch()` liefert ein generisches `Widget` (Zahlen, Liste, Hinweise, Knöpfe). Das Frontend braucht dafür keinen eigenen Code. Optional gibt es `Search()`, `Action()` und `ImageRequest()` (Cover und Vorschaubilder, die einen API-Key brauchen, lädt Heimdeck dann selbst, sodass der Key nie im Browser landet).
+
+---
+
+<p align="center"><sub>Erdacht mit ♥ von Luis Blum · gebaut mit KI ✨</sub></p>

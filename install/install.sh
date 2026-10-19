@@ -162,5 +162,6 @@ done
 
 ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 say "Heimdeck läuft: http://${ip:-localhost}:$port"
+echo "Erdacht mit ♥ von Luis Blum · gebaut mit KI ✨"
 echo "Aktualisieren: dieses Skript erneut ausführen. Entfernen: sh install.sh uninstall"
 echo "Passwort vergessen: sudo -u heimdeck HEIMDECK_DATA=$DATA heimdeck reset-password <neues-passwort>"
