@@ -26,7 +26,7 @@ func (homeAssistant) Def() Definition {
 			{Key: "entities", Label: "Entitäten auf der Kachel", Type: "text",
 				Help: "Optional, durch Komma getrennt, z. B. sensor.wohnzimmer_temperatur, light.kueche. Leer: Übersicht anzeigen."},
 		},
-		HasWidget: true, HasSearch: true, Images: []string{"home-assistant", "homeassistant"}, Port: 8123,
+		HasWidget: true, HasSearch: true, Images: []string{"home-assistant", "homeassistant", "haos"}, Port: 8123,
 	}
 }
 

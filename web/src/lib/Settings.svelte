@@ -5,8 +5,9 @@
   import { detectLocal } from './network.svelte.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
+  import { importFile } from './importFile.js';
 
-  let { settings, boards = [], username, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, username, onClose, onSaved, onSwitchBoard } = $props();
 
   // Editable copy of the dashboards list.
   // svelte-ignore state_referenced_locally
@@ -101,15 +102,8 @@
   }
 
   async function importBackup(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const res = await post('/import', JSON.parse(await file.text()));
-      toast(t('{n} Kachel(n) importiert', { n: res.tiles }));
-      onSaved();
-    } catch (err) {
-      toast(err.message || t('Datei konnte nicht gelesen werden'), 'bad');
-    }
+    if (await importFile(e.target.files[0], boardId)) onSaved();
+    e.target.value = '';
   }
 
   async function logout() {
@@ -226,6 +220,7 @@
   <section>
     <h3>{t('Sicherung')}</h3>
     <p class="help">{t('Exportiert Gruppen, Kacheln und Einstellungen – API-Keys werden aus Sicherheitsgründen nicht mitgesichert.')}</p>
+    <p class="help">{t('Importieren nimmt auch einen Heimdall-Export (Heimdall → Einstellungen → Exportieren). Die Kacheln landen im geöffneten Dashboard, bekannte Dienste werden samt API-Key als Live-Kachel übernommen.')}</p>
     <div class="row">
       <button onclick={exportBackup}>{t('Exportieren')}</button>
       <label class="button">{t('Importieren')}<input type="file" accept="application/json" onchange={importBackup} hidden /></label>
@@ -255,7 +250,5 @@
     .board-actions { grid-column: 1 / -1; }
     .board-actions button { flex: 1; }
   }
-  .button { cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface-2); border-radius: 10px; padding: 8px 14px; }
-  .button:hover { border-color: var(--accent); }
   @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
 </style>

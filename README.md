@@ -3,7 +3,8 @@
 Ein schlichtes Dashboard für deinen Home-Server: so einfach wie Heimdall, aber mit Live-Daten, einer gemeinsamen Suche und Aktionen direkt auf den Kacheln.
 
 - **Alles in der Oberfläche**: keine YAML-Dateien. Kacheln hinzufügen, verschieben und bearbeiten geht per Klick und Drag & Drop.
-- **Container automatisch finden**: Heimdeck liest deine Docker-Container aus und schlägt passende Kacheln mit Icon, Adresse und Dienst-Typ vor.
+- **Dienste automatisch finden**: Heimdeck liest deine Docker-Container und – mit Proxmox verbunden – deine VMs und LXC-Container aus und schlägt passende Kacheln mit Icon, Adresse und Dienst-Typ vor.
+- **Umstieg von Heimdall**: Den Heimdall-Export (Einstellungen → Exportieren) einfach importieren. Tags werden zu Gruppen, bekannte Dienste samt API-Key zu Live-Kacheln.
 - **Live-Daten**: Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer usw.
 - **Aktionen**: Jellyseerr-Anfragen genehmigen oder ablehnen, SABnzbd pausieren, AdGuard-Schutz pausieren, Lademodus in evcc wechseln, Lichter und Schalter in Home Assistant oder ioBroker umschalten, UniFi-Geräte neu starten, Speedtest starten …
 - **Zuhause oder unterwegs**: Jede Kachel kann zusätzlich eine öffentliche Adresse haben. Öffnest du das Dashboard über eine lokale Adresse, werden lokale Links verwendet, sonst die öffentlichen. Umschalten geht oben rechts per Klick.
@@ -39,6 +40,35 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken. Fert
 
 > Selbst bauen: `docker compose build` (in `docker-compose.yml` dafür `build: .` statt `image:` verwenden).
 
+### Ohne Docker: Debian, Ubuntu, Raspberry Pi OS
+
+```sh
+sudo sh install.sh
+```
+
+[`install/install.sh`](install/install.sh) lädt das Programm aus dem Image (Docker wird dafür nicht gebraucht), legt den Benutzer `heimdeck`, den Datenordner `/var/lib/heimdeck` und einen systemd-Dienst an. Einstellungen stehen in `/etc/default/heimdeck`. Erneut ausführen aktualisiert, `sh install.sh uninstall` entfernt Heimdeck (die Daten bleiben).
+
+### Proxmox VE: als eigener LXC-Container
+
+Auf dem Proxmox-Host (Shell des Nodes), mit `install.sh` im selben Ordner:
+
+```sh
+sh proxmox-lxc.sh
+```
+
+[`install/proxmox-lxc.sh`](install/proxmox-lxc.sh) legt einen kleinen unprivilegierten Debian-Container an (1 Kern, 512 MB RAM, 2 GB), installiert Heimdeck darin und zeigt die Adresse an. ID, Speicher, Netzwerk und feste IP lassen sich per Variable ändern (siehe Kopf des Skripts). Beim ersten Öffnen schlägt Heimdeck dann direkt „Proxmox verbinden“ vor.
+
+## Umstieg von Heimdall
+
+1. In Heimdall: Einstellungen → **Exportieren** – das lädt `HeimdallExport.json` herunter.
+2. In Heimdeck: auf der Startseite **Von Heimdall übernehmen** (oder Einstellungen → Sicherung → Importieren) und die Datei wählen.
+
+Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Dienste, die Heimdeck kennt (Sonarr, Radarr, Jellyfin, Nextcloud, AdGuard, Proxmox …), werden als Live-Kachel übernommen – mit API-Key, Benutzer und Passwort aus Heimdall sowie der „Override URL“ als interne Adresse.
+
+## Proxmox verbinden
+
+Proxmox-Kachel anlegen (Startseite → **Proxmox verbinden**) mit einem API-Token im Format `benutzer@pam!name=geheimnis` (Rechenzentrum → Berechtigungen → API-Token; Rolle *PVEAuditor* zum Anzeigen, zusätzlich *PVEVMUser* für Start/Stopp). Danach findet 🔍 die Dienste in deinen VMs und Containern: am Namen bzw. an den Tags (z. B. `jellyfin`, `adguard`, `paperless-ngx` – so heißen auch die Container der Proxmox-Community-Skripte), mit der IP-Adresse des Gasts und dem üblichen Port. VMs brauchen dafür den QEMU-Gast-Agenten.
+
 ## Unterstützte Dienste
 
 | Dienst | Live-Daten | Suche | Aktionen |
@@ -68,6 +98,8 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken. Fert
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
+| **System** | | | |
+| Proxmox VE (API-Token) | CPU, RAM, Gäste aktiv, Nodes bzw. gestoppte Gäste | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
 | ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |

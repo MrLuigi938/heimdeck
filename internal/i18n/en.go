@@ -366,4 +366,21 @@ var en = map[string]string{
 	"Fotos nach Inhalt suchen (KI-Suche)":            "Search photos by content (smart search)",
 	"Findet Fotos per Beschreibung, z. B. „Hund am Strand“. Braucht den Machine-Learning-Container von Immich und zeigt zu fast jedem Suchbegriff ähnliche Fotos. Ohne: Suche nach Personen und Dateinamen.": "Finds photos by description, e.g. “dog on the beach”. Needs Immich's machine learning container and shows similar photos for almost any search term. Without it: search for people and file names.",
 	"Fotos, Videos und Speicherplatz, Suche nach Personen und Fotos (auf Wunsch per Beschreibung, z. B. „Strand bei Sonnenuntergang“)":                                                                       "Photos, videos and storage, search people and photos (optionally by description, e.g. “beach at sunset”)",
+
+	// ---- Proxmox, discovery, Heimdall import ----
+	"Nodes, CPU und RAM, laufende VMs und Container, Gäste starten, herunterfahren und neu starten, Dienste in VMs und LXCs automatisch finden":                                                                                                                                     "Nodes, CPU and RAM, running VMs and containers, start, shut down and reboot guests, find services in VMs and LXCs automatically",
+	"Rechenzentrum → Berechtigungen → API-Token → Hinzufügen, eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser. Bei selbstsigniertem Zertifikat unter „Weitere Optionen“ „Zertifikat nicht prüfen“ aktivieren.": "Datacenter → Permissions → API Tokens → Add, enter as user@pam!name=secret. Role PVEAuditor is enough to view, add PVEVMUser for start/stop. With a self-signed certificate enable “Don't verify certificate” under “More options”.",
+	"Der API-Token hat das Format benutzer@pam!name=geheimnis":                "The API token has the format user@pam!name=secret",
+	"Dem API-Token fehlt das Recht dafür (Rolle PVEVMUser bzw. VM.PowerMgmt)": "The API token lacks the permission for this (role PVEVMUser or VM.PowerMgmt)",
+	"Nodes online":         "Nodes online",
+	"CPU":                  "CPU",
+	"RAM":                  "RAM",
+	"Gäste aktiv":          "Guests running",
+	"Nodes":                "Nodes",
+	"Herunterfahren":       "Shut down",
+	"Starten":              "Start",
+	"„%s“ herunterfahren?": "Shut down “%s”?",
+	"Nichts zum Durchsuchen: Docker-Socket einbinden (siehe docker-compose.yml) oder eine Proxmox-Kachel anlegen": "Nothing to search: mount the Docker socket (see docker-compose.yml) or add a Proxmox tile",
+	"keine gültige Heimdeck-Sicherung oder Heimdall-Export":                                                       "not a valid Heimdeck backup or Heimdall export",
+	"Heimdall": "Heimdall",
 }

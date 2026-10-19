@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/auth"
+	"github.com/heimdeck/heimdeck/internal/docker"
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
 	"github.com/heimdeck/heimdeck/internal/store"
@@ -200,12 +203,20 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name, _ := s.store.Username(s.auth.UserID(r))
+	hasProxmox := false
+	if all, err := s.store.Tiles(); err == nil {
+		for _, t := range all {
+			hasProxmox = hasProxmox || t.Integration == "proxmox"
+		}
+	}
 	writeJSON(w, map[string]any{
 		"settings":     settings,
 		"boards":       boards,
 		"groups":       out,
 		"integrations": integrations.All(langOf(r)),
 		"docker":       s.docker != nil,
+		"proxmox":      hasProxmox,
+		"proxmoxHint":  proxmoxHint(),
 		"username":     name,
 	})
 }
@@ -657,19 +668,41 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
-	if s.docker == nil {
-		writeErr(w, 404, errors.New("Kein Docker-Socket eingebunden – siehe Anleitung in der docker-compose.yml"))
-		return
-	}
-	ctx, cancel := timeout(r, 8*time.Second)
+	ctx, cancel := timeout(r, 12*time.Second)
 	defer cancel()
-	sugg, err := s.docker.Suggest(ctx, requestHost(r))
-	if err != nil {
-		writeErr(w, 502, err)
+	tiles, _ := s.store.Tiles()
+	var pve []store.Tile
+	for _, t := range tiles {
+		if integ, ok := integrations.Get(t.Integration); ok && t.Integration == "proxmox" && configured(integ, t) {
+			pve = append(pve, t)
+		}
+	}
+	if s.docker == nil && len(pve) == 0 {
+		writeErr(w, 404, errors.New("Nichts zum Durchsuchen: Docker-Socket einbinden (siehe docker-compose.yml) oder eine Proxmox-Kachel anlegen"))
 		return
 	}
-	// Mark containers that already have a tile with the same URL.
-	tiles, _ := s.store.Tiles()
+	var sugg []docker.Suggestion
+	var errs []string
+	if s.docker != nil {
+		ds, err := s.docker.Suggest(ctx, requestHost(r))
+		if err != nil {
+			errs = append(errs, "Docker: "+err.Error())
+		}
+		sugg = append(sugg, ds...)
+	}
+	for _, t := range pve {
+		guests, err := integrations.ProxmoxGuests(ctx, s.instance(t, langOf(r)))
+		if err != nil {
+			errs = append(errs, t.Name+": "+err.Error())
+			continue
+		}
+		sugg = append(sugg, proxmoxSuggestions(r, t, guests)...)
+	}
+	if len(sugg) == 0 && len(errs) > 0 {
+		writeErr(w, 502, errors.New(strings.Join(errs, " · ")))
+		return
+	}
+	// Mark services that already have a tile with the same URL.
 	existing := map[string]bool{}
 	for _, t := range tiles {
 		existing[strings.TrimRight(t.URL, "/")] = true
@@ -683,7 +716,47 @@ func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 		sg.Group = tr(r, sg.Group)
 		out = append(out, item{Suggestion: sg, Exists: sg.URL != "" && existing[strings.TrimRight(sg.URL, "/")]})
 	}
-	writeJSON(w, out)
+	writeJSON(w, map[string]any{"items": out, "errors": errs})
+}
+
+// proxmoxSuggestions turns VMs and containers into tile proposals. The service
+// is guessed from the guest's name and tags (e.g. LXCs created by the Proxmox
+// community scripts are named after the service), the port from its default.
+func proxmoxSuggestions(r *http.Request, host store.Tile, guests []integrations.Guest) []docker.Suggestion {
+	var out []docker.Suggestion
+	for _, g := range guests {
+		if strings.Contains(strings.ToLower(g.Name), "heimdeck") {
+			continue
+		}
+		kind := map[string]string{"qemu": "VM", "lxc": "LXC"}[g.Type]
+		state := "exited"
+		if g.Status == "running" {
+			state = "running"
+		}
+		sg := docker.Suggestion{
+			Container: docker.Container{ID: fmt.Sprintf("pve-%d-%s-%d", host.ID, g.Node, g.VMID), Name: g.Name, State: state,
+				Image: fmt.Sprintf("%s · %s %d · %s", host.Name, kind, g.VMID, g.Node)},
+			Name: g.Name, Integration: "link", Group: "Sonstiges", Icon: strings.ToLower(g.Name), Source: "proxmox",
+		}
+		port := 0
+		if integ, ok := integrations.MatchName(append([]string{g.Name}, g.Tags...)...); ok {
+			d := integ.Def()
+			sg.Integration, sg.Icon, sg.Group, port = d.ID, d.Icon, d.Category, d.Port
+			sg.Name = strings.Split(d.Name, " /")[0]
+		}
+		if g.IP != "" {
+			switch {
+			case port == 443 || port == 8443 || port == 8006:
+				sg.URL = fmt.Sprintf("https://%s:%d", g.IP, port)
+			case port == 80 || port == 0:
+				sg.URL = "http://" + g.IP
+			default:
+				sg.URL = fmt.Sprintf("http://%s:%d", g.IP, port)
+			}
+		}
+		out = append(out, sg)
+	}
+	return out
 }
 
 // ---- backup ----
@@ -755,9 +828,18 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 // handleImport adds the groups and tiles of a backup to the dashboard.
 func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, 5<<20))
+	if err != nil {
+		writeErr(w, 400, errors.New("ungültige Anfrage"))
+		return
+	}
+	if isHeimdallExport(body) {
+		s.importHeimdall(w, r, body)
+		return
+	}
 	var data exportData
-	if err := readJSON(r, &data); err != nil || data.Version != 1 {
-		writeErr(w, 400, errors.New("keine gültige Heimdeck-Sicherung"))
+	if err := json.Unmarshal(body, &data); err != nil || data.Version != 1 {
+		writeErr(w, 400, errors.New("keine gültige Heimdeck-Sicherung oder Heimdall-Export"))
 		return
 	}
 	if len(data.Settings) > 0 {
@@ -812,4 +894,60 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, map[string]any{"ok": true, "tiles": count})
+}
+
+// importHeimdall adds the items of a Heimdall export to the open dashboard.
+func (s *Server) importHeimdall(w http.ResponseWriter, r *http.Request, body []byte) {
+	groups, order, err := heimdallTiles(body, "Heimdall")
+	if err != nil {
+		writeErr(w, 400, errors.New("keine gültige Heimdeck-Sicherung oder Heimdall-Export"))
+		return
+	}
+	boardID, _ := strconv.ParseInt(r.URL.Query().Get("board"), 10, 64)
+	existing := map[string]int64{}
+	if all, err := s.store.Groups(); err == nil {
+		for _, g := range all {
+			if boardID == 0 || g.BoardID == boardID {
+				existing[strings.ToLower(g.Name)] = g.ID
+			}
+		}
+	}
+	count, live := 0, 0
+	for _, name := range order {
+		gid, ok := existing[strings.ToLower(name)]
+		if !ok {
+			g, err := s.store.CreateGroup(name, boardID)
+			if err != nil {
+				writeErr(w, 500, err)
+				return
+			}
+			gid = g.ID
+		}
+		for _, in := range groups[name] {
+			in.GroupID = gid
+			t, err := s.buildTile(in)
+			if err != nil {
+				continue
+			}
+			if s.store.SaveTile(&t) == nil {
+				count++
+				if t.Integration != "link" {
+					live++
+				}
+			}
+		}
+	}
+	writeJSON(w, map[string]any{"ok": true, "tiles": count, "integrations": live, "source": "heimdall"})
+}
+
+// proxmoxHint is the Proxmox address offered when adding a Proxmox tile: set
+// by the LXC installer, or the local API when Heimdeck runs on the host itself.
+func proxmoxHint() string {
+	if u := os.Getenv("HEIMDECK_PROXMOX_URL"); u != "" {
+		return u
+	}
+	if _, err := os.Stat("/etc/pve"); err == nil {
+		return "https://127.0.0.1:8006"
+	}
+	return ""
 }

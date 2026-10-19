@@ -62,6 +62,7 @@ type Suggestion struct {
 	Icon        string    `json:"icon"`
 	Integration string    `json:"integration"`
 	Group       string    `json:"group"`
+	Source      string    `json:"source"` // docker | proxmox
 }
 
 func (c *Client) Containers(ctx context.Context) ([]Container, error) {
@@ -128,7 +129,7 @@ func (c *Client) Suggest(ctx context.Context, host string) ([]Suggestion, error)
 		if ct.Labels["heimdeck.hide"] == "true" || strings.Contains(strings.ToLower(ct.Image), "heimdeck") {
 			continue
 		}
-		s := Suggestion{Container: ct, Name: titleCase(ct.Name), Integration: "link"}
+		s := Suggestion{Container: ct, Name: titleCase(ct.Name), Integration: "link", Source: "docker"}
 		if in, ok := integrations.Match(ct.Image); ok {
 			d := in.Def()
 			s.Integration, s.Icon, s.Group = d.ID, d.Icon, d.Category

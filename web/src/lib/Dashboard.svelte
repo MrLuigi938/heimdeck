@@ -5,6 +5,7 @@
   import Search from './Search.svelte';
   import TileEditor from './TileEditor.svelte';
   import Discover from './Discover.svelte';
+  import { importFile } from './importFile.js';
   import Settings from './Settings.svelte';
   import GroupEditor from './GroupEditor.svelte';
   import Uptime from './Uptime.svelte';
@@ -244,6 +245,20 @@
     dropTarget = null;
   }
 
+  // Adds a Proxmox tile (address prefilled when Heimdeck knows it) and opens
+  // the discovery right after it has been saved.
+  let discoverAfterSave = false;
+  async function connectProxmox() {
+    const open = boardGroups.filter((g) => !g.locked);
+    let gid = (open.find((g) => ['system', 'server'].includes(g.name.toLowerCase())) || open[0])?.id;
+    if (!gid) {
+      gid = (await post('/groups', { name: 'System', boardId: board?.id })).id;
+      await load();
+    }
+    discoverAfterSave = true;
+    editing = { groupId: gid, integration: 'proxmox', name: 'Proxmox', icon: 'proxmox', url: data.proxmoxHint || '', insecure: true };
+  }
+
   function saved(opts) {
     if (!opts?.keepOpen) {
       editing = null;
@@ -251,7 +266,12 @@
       showDiscover = false;
       showSettings = false;
     }
-    load().then(loadStatus);
+    const discover = discoverAfterSave && !opts?.keepOpen;
+    discoverAfterSave = false;
+    load().then(() => {
+      loadStatus();
+      if (discover && data.proxmox) showDiscover = true;
+    });
     // The server re-checks a saved tile right away; pick the result up shortly after.
     setTimeout(loadStatus, 4000);
   }
@@ -300,8 +320,8 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
           </button>
         {/if}
-        {#if data.docker}
-          <button class="ghost icon" title={t('Container automatisch finden')} aria-label={t('Container automatisch finden')} onclick={() => (showDiscover = true)}>🐳</button>
+        {#if data.docker || data.proxmox}
+          <button class="ghost icon" title={t('Dienste automatisch finden')} aria-label={t('Dienste automatisch finden')} onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'}</button>
         {/if}
         <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
@@ -326,11 +346,16 @@
         <h2>{t("Los geht's")} 👋</h2>
         <p class="muted">{t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.')}</p>
         <div class="row center">
-          {#if data.docker}<button class="primary" onclick={() => (showDiscover = true)}>🐳 {t('Container automatisch finden')}</button>{/if}
+          {#if data.docker || data.proxmox}<button class="primary" onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'} {t('Dienste automatisch finden')}</button>{/if}
+          {#if !data.proxmox}<button class:primary={!!data.proxmoxHint && !data.docker} onclick={connectProxmox}>🖥️ {t('Proxmox verbinden')}</button>{/if}
           <button class:primary={!data.docker} onclick={() => (editing = { groupId: boardGroups.find((g) => !g.locked)?.id })} disabled={!boardGroups.some((g) => !g.locked)}>+ {t('Kachel hinzufügen')}</button>
+          <label class="button">⇪ {t('Von Heimdall übernehmen')}<input type="file" accept="application/json,.json" onchange={async (e) => { if (await importFile(e.target.files[0], board?.id)) saved(); e.target.value = ''; }} hidden /></label>
         </div>
-        {#if !data.docker}
-          <p class="help">{t('Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml).')}</p>
+        <p class="help">{t('Heimdall: Einstellungen → Exportieren lädt eine HeimdallExport.json herunter. Bekannte Dienste werden samt API-Key als Live-Kachel übernommen, Tags werden zu Gruppen.')}</p>
+        {#if data.proxmoxHint && !data.proxmox}
+          <p class="help">{t('Heimdeck läuft auf Proxmox – verbinde es mit einem API-Token, dann werden deine VMs und Container als Dienste vorgeschlagen.')}</p>
+        {:else if !data.docker}
+          <p class="help">{t('Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml). Mit Proxmox verbunden werden auch deine VMs und LXC-Container vorgeschlagen.')}</p>
         {/if}
         {#if !boardGroups.length}<button onclick={addGroup}>+ {t('Gruppe anlegen')}</button>{/if}
       </div>
@@ -390,7 +415,7 @@
   </div>
 
   {#if editing}
-    <TileEditor tile={editing} groups={groupOptions} integrations={data.integrations} onClose={() => (editing = null)} onSaved={saved} />
+    <TileEditor tile={editing} groups={groupOptions} integrations={data.integrations} onClose={() => { editing = null; discoverAfterSave = false; }} onSaved={saved} />
   {/if}
   {#if showDiscover}
     <Discover groups={boardGroups.filter((g) => !g.locked)} boardId={board?.id} onClose={() => (showDiscover = false)} onSaved={saved} />
@@ -399,7 +424,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
 {/if}
 

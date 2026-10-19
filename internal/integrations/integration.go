@@ -245,6 +245,37 @@ func Match(image string) (Integration, bool) {
 	return best, best != nil
 }
 
+// MatchName finds the integration for a VM or container name such as
+// "jellyfin", "adguard-home" or "paperless-ngx" (names and tags as used by the
+// Proxmox community scripts). Link-only services count too.
+func MatchName(names ...string) (Integration, bool) {
+	norm := func(s string) string {
+		return strings.NewReplacer("-", "", "_", "", " ", "", ".", "", "/", "").Replace(strings.ToLower(s))
+	}
+	best, bestLen := Integration(nil), 0
+	for _, n := range names {
+		n = norm(n)
+		if n == "" {
+			continue
+		}
+		for id, in := range registry {
+			if id == "link" {
+				continue
+			}
+			d := in.Def()
+			cands := append([]string{d.ID, d.Name, strings.Split(d.Name, " ")[0], d.Icon}, d.Images...)
+			for _, c := range cands {
+				c = norm(c)
+				// Very short patterns ("stash") must match the whole name.
+				if len(c) >= 4 && strings.Contains(n, c) && len(c) > bestLen || c == n && len(c) > bestLen {
+					best, bestLen = in, len(c)
+				}
+			}
+		}
+	}
+	return best, best != nil
+}
+
 // ---- HTTP helpers ----
 
 func NewClient(insecure bool) *http.Client {
