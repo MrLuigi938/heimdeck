@@ -87,7 +87,7 @@ func TestAdGuard(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := stats(w)
-	if s["Anfragen"] != "10.000" || s["Blockiert"] != "1.200 (12.0 %)" || s["Antwortzeit"] != "12 ms" || s["Schutz"] != "An" {
+	if s["DNS-Anfragen"] != "10.000" || s["Blockiert"] != "1.200" || s["Quote"] != "12,0 %" || s["Antwortzeit"] != "12 ms" || s["Schutz"] != "An" {
 		t.Fatalf("stats: %v", s)
 	}
 	if len(w.Items) != 2 || w.Items[0].Title != "track.example.net" {
@@ -201,7 +201,7 @@ func TestBazarr(t *testing.T) {
 	if len(items) != 1 || items[0].Image != "/api/tiles/7/image?p=%2Fimages%2Fmovies%2Fposter.jpg" {
 		t.Fatalf("%+v", items)
 	}
-	if _, err := (bazarr{}).ImageHeaders(context.Background(), in, "/api/system/settings"); err == nil {
+	if _, _, err := (bazarr{}).ImageRequest(context.Background(), in, "/api/system/settings"); err == nil {
 		t.Fatal("non-image path allowed")
 	}
 	if err := (bazarr{}).Action(context.Background(), in, "search_wanted", nil); err != nil {

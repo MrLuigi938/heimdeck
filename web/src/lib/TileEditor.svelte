@@ -135,6 +135,13 @@
       </div>
 
       {#each def?.fields || [] as f}
+        {#if f.type === 'checkbox'}
+          <label class="check">
+            <input type="checkbox" checked={form.config[f.key] === 'true'} onchange={(e) => (form.config[f.key] = e.currentTarget.checked ? 'true' : '')} />
+            {f.label}
+          </label>
+          {#if f.help}<span class="help check-help">{f.help}</span>{/if}
+        {:else}
         <label class="field">
           <span>{f.label}{f.required ? '' : ` (${t('optional')})`}</span>
           {#if f.secret}
@@ -145,6 +152,7 @@
           {/if}
           {#if f.help}<span class="help">{f.help}</span>{/if}
         </label>
+        {/if}
       {/each}
 
       {#if def?.hasWidget}
@@ -210,6 +218,7 @@
   .more { justify-self: start; color: var(--muted); padding-left: 0; }
   .advanced { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
   .help a { color: var(--accent); }
+  .check-help { display: block; margin: -4px 0 4px 26px; }
   .test { padding: 12px; border-radius: 12px; font-size: 14px; }
   .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
   .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

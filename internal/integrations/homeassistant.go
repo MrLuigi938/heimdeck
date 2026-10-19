@@ -87,6 +87,10 @@ var haServices = map[string][]struct{ service, label string }{
 func (h homeAssistant) item(in *Instance, s haState) Item {
 	it := Item{Title: s.name(), Subtitle: h.value(in, s), URL: in.Link("/history?entity_id=" + url.QueryEscape(s.EntityID))}
 	for _, sv := range haServices[s.domain()] {
+		// Locks have no toggle: only offer the opposite of the current state.
+		if (sv.service == "lock" && s.State == "locked") || (sv.service == "unlock" && s.State == "unlocked") {
+			continue
+		}
 		a := Action{ID: "service", Label: in.T(sv.label), Params: map[string]string{"entity": s.EntityID, "service": sv.service}}
 		if s.domain() == "lock" && sv.service == "unlock" {
 			a.Confirm = in.T("„%s“ aufschließen?", s.name())

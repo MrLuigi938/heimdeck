@@ -153,11 +153,11 @@ func stripBasePath(base, path string) string {
 	return path
 }
 
-func (b bazarr) ImageHeaders(ctx context.Context, in *Instance, path string) (map[string]string, error) {
+func (b bazarr) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
 	if !hasPrefix(path, "/images/") {
-		return nil, in.Errorf("nicht gefunden")
+		return "", nil, in.Errorf("nicht gefunden")
 	}
-	return map[string]string{"X-API-KEY": in.V("apiKey")}, nil
+	return path, map[string]string{"X-API-KEY": in.V("apiKey")}, nil
 }
 
 func (b bazarr) Action(ctx context.Context, in *Instance, action string, p map[string]string) error {

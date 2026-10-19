@@ -25,7 +25,7 @@ import (
 type Field struct {
 	Key      string `json:"key"`
 	Label    string `json:"label"`
-	Type     string `json:"type"` // text | password
+	Type     string `json:"type"` // text | password | checkbox ("true" or "")
 	Help     string `json:"help,omitempty"`
 	Required bool   `json:"required"`
 	Secret   bool   `json:"secret"`
@@ -146,10 +146,10 @@ type Searcher interface {
 }
 
 // ImageSource is implemented by integrations that hand out Proxy URLs. It
-// returns the auth headers for an image path, or an error if the path is not
-// one the integration serves images from.
+// returns the request path (with auth added) and headers for an image path, or
+// an error if the path is not one the integration serves images from.
 type ImageSource interface {
-	ImageHeaders(ctx context.Context, in *Instance, path string) (map[string]string, error)
+	ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error)
 }
 
 // FetchImage loads an image through an ImageSource. The caller closes the body.
@@ -157,7 +157,7 @@ func FetchImage(ctx context.Context, src ImageSource, in *Instance, path string)
 	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || strings.Contains(path, "..") {
 		return nil, errors.New("invalid image path")
 	}
-	headers, err := src.ImageHeaders(ctx, in, path)
+	path, headers, err := src.ImageRequest(ctx, in, path)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,11 @@ func FetchImage(ctx context.Context, src ImageSource, in *Instance, path string)
 	}
 	resp, err := in.Client.Do(req)
 	if err != nil {
-		return nil, friendlyNetErr(in.Lang, err)
+		// The URL may carry a key, so never pass the raw error on.
+		if fe := friendlyNetErr(in.Lang, err); fe != err {
+			return nil, fe
+		}
+		return nil, errors.New(i18n.T(in.Lang, "Dienst nicht erreichbar"))
 	}
 	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
 		resp.Body.Close()

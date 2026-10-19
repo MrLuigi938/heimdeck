@@ -72,8 +72,9 @@ func (a adguard) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		ratio = float64(blocked) / float64(stats.Queries) * 100
 	}
 	w := &Widget{Stats: []Stat{
-		{Label: in.T("Anfragen"), Value: in.Num(stats.Queries)},
-		{Label: in.T("Blockiert"), Value: fmt.Sprintf("%s (%.1f %%)", in.Num(blocked), ratio)},
+		{Label: in.T("DNS-Anfragen"), Value: in.Num(stats.Queries)},
+		{Label: in.T("Blockiert"), Value: in.Num(blocked)},
+		{Label: in.T("Quote"), Value: percent(in, ratio)},
 		{Label: in.T("Antwortzeit"), Value: fmt.Sprintf("%.0f ms", stats.AvgTime*1000)},
 	}}
 	if st.Protection {
@@ -229,4 +230,13 @@ func (a adguard) Action(ctx context.Context, in *Instance, action string, p map[
 		return a.call(ctx, in, "POST", "/filtering/set_rules", nil, map[string]any{"rules": kept}, nil)
 	}
 	return in.Errorf("unbekannte Aktion %q", action)
+}
+
+// percent formats a share with one decimal, e.g. "12,7 %".
+func percent(in *Instance, v float64) string {
+	s := fmt.Sprintf("%.1f %%", v)
+	if in.Lang != "en" {
+		s = strings.Replace(s, ".", ",", 1)
+	}
+	return s
 }
