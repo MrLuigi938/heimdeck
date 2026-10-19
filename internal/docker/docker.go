@@ -45,13 +45,14 @@ func New() *Client {
 }
 
 type Container struct {
-	ID     string            `json:"id"`
-	Name   string            `json:"name"`
-	Image  string            `json:"image"`
-	State  string            `json:"state"`
-	Status string            `json:"status"`
-	Ports  []int             `json:"ports"` // published host ports
-	Labels map[string]string `json:"-"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Image   string            `json:"image"`
+	ImageID string            `json:"-"`
+	State   string            `json:"state"`
+	Status  string            `json:"status"`
+	Ports   []int             `json:"ports"` // published host ports
+	Labels  map[string]string `json:"-"`
 }
 
 // Suggestion is a ready-to-use tile proposal.
@@ -76,13 +77,14 @@ func (c *Client) Containers(ctx context.Context) ([]Container, error) {
 		return nil, fmt.Errorf("Docker antwortet mit Status %d", resp.StatusCode)
 	}
 	var raw []struct {
-		ID     string            `json:"Id"`
-		Names  []string          `json:"Names"`
-		Image  string            `json:"Image"`
-		State  string            `json:"State"`
-		Status string            `json:"Status"`
-		Labels map[string]string `json:"Labels"`
-		Ports  []struct {
+		ID      string            `json:"Id"`
+		Names   []string          `json:"Names"`
+		Image   string            `json:"Image"`
+		ImageID string            `json:"ImageID"`
+		State   string            `json:"State"`
+		Status  string            `json:"Status"`
+		Labels  map[string]string `json:"Labels"`
+		Ports   []struct {
 			PrivatePort int    `json:"PrivatePort"`
 			PublicPort  int    `json:"PublicPort"`
 			Type        string `json:"Type"`
@@ -93,7 +95,7 @@ func (c *Client) Containers(ctx context.Context) ([]Container, error) {
 	}
 	out := make([]Container, 0, len(raw))
 	for _, r := range raw {
-		ct := Container{ID: r.ID[:12], Image: r.Image, State: r.State, Status: r.Status, Labels: r.Labels}
+		ct := Container{ID: r.ID[:12], Image: r.Image, ImageID: r.ImageID, State: r.State, Status: r.Status, Labels: r.Labels}
 		if len(r.Names) > 0 {
 			ct.Name = strings.TrimPrefix(r.Names[0], "/")
 		}

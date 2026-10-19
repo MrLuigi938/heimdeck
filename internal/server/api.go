@@ -229,7 +229,7 @@ var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
 	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true,
-	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true,
+	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -437,11 +437,11 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	if t.URL == "" && t.APIURL == "" {
+	integ, _ := integrations.Get(t.Integration)
+	if t.URL == "" && t.APIURL == "" && !integ.Def().NoURL {
 		writeJSON(w, map[string]any{"ok": false, "error": "Bitte eine Adresse angeben"})
 		return
 	}
-	integ, _ := integrations.Get(t.Integration)
 	for _, f := range integ.Def().Fields {
 		if f.Required && t.Config[f.Key] == "" && t.Secrets[f.Key] == "" {
 			writeJSON(w, map[string]any{"ok": false, "error": tr(r, "„%s“ fehlt", tr(r, f.Label))})

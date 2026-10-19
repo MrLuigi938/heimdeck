@@ -206,7 +206,7 @@
     {#if step === 'form'}
       {#if form.id}<button class="danger" onclick={remove}>{t('Löschen')}</button>{/if}
       <span class="spacer"></span>
-      <button onclick={runTest} disabled={testing || (!form.url && !form.apiUrl)}>{testing ? t('Teste …') : t('Verbindung testen')}</button>
+      <button onclick={runTest} disabled={testing || (!form.url && !form.apiUrl && !def?.noUrl)}>{testing ? t('Teste …') : t('Verbindung testen')}</button>
       <button class="primary" type="submit" form="tile-form" disabled={saving}>{t('Speichern')}</button>
     {:else}
       <span class="help">{t("Nicht dabei? Einfach „Nur Link“ wählen – Status-Anzeige gibt es trotzdem.")}</span>

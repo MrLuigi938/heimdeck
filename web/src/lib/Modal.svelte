@@ -27,13 +27,22 @@
     display: grid; place-items: center; padding: 16px; animation: fade .12s;
   }
   .modal {
-    width: min(540px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
-    background: var(--surface-solid);
+    /* dvh: the visible height on phones (100vh includes the browser bars) */
+    width: min(540px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
+    display: flex; flex-direction: column; background: var(--surface-solid); overflow: hidden;
   }
   .modal.wide { width: min(780px, 100%); }
   header { display: flex; align-items: center; padding: 16px 16px 8px 20px; }
   h2 { margin: 0; font-size: 18px; flex: 1; }
-  .body { padding: 8px 20px 20px; overflow-y: auto; display: grid; gap: 14px; }
+  /* min-height: 0 lets the body shrink and scroll, so the footer (Save) stays visible */
+  .body { padding: 8px 20px 20px; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; align-content: start; min-height: 0; flex: 1 1 auto; }
+  header, footer { flex: none; }
+  @media (max-width: 520px) {
+    .backdrop { padding: 8px; }
+    .modal { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+    .body { padding: 8px 16px 16px; }
+    footer { padding: 12px 16px; }
+  }
   footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   @keyframes fade { from { opacity: 0; } }
 </style>

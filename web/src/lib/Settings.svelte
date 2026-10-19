@@ -8,7 +8,7 @@
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
 
-  let { settings, boards = [], boardId, notify = {}, username, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, onClose, onSaved, onSwitchBoard } = $props();
 
   // Editable copy of the dashboards list.
   // svelte-ignore state_referenced_locally
@@ -52,7 +52,7 @@
   let s = $state({
     title: 'Heimdeck', theme: 'auto', accent: '#5b8cff', background: '', searchEngine: 'duckduckgo',
     openInNewTab: 'true', showGreeting: 'true', showUptime: 'true', localHosts: '', uniformTiles: 'false',
-    ntfyUrl: '', notifyAfter: '2', notifyRecovery: 'true', notifyExternal: 'true',
+    ntfyUrl: '', notifyAfter: '2', notifyRecovery: 'true', notifyExternal: 'true', dockerUpdates: 'false', dockerControl: 'false',
     ...$state.snapshot(settings),
   });
   let pw = $state({ current: '', new: '' });
@@ -255,6 +255,16 @@
       <input bind:value={s.localHosts} placeholder={t('z. B. dashboard.home, 10.8.0.1')} />
       <span class="help">{t('Mit Komma trennen. Nützlich, wenn du das Dashboard zuhause über einen eigenen Hostnamen öffnest.')}</span>
     </label>
+    <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>{t('Speichern')}</button></div>
+  </section>
+
+  <section>
+    <h3>Docker</h3>
+    {#if !docker}<p class="help">{t('Kein Docker-Socket eingebunden – siehe Anleitung in der docker-compose.yml')}</p>{/if}
+    <label class="check"><input type="checkbox" checked={s.dockerUpdates === 'true'} onchange={setFlag('dockerUpdates')} disabled={!docker} /> {t('Nach Container-Updates suchen')}</label>
+    <p class="help indent">{t('Vergleicht alle 6 Stunden die Images deiner Container mit der Registry (Docker Hub, ghcr.io …). Es wird nichts heruntergeladen oder aktualisiert.')}</p>
+    <label class="check"><input type="checkbox" checked={s.dockerControl === 'true'} onchange={setFlag('dockerControl')} disabled={!docker} /> {t('Container starten, stoppen und neu starten erlauben')}</label>
+    <p class="help indent">{t('Knöpfe auf der Docker-Kachel und in der Suche. Jeder, der im Dashboard angemeldet ist, kann dann deine Container steuern.')}</p>
     <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>{t('Speichern')}</button></div>
   </section>
 

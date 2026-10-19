@@ -23,10 +23,11 @@ import (
 )
 
 type Server struct {
-	store  *store.Store
-	auth   *auth.Auth
-	docker *docker.Client
-	web    fs.FS
+	store   *store.Store
+	auth    *auth.Auth
+	docker  *docker.Client
+	updates *docker.Updates
+	web     fs.FS
 
 	mu      sync.Mutex
 	widgets map[string]cached[*integrations.Widget] // key: tile id + language
@@ -49,9 +50,11 @@ const (
 )
 
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
-	return &Server{store: s, auth: a, docker: d, web: web,
+	srv := &Server{store: s, auth: a, docker: d, updates: docker.NewUpdates(), web: web,
 		widgets: map[string]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
+	integrations.Register(dockerTile{srv})
+	return srv
 }
 
 func (s *Server) Handler() http.Handler {

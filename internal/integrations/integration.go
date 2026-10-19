@@ -48,6 +48,8 @@ type Definition struct {
 	Images []string `json:"-"`
 	// Port is the usual container port, used when a container publishes several.
 	Port int `json:"port,omitempty"`
+	// NoURL marks integrations that work without an address (e.g. local Docker).
+	NoURL bool `json:"noUrl,omitempty"`
 }
 
 // Instance is a configured tile, as seen by an integration.
@@ -198,6 +200,9 @@ func hasPrefix(path string, prefixes ...string) bool {
 var registry = map[string]Integration{}
 
 func register(i Integration) { registry[i.Def().ID] = i }
+
+// Register adds an integration implemented outside this package.
+func Register(i Integration) { register(i) }
 
 func Get(id string) (Integration, bool) {
 	i, ok := registry[id]
@@ -416,7 +421,6 @@ func init() {
 		{ID: "jdownloader", Name: "JDownloader", Icon: "jdownloader", Category: "Downloads", Images: []string{"jdownloader"}, Port: 5800},
 		{ID: "portainer", Name: "Portainer", Icon: "portainer", Category: "System", Images: []string{"portainer"}, Port: 9000},
 		{ID: "dockge", Name: "Dockge", Icon: "dockge", Category: "System", Images: []string{"dockge"}, Port: 5001},
-		{ID: "qbittorrent", Name: "qBittorrent", Icon: "qbittorrent", Category: "Downloads", Images: []string{"qbittorrent"}, Port: 8080},
 		{ID: "vaultwarden", Name: "Vaultwarden", Icon: "vaultwarden", Category: "Sonstiges", Images: []string{"vaultwarden"}, Port: 80},
 	} {
 		register(linkOnly{def: d})
