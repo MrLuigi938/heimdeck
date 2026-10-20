@@ -54,10 +54,12 @@
 </div>
 
 <style>
-  .icon { display: grid; place-items: center; flex: none; overflow: hidden; }
+  /* Fixed tracks: with "auto" rows a tall image (e.g. a portrait logo) set the
+     row height itself and was cropped instead of scaled down. */
+  .icon { display: grid; grid-template: 100% / 100%; place-items: center; flex: none; overflow: hidden; }
   .icon span { line-height: 1; }
   .icon > * { grid-area: 1 / 1; }
-  img { width: 100%; height: 100%; object-fit: contain; }
+  img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
   img.hidden { visibility: hidden; }
   .letter { width: 100%; height: 100%; border-radius: 25%; display: grid; place-items: center; color: #fff; font-weight: 700; }
 </style>
