@@ -74,4 +74,6 @@ Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr �
 
 ## Lizenz
 
-[MIT](LICENSE)
+Copyright © 2026 Luis Blum
+
+Heimdeck ist freie Software unter der [GNU Affero General Public License v3.0](LICENSE). Du darfst es nutzen, verändern und weitergeben – auch kommerziell –, solange veränderte Versionen, auch wenn sie als Webdienst angeboten werden, unter derselben Lizenz samt Quellcode veröffentlicht werden.
