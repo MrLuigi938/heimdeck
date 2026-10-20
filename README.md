@@ -12,7 +12,8 @@
   <b>English</b> · <a href="README.de.md">Deutsch</a>
 </p>
 
----
+![Heimdeck dashboard](docs/images/dashboard-en.webp)
+<p align="center"><sub>Screenshot with demo data</sub></p>
 
 ## Highlights
 
@@ -28,6 +29,20 @@
 - **Easy switch from Heimdall** – import the Heimdall export file; known services become live tiles.
 - **English and German**, secure by default (bcrypt passwords, AES-256 encrypted API keys that never reach the browser).
 - **One small image** for amd64 and arm64 (Raspberry Pi, NAS).
+
+<details>
+<summary><b>More screenshots</b></summary>
+
+**Search across all services** (press `/`)
+
+![Search](docs/images/search.webp)
+
+**A full dashboard** with smart home, network, quick links and the availability overview
+
+![Full dashboard](docs/images/dashboard-full.webp)
+
+<sub>All screenshots use demo data.</sub>
+</details>
 
 ## Quick start (Docker Compose)
 

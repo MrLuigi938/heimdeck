@@ -37,6 +37,9 @@ Each tile can have a second, public address. If you open the dashboard via a loc
 
 ## Search
 
+![Search with results from Jellyfin and Jellyseerr](images/search.webp)
+<sub>Demo data</sub>
+
 Press `/` anywhere (or click the search box). One search covers your tiles and every connected service that supports search – media libraries, requests, documents, photos and people, games, audiobooks, comics, files, smart-home devices, network clients, DNS queries and more, with covers and thumbnails. Paste a video URL to send it straight to Tubesy.
 
 Which services can be searched is listed in [Supported services](services.md).

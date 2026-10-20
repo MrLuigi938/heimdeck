@@ -9,6 +9,12 @@
 
 Add a tile, choose the service and enter its address and API key (or user and password). Keys are stored encrypted and never reach the browser – covers and thumbnails that need a key are loaded by Heimdeck itself.
 
+<details>
+<summary><b>Example: a dashboard with many integrations</b> (demo data)</summary>
+
+![Dashboard with media, downloads, smart home, network and system tiles](images/dashboard-full.webp)
+</details>
+
 ## All integrations
 
 | Service | Live data | Search | Actions |

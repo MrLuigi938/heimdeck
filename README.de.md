@@ -12,7 +12,8 @@
   <a href="README.md">English</a> · <b>Deutsch</b>
 </p>
 
----
+![Heimdeck-Dashboard](docs/images/dashboard-de.jpg)
+<p align="center"><sub>Screenshot mit Demo-Daten</sub></p>
 
 ## Das kann Heimdeck
 
@@ -28,6 +29,20 @@
 - **Umstieg von Heimdall** – Heimdall-Export importieren; bekannte Dienste werden zu Live-Kacheln.
 - **Deutsch und Englisch**, sicher von Haus aus (Passwörter mit bcrypt, API-Keys mit AES-256 verschlüsselt und nie im Browser).
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).
+
+<details>
+<summary><b>Weitere Screenshots</b></summary>
+
+**Eine Suche über alle Dienste** (Taste `/`)
+
+![Suche](docs/images/search.webp)
+
+**Ein komplettes Dashboard** mit Smart Home, Netzwerk, Schnellzugriff und der Verfügbarkeits-Übersicht
+
+![Komplettes Dashboard](docs/images/dashboard-full.webp)
+
+<sub>Alle Screenshots mit Demo-Daten, Oberfläche auf Englisch.</sub>
+</details>
 
 ## Schnellstart (Docker Compose)
 

@@ -37,6 +37,9 @@ Als „zuhause“ gilt, wenn das Dashboard über eine private IP (`192.168.…`,
 
 ## Suche
 
+![Suche mit Treffern aus Jellyfin und Jellyseerr](../images/search.webp)
+<sub>Demo-Daten, Oberfläche auf Englisch</sub>
+
 Taste `/` drücken (oder ins Suchfeld klicken). Eine Suche umfasst deine Kacheln und jeden verbundenen Dienst mit Suchfunktion – Medienbibliotheken, Anfragen, Dokumente, Fotos und Personen, Spiele, Hörbücher, Comics, Dateien, Smart-Home-Geräte, Netzwerk-Clients, DNS-Abfragen und mehr, mit Covern und Vorschaubildern. Eine eingefügte Video-URL lässt sich direkt an Tubesy schicken.
 
 Welche Dienste durchsucht werden können, steht unter [Unterstützte Dienste](dienste.md).
