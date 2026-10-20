@@ -80,6 +80,8 @@
         <option value="">{t('Wie in den Einstellungen')}</option>
         <option value="uniform">{t('Einheitlich – alle Kacheln gleich groß')}</option>
         <option value="auto">{t('Automatisch – Kacheln mit Live-Daten breiter')}</option>
+        <option value="icons">{t('Kompakt – Icon mit Namen darunter')}</option>
+        <option value="icons-hover">{t('Kompakt – nur Icon, Name beim Darüberfahren')}</option>
       </select>
     </label>
     {#if boards.length > 1}

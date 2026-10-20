@@ -7,7 +7,7 @@
 
 <footer class="credit">
   <span class="on-bg">
-    {#if app}<b>Heimdeck</b>{' · '}{/if}{t('Erdacht mit')} <span class="heart" aria-label={t('Liebe')}>♥</span> {t('von')} Luis Blum · {t('gebaut mit KI')} ✨
+    {#if app}<b>Heimdeck</b>{' · '}{/if}{t('Erdacht mit')} <span class="heart" aria-label={t('Liebe')}>♥</span> {t('von')} <a href="https://github.com/MrLuigi938" target="_blank" rel="noopener noreferrer">Luis Blum</a> · {t('gebaut mit KI')} ✨
   </span>
 </footer>
 
@@ -16,4 +16,6 @@
   .credit > span { padding: 4px 12px; border-radius: 999px; }
   b { font-weight: 600; color: var(--text); }
   .heart { color: #e5484d; }
+  a { color: inherit; font-weight: 600; text-decoration: none; border-bottom: 1px dotted currentColor; }
+  a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 </style>

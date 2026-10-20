@@ -285,4 +285,7 @@ export const en = {
   'Vergleicht alle 6 Stunden die Images deiner Container mit der Registry (Docker Hub, ghcr.io …). Es wird nichts heruntergeladen oder aktualisiert.': 'Compares your containers\' images with the registry (Docker Hub, ghcr.io …) every 6 hours. Nothing is downloaded or updated.',
   'Container starten, stoppen und neu starten erlauben': 'Allow starting, stopping and restarting containers',
   'Knöpfe auf der Docker-Kachel und in der Suche. Jeder, der im Dashboard angemeldet ist, kann dann deine Container steuern.': 'Buttons on the Docker tile and in the search. Anyone logged in to the dashboard can then control your containers.',
+  'Kompakt – Icon mit Namen darunter': 'Compact – icon with name below',
+  'Kompakt – nur Icon, Name beim Darüberfahren': 'Compact – icon only, name on hover',
+  'Kompakte Kacheln zeigen keine Live-Daten, nur Icon und Status.': 'Compact tiles show no live data, only icon and status.',
 };

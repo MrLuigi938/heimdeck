@@ -55,6 +55,8 @@
     ntfyUrl: '', notifyAfter: '2', notifyRecovery: 'true', notifyExternal: 'true', dockerUpdates: 'false', dockerControl: 'false',
     ...$state.snapshot(settings),
   });
+  // svelte-ignore state_referenced_locally
+  s.tileLayout ||= settings.uniformTiles === 'true' ? 'uniform' : 'auto';
   let pw = $state({ current: '', new: '' });
   const accents = ['#5b8cff', '#3ecf8e', '#a78bfa', '#f5b942', '#fb7d4b', '#f2555a', '#22c3d6', '#ec4899'];
 
@@ -200,8 +202,16 @@
       <span>{t('Hintergrundbild (URL, optional)')}</span>
       <input bind:value={s.background} placeholder="https://…/wallpaper.jpg" />
     </label>
-    <label class="check"><input type="checkbox" checked={flag('uniformTiles')} onchange={setFlag('uniformTiles')} /> {t('Einheitliche Kachelgrößen (alle Kacheln gleich breit, gleiche Höhe pro Reihe)')}</label>
-    <p class="help indent">{t('Gilt für alle Gruppen – außer denen, bei denen du unter „Gruppe bearbeiten“ eine eigene Kachelgröße gewählt hast.')}</p>
+    <label class="field">
+      <span>{t('Kachelgröße')}</span>
+      <select bind:value={s.tileLayout}>
+        <option value="auto">{t('Automatisch – Kacheln mit Live-Daten breiter')}</option>
+        <option value="uniform">{t('Einheitlich – alle Kacheln gleich groß')}</option>
+        <option value="icons">{t('Kompakt – Icon mit Namen darunter')}</option>
+        <option value="icons-hover">{t('Kompakt – nur Icon, Name beim Darüberfahren')}</option>
+      </select>
+      <span class="help">{t('Gilt für alle Gruppen – außer denen, bei denen du unter „Gruppe bearbeiten“ eine eigene Kachelgröße gewählt hast.')} {t('Kompakte Kacheln zeigen keine Live-Daten, nur Icon und Status.')}</span>
+    </label>
     <label class="check"><input type="checkbox" checked={s.showGreeting !== 'false'} onchange={setFlag('showGreeting')} /> {t('Begrüßung, Datum und Uhrzeit anzeigen')}</label>
   </section>
 

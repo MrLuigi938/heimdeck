@@ -6,17 +6,19 @@
 
   const CDN = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 
+  // Only a single emoji (or one or two characters) is drawn as text; longer
+  // text like "Paperless NGX" or "sonarr.png" is turned into an icon name,
+  // so it can never overflow the tile.
+  const isEmoji = (s) => /\p{Extended_Pictographic}/u.test(s) && [...new Intl.Segmenter().segment(s)].length <= 2;
   let sources = $derived.by(() => {
     const i = (icon || '').trim();
-    if (!i) return [];
+    if (!i || isEmoji(i)) return [];
     if (/^(https?:)?\/\//.test(i) || i.startsWith('/') || i.startsWith('data:')) return [i];
-    if (/^[a-z0-9-]+$/i.test(i)) {
-      const slug = i.toLowerCase();
-      return [`${CDN}/svg/${slug}.svg`, `${CDN}/png/${slug}.png`];
-    }
-    return [];
+    const slug = i.toLowerCase().replace(/\.(svg|png|webp|jpe?g)$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (!slug) return [];
+    return [`${CDN}/svg/${slug}.svg`, `${CDN}/png/${slug}.png`, `${CDN}/webp/${slug}.webp`];
   });
-  let emoji = $derived(icon && sources.length === 0 ? icon : '');
+  let emoji = $derived(icon && isEmoji(icon.trim()) ? icon.trim() : '');
 
   // Load state is remembered per URL instead of being reset in an effect:
   // a cached image can finish loading before an effect runs, which used to
@@ -52,7 +54,8 @@
 </div>
 
 <style>
-  .icon { display: grid; place-items: center; flex: none; }
+  .icon { display: grid; place-items: center; flex: none; overflow: hidden; }
+  .icon span { line-height: 1; }
   .icon > * { grid-area: 1 / 1; }
   img { width: 100%; height: 100%; object-fit: contain; }
   img.hidden { visibility: hidden; }

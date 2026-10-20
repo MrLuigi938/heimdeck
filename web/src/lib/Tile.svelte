@@ -6,7 +6,7 @@
   import { tileHref, rewrite } from './network.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
 
-  let { tile, def, status, editMode, newTab, local, uniform = false, onEdit, dragProps } = $props();
+  let { tile, def, status, editMode, newTab, local, uniform = false, compact = '', onEdit, dragProps } = $props();
 
   let widget = $state(null);
   let error = $state('');
@@ -15,7 +15,8 @@
   let missing = $derived(
     (def?.fields || []).filter((f) => f.required && (f.secret ? !tile.secretsSet.includes(f.key) : !tile.config?.[f.key])),
   );
-  let live = $derived(def?.hasWidget && tile.showWidget && missing.length === 0);
+  // Compact tiles (icon only) never load live data.
+  let live = $derived(!compact && def?.hasWidget && tile.showWidget && missing.length === 0);
 
   async function load() {
     try {
@@ -64,6 +65,20 @@
   let href = $derived(tileHref(tile, local));
 </script>
 
+{#if compact}
+<div class="tile card compact {compact}" class:editing={editMode} {...dragProps}>
+  <a class="square" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
+     title={tile.description ? `${tile.name} – ${tile.description}` : tile.name} aria-label={tile.name}
+     onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
+    <Icon icon={tile.icon} name={tile.name} size={44} />
+    <span class="cname">{tile.name}</span>
+  </a>
+  {#if dot}<span class="dot corner {dot}" title={dotTitle}></span>{/if}
+  {#if editMode}
+    <button class="ghost icon edit cedit" onclick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(); }} aria-label={t('Bearbeiten')}>✎</button>
+  {/if}
+</div>
+{:else}
 <div class="tile card" class:wide={!uniform && (live || (missing.length > 0 && def?.hasWidget && tile.showWidget))} class:uniform class:editing={editMode} {...dragProps}>
   <a class="head" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
@@ -94,6 +109,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   /* translateZ gives each tile its own layer: Chrome sometimes skips repainting text inside
@@ -118,5 +134,20 @@
   .skeleton { height: 54px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   .setup { margin: 0 14px 14px; font-size: 13px; text-align: left; border-style: dashed; }
   @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* Compact: a square with the icon; the name below or, with icons-hover, on hover. */
+  .tile.compact { position: relative; aspect-ratio: 1; }
+  .square { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; min-width: 0; }
+  .cname { font-size: 12px; font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .tile.compact:not(.editing) .square[href]:hover .cname { color: var(--accent); }
+  .icons-hover .cname {
+    position: absolute; left: 6px; right: 6px; bottom: 8px; text-align: center; opacity: 0; transform: translateY(4px);
+    transition: opacity .15s, transform .15s; pointer-events: none; color: var(--text);
+  }
+  .icons-hover:hover .cname, .icons-hover .square:focus-visible .cname, .icons-hover.editing .cname { opacity: 1; transform: none; }
+  /* Touch screens have no hover: always show the name there. */
+  @media (hover: none) { .icons-hover .cname { opacity: 1; transform: none; } }
+  .corner { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; }
+  .cedit { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; padding: 0; justify-content: center; }
   @media (max-width: 520px) { .tile.wide { grid-column: 1 / -1; } }
 </style>

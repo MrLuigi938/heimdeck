@@ -129,7 +129,7 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Layout != nil {
 		switch *body.Layout {
-		case "", "uniform", "auto":
+		case "", "uniform", "auto", "icons", "icons-hover":
 			g.Layout = *body.Layout
 		default:
 			writeErr(w, 400, errors.New("unbekannte Kachelgröße"))

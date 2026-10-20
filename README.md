@@ -120,7 +120,7 @@ Proxmox-Kachel anlegen (Startseite → **Proxmox verbinden**) mit einem API-Toke
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
 | JDownloader, FRITZ!Box, Zoraxy, Portainer, … | Online-Status | | |
 
-Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten, die Kachelgröße (einheitlich oder automatisch) pro Gruppe einstellen.
+Jede Kachel kann außerdem ein „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten, die Kachelgröße (automatisch, einheitlich oder kompakt als Icon-Quadrat) für alle oder pro Gruppe einstellen.
 
 ## Benachrichtigungen
 
@@ -187,4 +187,4 @@ Eine neue Integration ist eine einzelne Datei in `internal/integrations/`: `Def(
 
 ---
 
-<p align="center"><sub>Erdacht mit ♥ von Luis Blum · gebaut mit KI ✨</sub></p>
+<p align="center"><sub>Erdacht mit ♥ von <a href="https://github.com/MrLuigi938">Luis Blum</a> · gebaut mit KI ✨</sub></p>

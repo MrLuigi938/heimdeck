@@ -87,8 +87,11 @@
   });
   let hasHidden = $derived(boardGroups.some((g) => g.visibility === 'hidden'));
   let hiddenCount = $derived(boardGroups.filter((g) => g.visibility === 'hidden').length);
-  // A group can override the global "uniform tiles" setting.
-  const isUniform = (g) => g.layout === 'uniform' || (g.layout !== 'auto' && settings.uniformTiles === 'true');
+  // A group can override the global tile size (setting tileLayout; older
+  // installs only have the uniformTiles switch).
+  const layoutOf = (g) => g.layout || settings.tileLayout || (settings.uniformTiles === 'true' ? 'uniform' : 'auto');
+  const isUniform = (g) => layoutOf(g) === 'uniform';
+  const compactOf = (g) => (layoutOf(g).startsWith('icons') ? layoutOf(g) : '');
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -389,13 +392,13 @@
               </div>
             {/if}
           </div>
-          <div class="grid" class:uniform={isUniform(group)}>
+          <div class="grid" class:uniform={isUniform(group)} class:compact={!!compactOf(group)}>
             {#if !group.tiles.length && !editMode}
               <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
             {/if}
             {#each group.tiles as tile (tile.id)}
               <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
-                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)}
+                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)} compact={compactOf(group)}
                   onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
               </div>
             {/each}
@@ -468,6 +471,9 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }
   /* Uniform: every tile one column of the same width; tiles in a row share the tallest one's height. */
   .grid.uniform { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: stretch; }
+  /* Compact: small square tiles with the icon. */
+  .grid.compact { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: stretch; }
+  .grid.compact .add { min-height: 0; aspect-ratio: 1; }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: translateZ(0) scale(1.02); }
   .slot.dragging > :global(.tile) { opacity: .4; }
@@ -492,5 +498,6 @@
     .page { padding: 16px 16px 60px; gap: 22px; }
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .grid.uniform { grid-template-columns: minmax(0, 1fr); }
+    .grid.compact { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
   }
 </style>

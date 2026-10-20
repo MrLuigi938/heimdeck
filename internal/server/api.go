@@ -225,10 +225,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// tileLayouts are the tile sizes a group (or the setting tileLayout) can have.
+var tileLayouts = map[string]bool{"uniform": true, "auto": true, "icons": true, "icons-hover": true}
+
 var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
 	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
-	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true,
+	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 }
 
@@ -886,11 +889,11 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err)
 			return
 		}
-		if eg.Visibility == store.Hidden || eg.Layout == "uniform" || eg.Layout == "auto" {
+		if eg.Visibility == store.Hidden || tileLayouts[eg.Layout] {
 			if eg.Visibility == store.Hidden {
 				g.Visibility = store.Hidden
 			}
-			if eg.Layout == "uniform" || eg.Layout == "auto" {
+			if tileLayouts[eg.Layout] {
 				g.Layout = eg.Layout
 			}
 			logErr("import group", s.store.UpdateGroup(g))
