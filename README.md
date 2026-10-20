@@ -92,3 +92,5 @@ Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr �
 Copyright © 2026 Luis Blum
 
 Heimdeck is free software under the [GNU Affero General Public License v3.0](LICENSE). You may use, change and share it – also commercially – as long as changed versions, including ones offered as a web service, are published under the same license with their source code.
+
+Heimdeck was built with the help of AI ([Claude](https://claude.ai) by Anthropic).
