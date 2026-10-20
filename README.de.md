@@ -71,3 +71,7 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken, um d
 Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · UniFi · Speedtest Tracker · Anubis · Docker · Proxmox VE · Home Assistant · ioBroker · evcc · beliebige JSON-API
 
 → [Vollständige Liste mit Live-Daten, Suche und Aktionen](docs/de/dienste.md)
+
+## Lizenz
+
+[MIT](LICENSE)

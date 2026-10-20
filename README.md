@@ -71,3 +71,7 @@ Open `http://<your-server>:3000`, create your user and click 🐳 to add your co
 Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · UniFi · Speedtest Tracker · Anubis · Docker · Proxmox VE · Home Assistant · ioBroker · evcc · any JSON API
 
 → [Full list with live data, search and actions](docs/services.md)
+
+## License
+
+[MIT](LICENSE)
