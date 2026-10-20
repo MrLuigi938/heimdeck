@@ -1,7 +1,7 @@
 services:
   heimdeck:
     image: ghcr.io/mrluigi938/heimdeck:latest
-    # Oder selbst bauen: statt "image" die nächste Zeile verwenden
+    # Or build it yourself: use the next line instead of "image"
     # build: .
     container_name: heimdeck
     restart: unless-stopped
@@ -9,15 +9,15 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/data
-      # Optional: Container automatisch erkennen (nur lesend)
+      # Optional: discover your containers automatically (read-only)
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - TZ=Europe/Berlin
-      # Auf "true" setzen, wenn Heimdeck nur über HTTPS (Reverse Proxy) erreichbar ist
+      - TZ=Etc/UTC   # your time zone, e.g. Europe/Berlin
+      # Set to "true" if Heimdeck is only reachable via HTTPS (reverse proxy)
       - HEIMDECK_SECURE_COOKIE=false
 
-# Noch sicherer: Docker-Socket über einen Proxy freigeben, der nur das Auflisten erlaubt.
-# Dann oben den Socket-Eintrag entfernen und Folgendes ergänzen:
+# Even safer: expose the Docker socket through a proxy that only allows listing.
+# Remove the socket line above and add the following:
 #
 #   heimdeck:
 #     environment:

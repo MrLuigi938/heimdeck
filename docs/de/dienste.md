@@ -1,0 +1,101 @@
+# Unterstützte Dienste
+
+[← Zurück zur Übersicht](../../README.de.md) · [English](../services.md)
+
+- [Alle Integrationen](#alle-integrationen)
+- [Proxmox verbinden](#proxmox-verbinden)
+- [Docker-Kachel](#docker-kachel)
+- [Eigene API](#eigene-api)
+
+Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und Passwort) eintragen. Schlüssel werden verschlüsselt gespeichert und gelangen nie in den Browser – Cover und Vorschaubilder, die einen Key brauchen, lädt Heimdeck selbst.
+
+## Alle Integrationen
+
+| Dienst | Live-Daten | Suche | Aktionen |
+|---|---|---|---|
+| **Medien** | | | |
+| Jellyfin | Streams, Bibliotheksgröße | ✓ | |
+| Jellyseerr / Overseerr | offene Anfragen, Zähler | ✓ | genehmigen, ablehnen, anfragen |
+| Sonarr / Radarr | Warteschlange, Demnächst, Warnungen | | |
+| Lidarr | Warteschlange, neue und fehlende Alben, Warnungen | ✓ Künstler | fehlende Alben suchen |
+| Bazarr | fehlende Untertitel (Folgen/Filme), gedrosselte Anbieter | ✓ Serien und Filme | fehlende Untertitel suchen |
+| Prowlarr | aktive und gestörte Indexer | | |
+| Immich | Fotos, Videos, Speicher pro Benutzer | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
+| Audiobookshelf | Hörbücher, Podcasts, Stunden, Weiterhören | ✓ Titel, Autoren, Serien | |
+| Kavita | Serien, Bände, Dateien, Weiterlesen | ✓ mit Covern | |
+| Komga | Serien, Bücher, angefangene Bücher | ✓ mit Covern | |
+| Stash | Szenen, Bilder, Größe | | |
+| RomM (API-Token oder Benutzer/Passwort) | Plattformen, Spiele, Spielstände | ✓ | |
+| Plex | Streams, Filme/Serien/Musik | ✓ mit Covern | |
+| Emby | Streams, Bibliotheksgröße | ✓ | |
+| Navidrome | läuft gerade, Titelanzahl, Scan | ✓ Künstler, Alben, Titel mit Covern | |
+| Readarr / Bookshelf | Warteschlange, neue und fehlende Bücher | ✓ Autoren | fehlende Bücher suchen |
+| Tdarr | Dateien, Transcodes, Warteschlange, gesparter Speicher, laufende Worker | | |
+| **Downloads** | | | |
+| SABnzbd | Tempo, Warteschlange, Restzeit | | pausieren, fortsetzen |
+| NZBGet | Tempo, Warteschlange, Restgröße, Restzeit | | pausieren, fortsetzen |
+| qBittorrent, Transmission, Deluge | ↓/↑-Tempo, lädt/seedet, aktive Torrents mit Fortschritt | ✓ Torrents | alle pausieren/fortsetzen |
+| MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
+| Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
+| **Dokumente** | | | |
+| Paperless-ngx | Dokumente, Posteingang | ✓ | |
+| Nextcloud (App-Passwort) | Dateien, Benutzer, aktive Nutzer, freier Speicher (ohne Admin: eigener Speicher) | ✓ Dateien, Kalender, Kontakte, Talk, Notizen, Deck … | |
+| **Netzwerk** | | | |
+| AdGuard Home | DNS-Anfragen, Blockierquote, Antwortzeit, meistblockierte Domains | ✓ Abfrage-Log | Schutz pausieren/ausschalten, Domain sperren oder freigeben |
+| Pi-hole (v6 mit App-Passwort, v5 mit API-Token) | DNS-Anfragen, Blockierquote, Clients | ✓ Abfrage-Log (v6) | Blockieren pausieren, Domain sperren oder freigeben |
+| OPNsense (API-Key + Secret) | WAN-Datenrate, RAM, Last, Laufzeit, Gateways, Updates | | |
+| UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
+| Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
+| Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
+| **System** | | | |
+| Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
+| Proxmox VE (API-Token) | CPU, RAM, Gäste aktiv, Nodes bzw. gestoppte Gäste | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| **Smart Home & Energie** | | | |
+| Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
+| ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |
+| evcc | PV, Haus, Netz, Batterie, Ladepunkte | | Lademodus wechseln (Aus, PV, Min+PV, Schnell) |
+| **Sonstige** | | | |
+| Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
+| JDownloader, FRITZ!Box, Zoraxy, Portainer, … | Online-Status | | |
+
+Jede Kachel kann außerdem „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist.
+
+Dein Dienst fehlt? Nimm die Kachel [Eigene API](#eigene-api) oder [eröffne ein Issue](https://github.com/MrLuigi938/heimdeck/issues).
+
+## Proxmox verbinden
+
+1. In Proxmox: Rechenzentrum → Berechtigungen → **API-Token** → Token anlegen (z. B. `root@pam`, Name `heimdeck`). Rolle **PVEAuditor** zum Anzeigen, zusätzlich **PVEVMUser**, wenn du Gäste aus Heimdeck starten und stoppen willst.
+2. In Heimdeck: Startseite → **Proxmox verbinden** (oder Proxmox-Kachel anlegen) und das Token im Format `benutzer@pam!name=geheimnis` eintragen.
+
+Danach findet 🔍 die Dienste in deinen VMs und Containern: am Namen bzw. an den Tags (z. B. `jellyfin`, `adguard`, `paperless-ngx` – so heißen auch die Container der Proxmox-Community-Skripte), mit der IP-Adresse des Gasts und dem üblichen Port. VMs brauchen dafür den QEMU-Gast-Agenten.
+
+## Docker-Kachel
+
+Zeigt laufende und gestoppte Container. In den Einstellungen unter „Docker“ lassen sich zwei Dinge einschalten (beide standardmäßig aus):
+
+- **Nach Container-Updates suchen**: alle 6 Stunden wird das Image jedes Containers mit der Registry verglichen (nur lesen, es wird nichts aktualisiert).
+- **Container starten, stoppen und neu starten**: Knöpfe auf der Kachel und in der Suche. Achtung: Jeder, der im Dashboard angemeldet ist, kann dann deine Container steuern. Mit einem Socket-Proxy braucht es dafür `POST=1` und `CONTAINERS=1`.
+
+## Eigene API
+
+Für alles ohne eigene Integration: Kachel „Eigene API“ wählen, Adresse eintragen und beschreiben, was angezeigt werden soll. Beispiel für eine Antwort wie `{"cpu": 0.42, "disk": {"used": 550000000000}, "devices": [{"name": "NAS", "online": true}]}`:
+
+```
+Werte:
+  CPU = cpu | anteil
+  Belegt = disk.used | bytes
+  Online = devices[online=true].# | zahl warn<1
+Liste:          devices
+Listeneintrag:  title = name
+                badge = online | janein
+Knöpfe:         Neu starten = POST /api/restart
+```
+
+- **Pfade**: `a.b.c`, `liste[0]`, `liste[-1]` (letztes), `liste.#` (Anzahl), `liste[feld=wert]` (filtern, auch `!=`, `>`, `<`).
+- **Formate**: `text`, `zahl[:Nachkommastellen]`, `bytes`, `prozent`, `anteil` (0–1 → %), `dauer` (Sekunden), `datum`, `seit`, `janein`. Dahinter eine Einheit (`zahl:1 °C`) und Farben (`ok=up`, `warn>80`, `bad<10`). Englische Namen (`number`, `percent`, `ratio`, `duration`, `date`, `since`, `bool`) gehen ebenso.
+- **Listeneintrag**: `title`, `subtitle`, `badge`, `progress`, `url`; mehrere Pfade mit `+` verbinden (`subtitle = artist + album`).
+- **Suche**: optional ein Pfad mit `{q}` als Platzhalter (z. B. `/api/search?q={q}`), dann ist die API Teil der gemeinsamen Suche.
+- **Header** wie `Authorization: Bearer …` werden verschlüsselt gespeichert.
+
+Ohne eingetragene Werte zeigt die Kachel die Antwort an – praktisch, um die Pfade zu finden.
+

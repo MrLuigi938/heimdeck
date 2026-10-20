@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build frontend
+        run: cd web && npm ci && npm run build
+      - name: Test
+        run: go test ./...
+      - name: Build binaries
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            name="heimdeck_${version}_linux_${arch}"
+            mkdir -p "build/$name"
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "build/$name/heimdeck" .
+            cp README.md "build/$name/"
+            tar -czf "dist/$name.tar.gz" -C "build/$name" .
+          done
+          cp install/install.sh install/proxmox-lxc.sh dist/
+          cd dist && sha256sum * > checksums.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
