@@ -23,7 +23,7 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 ## Dashboards and groups
 
 - **Multiple dashboards**, e.g. “Home” and “Work”: switch next to the title at the top. Each dashboard can have its own background image. Every browser remembers the last one used; `?board=<id>` links to a specific one.
-- **Groups** sort your tiles. The tile size (automatic, uniform or compact as an icon square) can be set for all groups or per group. With the arrangement **In columns** (per group) tiles fill the columns from top to bottom instead of lining up in rows, so there are no gaps below shorter tiles; all tiles then have the same width.
+- **Groups** sort your tiles. The tile size (automatic, uniform or compact as an icon square) can be set for all groups or per group (edit group → Display). With the display **Free grid** (per group) you place the tiles yourself: in edit mode (✎) a 12-column grid appears under the group, tiles can be dragged anywhere and made wider, narrower, taller or shorter with the bottom-right corner (double-clicking the corner fits the height to the content, the arrow keys resize as well). A tile only one column wide is shown as an icon, so large live tiles and small icons can share a group. Gaps stay where you leave them; a tile dropped onto another pushes that one down. On phones the tiles are shown like in the other groups, ordered from top left to bottom right.
 - **Hidden groups** are only shown after clicking 👁 (for the current session). **Protected groups** need their own password.
 - **Link-only tiles**: every tile can be a plain link and still shows whether the service is reachable. The status check can be turned off per tile.
 

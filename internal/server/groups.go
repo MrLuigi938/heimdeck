@@ -138,7 +138,7 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if body.Arrange != nil {
-		if *body.Arrange != "" && *body.Arrange != "columns" {
+		if *body.Arrange != "" && *body.Arrange != "free" {
 			writeErr(w, 400, errors.New("unbekannte Anordnung"))
 			return
 		}

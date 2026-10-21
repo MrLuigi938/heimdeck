@@ -2,6 +2,7 @@
   import { get, post, put } from './api.js';
   import { toast } from './toast.svelte.js';
   import Tile from './Tile.svelte';
+  import FreeGrid, { byPosition } from './FreeGrid.svelte';
   import Search from './Search.svelte';
   import TileEditor from './TileEditor.svelte';
   import Discover from './Discover.svelte';
@@ -89,10 +90,20 @@
   let hiddenCount = $derived(boardGroups.filter((g) => g.visibility === 'hidden').length);
   // A group can override the global tile size (setting tileLayout; older
   // installs only have the uniformTiles switch).
-  const layoutOf = (g) => g.layout || settings.tileLayout || (settings.uniformTiles === 'true' ? 'uniform' : 'auto');
+  // A free grid sizes each tile itself; on phones its tiles show like "auto".
+  const layoutOf = (g) => (g.arrange === 'free' ? 'auto' : g.layout || settings.tileLayout || (settings.uniformTiles === 'true' ? 'uniform' : 'auto'));
   const isUniform = (g) => layoutOf(g) === 'uniform';
   const compactOf = (g) => (layoutOf(g).startsWith('icons') ? layoutOf(g) : '');
-  const columnsOf = (g) => g.arrange === 'columns' && !compactOf(g);
+  const isFree = (g) => g.arrange === 'free';
+  // On phones a freely arranged group is shown like the others, in reading order.
+  let narrow = $state(matchMedia('(max-width: 640px)').matches);
+  $effect(() => {
+    const media = matchMedia('(max-width: 640px)');
+    const update = () => (narrow = media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  });
+  const tilesOf = (g) => (isFree(g) ? byPosition(g.tiles) : g.tiles);
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -203,7 +214,11 @@
   // ---- drag & drop ----
   async function saveLayout() {
     try {
-      await put('/layout', data.groups.map((g) => ({ groupId: g.id, tiles: g.tiles.map((t) => t.id) })));
+      await put('/layout', data.groups.map((g) => ({
+        groupId: g.id,
+        tiles: g.tiles.map((t) => t.id),
+        grid: isFree(g) ? Object.fromEntries(g.tiles.filter((t) => t.grid).map((t) => [t.id, t.grid])) : undefined,
+      })));
     } catch (e) {
       toast(e.message, 'bad');
       load();
@@ -218,6 +233,7 @@
     }
     if (!tile) return;
     const target = data.groups.find((g) => g.id === groupId);
+    if (tile.groupId !== groupId) tile.grid = null; // the server drops it as well
     tile.groupId = groupId;
     const idx = beforeId == null ? -1 : target.tiles.findIndex((t) => t.id === beforeId);
     if (idx < 0) target.tiles.push(tile);
@@ -231,6 +247,7 @@
       draggable: 'true',
       ondragstart: (e) => {
         dragging = tile.id;
+        grab = { x: 0, y: 0 }; // dropped into a free grid, the tile lands with its top left at the pointer
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', String(tile.id));
       },
@@ -245,6 +262,46 @@
       },
     };
   }
+
+  // In a free grid the tile only starts the drag; the grid finds the cell.
+  let grab = { x: 0, y: 0 };
+  function freeDragProps(tile) {
+    if (!editMode) return {};
+    return {
+      draggable: 'true',
+      ondragstart: (e) => {
+        dragging = tile.id;
+        const r = e.currentTarget.getBoundingClientRect();
+        grab = { x: e.clientX - r.left, y: e.clientY - r.top };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(tile.id));
+      },
+      ondragend: () => { dragging = null; dropTarget = null; },
+    };
+  }
+  // Tiles dragged out of a free grid into a normal group start at their top left.
+  function dragPropsOf(tile, group) {
+    if (!isFree(group)) return dragPropsFor(tile, group);
+    return narrow ? {} : freeDragProps(tile);
+  }
+
+  // A free grid reports the new positions; a tile dropped in from another group moves along.
+  function commitGrid(group, grid, incomingId) {
+    if (incomingId != null && !group.tiles.some((t) => t.id === incomingId)) {
+      for (const g of data.groups) {
+        const i = g.tiles.findIndex((t) => t.id === incomingId);
+        if (i >= 0) {
+          const [tile] = g.tiles.splice(i, 1);
+          tile.groupId = group.id;
+          group.tiles.push(tile);
+        }
+      }
+    }
+    for (const t of group.tiles) if (grid[t.id]) t.grid = grid[t.id];
+    group.tiles = byPosition(group.tiles);
+    saveLayout();
+  }
+  const findTile = (id) => data.groups.flatMap((g) => g.tiles).find((t) => t.id === id);
 
   function groupDrop(e, group) {
     e.preventDefault();
@@ -393,20 +450,34 @@
               </div>
             {/if}
           </div>
-          <div class="grid" class:uniform={isUniform(group)} class:compact={!!compactOf(group)} class:columns={columnsOf(group)}>
-            {#if !group.tiles.length && !editMode}
-              <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
-            {/if}
-            {#each group.tiles as tile (tile.id)}
-              <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
-                <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)} compact={compactOf(group)}
-                  onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
-              </div>
-            {/each}
+          {#if isFree(group) && !narrow && group.tiles.length}
+            <FreeGrid tiles={group.tiles} {defs} {status} {editMode} {newTab} {local}
+              {dragging} {findTile} grab={() => grab} tileDragProps={freeDragProps} onEdit={(tile) => (editing = tile)}
+              onCommit={(grid, incomingId) => commitGrid(group, grid, incomingId)} />
             {#if editMode}
-              <button class="add" onclick={() => (editing = { groupId: group.id })}>+ {t('Kachel')}</button>
+              <div class="free-add">
+                <button class="add" onclick={() => (editing = { groupId: group.id })}>+ {t('Kachel')}</button>
+              </div>
             {/if}
-          </div>
+          {:else}
+            <div class="grid" class:uniform={isUniform(group)} class:compact={!!compactOf(group)}>
+              {#if !group.tiles.length && !editMode}
+                <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
+              {/if}
+              {#if editMode && isFree(group) && narrow && group.tiles.length}
+                <p class="empty-group on-bg">{t('Freies Raster: auf einem größeren Bildschirm anordnen.')}</p>
+              {/if}
+              {#each tilesOf(group) as tile (tile.id)}
+                <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
+                  <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)} compact={compactOf(group)}
+                    onEdit={() => (editing = tile)} dragProps={dragPropsOf(tile, group)} />
+                </div>
+              {/each}
+              {#if editMode}
+                <button class="add" onclick={() => (editing = { groupId: group.id })}>+ {t('Kachel')}</button>
+              {/if}
+            </div>
+          {/if}
         </section>
       {/if}
     {/each}
@@ -475,12 +546,7 @@
   /* Compact: small square tiles with the icon. */
   .grid.compact { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: stretch; }
   .grid.compact .add { min-height: 0; aspect-ratio: 1; }
-  /* Columns: tiles of one width fill the columns from top to bottom, so no
-     row waits for its tallest tile. */
-  .grid.columns { display: block; columns: 300px; column-gap: 12px; }
-  .grid.columns > * { break-inside: avoid; margin-bottom: 12px; }
-  .grid.columns > .slot { display: block; }
-  .grid.columns .add { width: 100%; }
+  .free-add { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: translateZ(0) scale(1.02); }
   .slot.dragging > :global(.tile) { opacity: .4; }

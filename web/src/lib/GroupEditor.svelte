@@ -12,10 +12,10 @@
   // svelte-ignore state_referenced_locally
   let visibility = $state(group.visibility || 'visible');
   let password = $state('');
+  // One choice for tile size and arrangement; the free grid keeps the stored tile size
+  // so switching back restores it.
   // svelte-ignore state_referenced_locally
-  let layout = $state(group.layout || '');
-  // svelte-ignore state_referenced_locally
-  let arrange = $state(group.arrange || '');
+  let look = $state(group.arrange === 'free' ? 'free' : group.layout || '');
   // svelte-ignore state_referenced_locally
   let boardId = $state(group.boardId);
   let saving = $state(false);
@@ -32,7 +32,9 @@
     e?.preventDefault();
     saving = true;
     try {
-      await put(`/groups/${group.id}`, { name, visibility, password, layout, arrange, boardId });
+      const free = look === 'free';
+      const layout = free ? group.layout || '' : look;
+      await put(`/groups/${group.id}`, { name, visibility, password, layout, arrange: free ? 'free' : '', boardId });
       toast(t('Gruppe gespeichert'));
       onSaved();
     } catch (err) {
@@ -77,25 +79,17 @@
       </label>
     {/if}
     <label class="field">
-      <span>{t('Kachelgröße')}</span>
-      <select bind:value={layout}>
+      <span>{t('Darstellung')}</span>
+      <select bind:value={look}>
         <option value="">{t('Wie in den Einstellungen')}</option>
         <option value="uniform">{t('Einheitlich – alle Kacheln gleich groß')}</option>
         <option value="auto">{t('Automatisch – Kacheln mit Live-Daten breiter')}</option>
         <option value="icons">{t('Kompakt – Icon mit Namen darunter')}</option>
         <option value="icons-hover">{t('Kompakt – nur Icon, Name beim Darüberfahren')}</option>
+        <option value="free">{t('Freies Raster – Kacheln frei platzieren und in der Größe ändern')}</option>
       </select>
+      {#if look === 'free'}<span class="help">{t('Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.')}</span>{/if}
     </label>
-    {#if !layout.startsWith('icons')}
-      <label class="field">
-        <span>{t('Anordnung')}</span>
-        <select bind:value={arrange}>
-          <option value="">{t('In Reihen – jede Reihe so hoch wie ihre höchste Kachel')}</option>
-          <option value="columns">{t('In Spalten – keine Lücken, Reihenfolge von oben nach unten')}</option>
-        </select>
-        {#if arrange === 'columns'}<span class="help">{t('Alle Kacheln sind dann gleich breit.')}</span>{/if}
-      </label>
-    {/if}
     {#if boards.length > 1}
       <label class="field">
         <span>{t('Dashboard')}</span>

@@ -35,8 +35,24 @@ type Group struct {
 	Position     int    `json:"position"`
 	Visibility   string `json:"visibility"`
 	Layout       string `json:"layout"`  // "" = follow the global setting, "uniform" or "auto"
-	Arrange      string `json:"arrange"` // "" = in rows, "columns" = filled column by column
+	Arrange      string `json:"arrange"` // "" = in rows, "free" = tiles placed freely on a grid
 	PasswordHash string `json:"-"`
+}
+
+// GridCols is the number of columns of a group arranged freely.
+const GridCols = 12
+
+// GridPos is where a tile sits in a freely arranged group, in grid cells.
+type GridPos struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+	W int `json:"w"`
+	H int `json:"h"`
+}
+
+// Valid reports whether the position fits the grid.
+func (p GridPos) Valid() bool {
+	return p.X >= 0 && p.Y >= 0 && p.Y < 1000 && p.W >= 1 && p.X+p.W <= GridCols && p.H >= 1 && p.H <= 100
 }
 
 // Board is a separate dashboard, e.g. "Privat" and "Arbeit".
@@ -63,6 +79,7 @@ type Tile struct {
 	ShowWidget  bool              `json:"showWidget"`
 	Monitor     bool              `json:"monitor"` // check and show the online status
 	Position    int               `json:"position"`
+	Grid        *GridPos          `json:"grid"` // nil = not placed yet (or the group is not arranged freely)
 	// Secrets never leave the backend; the API only reports which keys are set.
 	Secrets map[string]string `json:"-"`
 }
@@ -138,10 +155,18 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE groups ADD COLUMN layout TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE boards ADD COLUMN background TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE groups ADD COLUMN arrange TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE tiles ADD COLUMN grid_x INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE tiles ADD COLUMN grid_y INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE tiles ADD COLUMN grid_w INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE tiles ADD COLUMN grid_h INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
 		}
+	}
+	// The arrangement "columns" (CSS columns) was replaced by the free grid.
+	if _, err := db.Exec(`UPDATE groups SET arrange = '' WHERE arrange = 'columns'`); err != nil {
+		return nil, err
 	}
 	st := &Store{db: db, box: box}
 	if err := st.ensureBoard(); err != nil {
@@ -408,14 +433,19 @@ func (s *Store) DeleteGroup(id int64) error {
 
 // ---- tiles ----
 
-const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position`
+const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position, grid_x, grid_y, grid_w, grid_h`
 
 func (s *Store) scanTile(sc interface{ Scan(...any) error }) (Tile, error) {
 	var t Tile
 	var cfg, sec string
-	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Monitor, &t.Position)
+	var p GridPos
+	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Monitor, &t.Position,
+		&p.X, &p.Y, &p.W, &p.H)
 	if err != nil {
 		return t, err
+	}
+	if p.W > 0 {
+		t.Grid = &p
 	}
 	t.Config = map[string]string{}
 	json.Unmarshal([]byte(cfg), &t.Config)
@@ -459,18 +489,28 @@ func (s *Store) SaveTile(t *Tile) error {
 		return err
 	}
 	if t.ID == 0 {
+		// A new tile keeps a valid grid position (from a backup); otherwise the browser places it.
+		var p GridPos
+		if t.Grid != nil && t.Grid.Valid() {
+			p = *t.Grid
+		} else {
+			t.Grid = nil
+		}
 		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM tiles WHERE group_id = ?`, t.GroupID).Scan(&t.Position)
-		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.Position)
+		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position, grid_x, grid_y, grid_w, grid_h)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.Position,
+			p.X, p.Y, p.W, p.H)
 		if err != nil {
 			return err
 		}
 		t.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err = s.db.Exec(`UPDATE tiles SET group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ?, monitor = ? WHERE id = ?`,
-		t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.ID)
+	// The grid position is only changed by SaveLayout; a tile moved to another group loses it.
+	// (SQLite evaluates every SET expression with the old row, so group_id here is the old one.)
+	_, err = s.db.Exec(`UPDATE tiles SET grid_w = CASE WHEN group_id = ? THEN grid_w ELSE 0 END, group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ?, monitor = ? WHERE id = ?`,
+		t.GroupID, t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.ID)
 	return err
 }
 
@@ -483,9 +523,11 @@ func (s *Store) DeleteTile(id int64) error {
 }
 
 // Layout describes the complete order: groups in order, each with its tile ids in order.
+// Freely arranged groups also send the grid position of their tiles.
 type Layout []struct {
-	GroupID int64   `json:"groupId"`
-	Tiles   []int64 `json:"tiles"`
+	GroupID int64             `json:"groupId"`
+	Tiles   []int64           `json:"tiles"`
+	Grid    map[int64]GridPos `json:"grid,omitempty"`
 }
 
 func (s *Store) SaveLayout(l Layout) error {
@@ -499,8 +541,13 @@ func (s *Store) SaveLayout(l Layout) error {
 			return err
 		}
 		for ti, id := range g.Tiles {
-			if _, err := tx.Exec(`UPDATE tiles SET group_id = ?, position = ? WHERE id = ?`, g.GroupID, ti, id); err != nil {
+			if _, err := tx.Exec(`UPDATE tiles SET grid_w = CASE WHEN group_id = ? THEN grid_w ELSE 0 END, group_id = ?, position = ? WHERE id = ?`, g.GroupID, g.GroupID, ti, id); err != nil {
 				return err
+			}
+			if p, ok := g.Grid[id]; ok && p.Valid() {
+				if _, err := tx.Exec(`UPDATE tiles SET grid_x = ?, grid_y = ?, grid_w = ?, grid_h = ? WHERE id = ?`, p.X, p.Y, p.W, p.H, id); err != nil {
+					return err
+				}
 			}
 		}
 	}

@@ -884,6 +884,7 @@ type exportTile struct {
 	Insecure    bool              `json:"insecure,omitempty"`
 	ShowWidget  bool              `json:"showWidget"`
 	NoMonitor   bool              `json:"noMonitor,omitempty"`
+	Grid        *store.GridPos    `json:"grid,omitempty"`
 }
 
 type exportData struct {
@@ -930,7 +931,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, t := range tiles {
 			if t.GroupID == g.ID {
 				eg.Tiles = append(eg.Tiles, exportTile{Name: t.Name, URL: t.URL, ExternalURL: t.ExternalURL, APIURL: t.APIURL, Icon: t.Icon,
-					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor})
+					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor, Grid: t.Grid})
 			}
 		}
 		data.Groups = append(data.Groups, eg)
@@ -983,15 +984,16 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err)
 			return
 		}
-		if eg.Visibility == store.Hidden || tileLayouts[eg.Layout] || eg.Arrange == "columns" {
+		// Older backups may say "columns"; that arrangement no longer exists and becomes rows.
+		if eg.Visibility == store.Hidden || tileLayouts[eg.Layout] || eg.Arrange == "free" {
 			if eg.Visibility == store.Hidden {
 				g.Visibility = store.Hidden
 			}
 			if tileLayouts[eg.Layout] {
 				g.Layout = eg.Layout
 			}
-			if eg.Arrange == "columns" {
-				g.Arrange = "columns"
+			if eg.Arrange == "free" {
+				g.Arrange = "free"
 			}
 			logErr("import group", s.store.UpdateGroup(g))
 		}
@@ -999,7 +1001,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			monitor := !et.NoMonitor
 			t, err := s.buildTile(tileInput{Tile: store.Tile{
 				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
-				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget,
+				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget, Grid: et.Grid,
 			}, Monitor: &monitor})
 			if err != nil {
 				continue

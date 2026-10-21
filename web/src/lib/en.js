@@ -298,9 +298,11 @@ export const en = {
   'Benutzerdefiniert …': 'Custom …',
   'Adresse der Suchmaschine': 'Search engine address',
   '{q} wird durch den Suchbegriff ersetzt, z. B. für deine eigene SearXNG-Instanz.': '{q} is replaced with the search term, e.g. for your own SearXNG instance.',
-  // group arrangement
-  'Anordnung': 'Arrangement',
-  'In Reihen – jede Reihe so hoch wie ihre höchste Kachel': 'In rows – each row as tall as its tallest tile',
-  'In Spalten – keine Lücken, Reihenfolge von oben nach unten': 'In columns – no gaps, order runs top to bottom',
-  'Alle Kacheln sind dann gleich breit.': 'All tiles then have the same width.',
+  // group display and free grid
+  'Darstellung': 'Display',
+  'Freies Raster – Kacheln frei platzieren und in der Größe ändern': 'Free grid – place and resize tiles freely',
+  'Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.':
+    'In edit mode (✎) drag tiles to where you want them and resize them with the bottom-right corner (double-click fits the height to the content). One column wide, a tile becomes an icon. On phones the tiles are listed in this order.',
+  'Größe ändern': 'Resize',
+  'Freies Raster: auf einem größeren Bildschirm anordnen.': 'Free grid: arrange it on a larger screen.',
 };
