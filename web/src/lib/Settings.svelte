@@ -50,7 +50,7 @@
 
   // svelte-ignore state_referenced_locally
   let s = $state({
-    title: 'Heimdeck', theme: 'auto', accent: '#5b8cff', background: '', searchEngine: 'duckduckgo',
+    title: 'Heimdeck', theme: 'auto', accent: '#5b8cff', background: '', searchEngine: 'duckduckgo', searchUrl: '',
     openInNewTab: 'true', showGreeting: 'true', showUptime: 'true', localHosts: '', uniformTiles: 'false',
     ntfyUrl: '', notifyAfter: '2', notifyRecovery: 'true', notifyExternal: 'true', dockerUpdates: 'false', dockerControl: 'false',
     ...$state.snapshot(settings),
@@ -226,8 +226,19 @@
         <option value="startpage">Startpage</option>
         <option value="google">Google</option>
         <option value="bing">Bing</option>
+        <option value="ecosia">Ecosia</option>
+        <option value="qwant">Qwant</option>
+        <option value="kagi">Kagi</option>
+        <option value="custom">{t('Benutzerdefiniert …')}</option>
       </select>
     </label>
+    {#if s.searchEngine === 'custom'}
+      <label class="field">
+        <span>{t('Adresse der Suchmaschine')}</span>
+        <input bind:value={s.searchUrl} placeholder="https://searx.example.com/search?q={'{q}'}" inputmode="url" />
+        <span class="help">{t('{q} wird durch den Suchbegriff ersetzt, z. B. für deine eigene SearXNG-Instanz.')}</span>
+      </label>
+    {/if}
     <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={setFlag('showUptime')} /> {t('Verfügbarkeits-Übersicht unten anzeigen')}</label>
     <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>{t('Speichern')}</button></div>
   </section>

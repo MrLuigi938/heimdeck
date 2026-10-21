@@ -9,6 +9,7 @@
 #   DISK (2, GB)  STORAGE (first container storage)  BRIDGE (vmbr0)
 #   IP (dhcp, or e.g. 192.168.1.50/24)  GATEWAY (static IP only)
 #   HEIMDECK_PORT (3000)
+#   ROOT_PASSWORD (random, shown at the end)  SSH_KEY_FILE (none, e.g. ~/.ssh/id_ed25519.pub)
 #
 # The container is unprivileged, starts with the host and gets Heimdeck via
 # install.sh (next to this script, otherwise downloaded from INSTALL_URL).
@@ -28,6 +29,9 @@ DISK="${DISK:-2}"
 BRIDGE="${BRIDGE:-vmbr0}"
 IP="${IP:-dhcp}"
 PORT="${HEIMDECK_PORT:-3000}"
+# root password for the container console; a random one unless set
+ROOT_PASSWORD="${ROOT_PASSWORD:-$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)}"
+[ "${#ROOT_PASSWORD}" -ge 8 ] || die "ROOT_PASSWORD needs at least 8 characters"
 INSTALL_URL="${INSTALL_URL:-https://raw.githubusercontent.com/MrLuigi938/heimdeck/main/install/install.sh}"
 STORAGE="${STORAGE:-$(pvesm status -content rootdir 2>/dev/null | awk 'NR > 1 && $3 == "active" { print $1; exit }')}"
 TPL_STORAGE="${TPL_STORAGE:-$(pvesm status -content vztmpl 2>/dev/null | awk 'NR > 1 && $3 == "active" { print $1; exit }')}"
@@ -53,6 +57,7 @@ pct create "$CTID" "$TPL_STORAGE:vztmpl/$TEMPLATE" \
   --hostname "$CT_HOSTNAME" --cores "$CORES" --memory "$MEMORY" --swap 256 \
   --rootfs "$STORAGE:$DISK" --net0 "$net" \
   --unprivileged 1 --features nesting=1 --onboot 1 --tags heimdeck \
+  --password "$ROOT_PASSWORD" ${SSH_KEY_FILE:+--ssh-public-keys "$SSH_KEY_FILE"} \
   --description "Heimdeck – Dashboard: http://<IP>:$PORT" >/dev/null
 pct start "$CTID"
 
@@ -81,5 +86,11 @@ pct exec "$CTID" -- env HEIMDECK_PORT="$PORT" HEIMDECK_DOCKER=0 HEIMDECK_PROXMOX
 ct_ip=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
 pct set "$CTID" --description "Heimdeck – Dashboard: http://$ct_ip:$PORT" >/dev/null
 say "Done! Heimdeck is running in container $CTID: http://$ct_ip:$PORT"
+echo
+echo "Console login for the container (Proxmox → $CTID → Console):"
+echo "  user: root"
+echo "  password: $ROOT_PASSWORD"
+echo "Please change it after the first login with: passwd"
+echo
 echo "Update: pct exec $CTID -- sh /root/heimdeck-install.sh"
 echo "Tip: click \"Connect Proxmox\" during setup – Heimdeck then suggests your VMs and containers as tiles."

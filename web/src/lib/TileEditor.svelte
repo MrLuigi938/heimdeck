@@ -58,6 +58,56 @@
     testing = false;
   }
 
+  // Pick list for fields like Home Assistant entities: search and tick instead of typing IDs.
+  let picking = $state('');
+  let pickQuery = $state('');
+  let choices = $state(null);
+  let pickError = $state('');
+  let pickLoading = $state(false);
+  let pickTimer;
+  let pickSeq = 0;
+
+  const ids = (key) => (form.config[key] || '').split(/[\s,;]+/).filter(Boolean);
+
+  function openPicker(key) {
+    if (picking === key) {
+      picking = '';
+      return;
+    }
+    picking = key;
+    pickQuery = '';
+    loadChoices();
+  }
+
+  async function loadChoices() {
+    const seq = ++pickSeq;
+    pickLoading = true;
+    pickError = '';
+    try {
+      const list = await post('/tiles/choices', { ...payload(), field: picking, query: pickQuery });
+      if (seq === pickSeq) choices = list;
+    } catch (e) {
+      if (seq === pickSeq) { choices = null; pickError = e.message; }
+    }
+    if (seq === pickSeq) pickLoading = false;
+  }
+
+  function searchChoices() {
+    clearTimeout(pickTimer);
+    pickTimer = setTimeout(loadChoices, 300);
+  }
+
+  function toggleChoice(key, id) {
+    const list = ids(key);
+    form.config[key] = (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]).join(', ');
+  }
+
+  let groupedChoices = $derived.by(() => {
+    const out = {};
+    for (const c of choices || []) (out[c.group || ''] ??= []).push(c);
+    return Object.entries(out);
+  });
+
   async function save(e) {
     e?.preventDefault();
     saving = true;
@@ -111,6 +161,13 @@
         <span class="muted">{t('ändern')}</span>
       </button>
 
+      {#if def?.setup?.length}
+        <details class="setup" open={!form.id}>
+          <summary>{t('So richtest du {name} ein', { name: def.name })}</summary>
+          <ol>{#each def.setup as step}<li>{step}</li>{/each}</ol>
+        </details>
+      {/if}
+
       <div class="grid2">
         <label class="field"><span>{t('Name')}</span><input bind:value={form.name} required /></label>
         <label class="field">
@@ -156,11 +213,46 @@
             <select bind:value={form.config[f.key]}>
               {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
             </select>
+          {:else if f.pick}
+            <div class="row">
+              <input bind:value={form.config[f.key]} autocomplete="off" />
+              <button type="button" class:primary={picking === f.key} onclick={() => openPicker(f.key)}
+                disabled={!form.url && !form.apiUrl}>{t('Auswählen')}</button>
+            </div>
           {:else}
             <input bind:value={form.config[f.key]} autocomplete="off" />
           {/if}
           {#if f.help}<span class="help">{f.help}</span>{/if}
         </label>
+        {#if picking === f.key}
+          <div class="chooser">
+            <!-- svelte-ignore a11y_autofocus -->
+            <input type="search" placeholder={t('Suchen … (Name oder ID)')} bind:value={pickQuery} oninput={searchChoices} autofocus />
+            {#if pickError}
+              <div class="help bad">{pickError}</div>
+            {:else if choices && !choices.length && !pickLoading}
+              <div class="help">{pickQuery ? t('Nichts gefunden.') : t('Gib einen Suchbegriff ein, z. B. einen Raum oder Gerätenamen.')}</div>
+            {:else if choices}
+              <div class="choices" class:dim={pickLoading}>
+                {#each groupedChoices as [group, list]}
+                  {#if group}<div class="cgroup">{group}</div>{/if}
+                  {#each list as c}
+                    <label class="choice">
+                      <input type="checkbox" checked={ids(f.key).includes(c.id)} onchange={() => toggleChoice(f.key, c.id)} />
+                      <span class="cname">
+                        <span>{c.name || c.id}</span>
+                        {#if c.name}<span class="cid">{c.id}</span>{/if}
+                      </span>
+                      {#if c.value}<span class="cval">{c.value}</span>{/if}
+                    </label>
+                  {/each}
+                {/each}
+              </div>
+            {:else}
+              <div class="help">{t('Lade …')}</div>
+            {/if}
+          </div>
+        {/if}
         {/if}
       {/each}
 
@@ -229,6 +321,22 @@
   .help a { color: var(--accent); }
   .check-help { display: block; margin: -4px 0 4px 26px; }
   textarea { width: 100%; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5; }
+  .setup { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+  .setup summary { cursor: pointer; font-weight: 600; }
+  .setup ol { margin: 8px 0 2px; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input { flex: 1; min-width: 0; }
+  .chooser { display: grid; gap: 8px; margin-top: -6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; }
+  .choices { max-height: 280px; overflow: auto; display: grid; gap: 2px; }
+  .choices.dim { opacity: .6; }
+  .cgroup { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 6px 0 2px; }
+  .choice { display: flex; gap: 10px; align-items: center; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+  .choice:hover { background: var(--surface-2); }
+  .cname { flex: 1; min-width: 0; display: grid; }
+  .cname > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); }
+  .cval { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .bad { color: var(--bad); }
   .test { padding: 12px; border-radius: 12px; font-size: 14px; }
   .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
   .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

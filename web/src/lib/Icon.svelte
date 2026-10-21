@@ -1,8 +1,9 @@
 <script>
   // Shows an icon from the dashboard-icons collection (by name), a URL, an
-  // emoji, or the first letter of the name as fallback. The letter stays
-  // visible until the image has loaded, so slow or offline CDNs never leave a gap.
-  let { icon = '', name = '', size = 40 } = $props();
+  // emoji, then the service's own favicon (`favicon`, served by Heimdeck),
+  // and the first letter of the name as last resort. The letter stays
+  // visible until an image has loaded, so slow or offline CDNs never leave a gap.
+  let { icon = '', name = '', size = 40, favicon = '' } = $props();
 
   const CDN = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 
@@ -10,13 +11,17 @@
   // text like "Paperless NGX" or "sonarr.png" is turned into an icon name,
   // so it can never overflow the tile.
   const isEmoji = (s) => /\p{Extended_Pictographic}/u.test(s) && [...new Intl.Segmenter().segment(s)].length <= 2;
-  let sources = $derived.by(() => {
-    const i = (icon || '').trim();
+  function iconSources(i) {
     if (!i || isEmoji(i)) return [];
     if (/^(https?:)?\/\//.test(i) || i.startsWith('/') || i.startsWith('data:')) return [i];
     const slug = i.toLowerCase().replace(/\.(svg|png|webp|jpe?g)$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!slug) return [];
     return [`${CDN}/svg/${slug}.svg`, `${CDN}/png/${slug}.png`, `${CDN}/webp/${slug}.webp`];
+  }
+  let sources = $derived.by(() => {
+    const i = (icon || '').trim();
+    if (isEmoji(i)) return [];
+    return favicon ? [...iconSources(i), favicon] : iconSources(i);
   });
   let emoji = $derived(icon && isEmoji(icon.trim()) ? icon.trim() : '');
 

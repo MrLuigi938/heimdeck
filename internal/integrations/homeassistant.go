@@ -20,10 +20,15 @@ func (homeAssistant) Def() Definition {
 	return Definition{
 		ID: "home-assistant", Name: "Home Assistant", Icon: "home-assistant", Category: "Smart Home",
 		Description: "Gewählte Sensoren und Schalter auf der Kachel, alle Geräte in der Suche schalten, verfügbare Updates",
+		Setup: []string{
+			"Als lokale Adresse die Adresse deiner Home-Assistant-Oberfläche eintragen, meist http://<IP>:8123 (oder http://homeassistant.local:8123).",
+			"Token erstellen: in Home Assistant unten links auf dein Profil → Reiter „Sicherheit“ → ganz unten „Langlebige Zugriffstokens“ → „Token erstellen“. Den Token gleich kopieren, er wird nur einmal angezeigt.",
+			"Mit „Auswählen“ unter den Entitäten Sensoren und Schalter für die Kachel suchen und anhaken – ohne Auswahl zeigt die Kachel eine Übersicht.",
+		},
 		Fields: []Field{
 			{Key: "token", Label: "Zugriffstoken", Type: "password", Required: true, Secret: true,
 				Help: "Profil (unten links) → Sicherheit → Langlebige Zugriffstokens → Token erstellen"},
-			{Key: "entities", Label: "Entitäten auf der Kachel", Type: "text",
+			{Key: "entities", Label: "Entitäten auf der Kachel", Type: "text", Pick: true,
 				Help: "Optional, durch Komma getrennt, z. B. sensor.wohnzimmer_temperatur, light.kueche. Leer: Übersicht anzeigen."},
 		},
 		HasWidget: true, HasSearch: true, Images: []string{"home-assistant", "homeassistant", "haos"}, Port: 8123,
@@ -141,7 +146,7 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 	if list := in.V("entities"); list != "" {
 		// Values go into the stats row, things you can switch into the list.
 		for _, id := range strings.FieldsFunc(list, func(r rune) bool { return r == ',' || r == ' ' || r == ';' || r == '\n' }) {
-			s, ok := byID[id]
+			s, ok := byID[strings.ToLower(id)]
 			if !ok {
 				w.Alerts = append(w.Alerts, in.T("Entität %s nicht gefunden", id))
 				continue
@@ -191,8 +196,8 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 	return w, nil
 }
 
-// Search finds entities by name or ID; every word has to match.
-func (h homeAssistant) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
+// matching returns the entities whose name or ID contains every word of the query.
+func (h homeAssistant) matching(ctx context.Context, in *Instance, query string) ([]haState, error) {
 	states, err := h.states(ctx, in)
 	if err != nil {
 		return nil, err
@@ -215,6 +220,15 @@ func (h homeAssistant) Search(ctx context.Context, in *Instance, query string) (
 			hits = append(hits, s)
 		}
 	}
+	return hits, nil
+}
+
+// Search finds entities by name or ID; every word has to match.
+func (h homeAssistant) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
+	hits, err := h.matching(ctx, in, query)
+	if err != nil {
+		return nil, err
+	}
 	// Switchable entities first, they are what you usually look for.
 	sort.SliceStable(hits, func(i, j int) bool {
 		_, a := haServices[hits[i].domain()]
@@ -225,6 +239,28 @@ func (h homeAssistant) Search(ctx context.Context, in *Instance, query string) (
 	for _, s := range hits {
 		out = append(out, h.item(in, s))
 		if len(out) == 8 {
+			break
+		}
+	}
+	return out, nil
+}
+
+// Choices lists entities for the "entities" field, grouped by domain.
+func (h homeAssistant) Choices(ctx context.Context, in *Instance, field, query string) ([]Choice, error) {
+	hits, err := h.matching(ctx, in, query)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(hits, func(i, j int) bool {
+		if hits[i].domain() != hits[j].domain() {
+			return hits[i].domain() < hits[j].domain()
+		}
+		return strings.ToLower(hits[i].name()) < strings.ToLower(hits[j].name())
+	})
+	out := []Choice{}
+	for _, s := range hits {
+		out = append(out, Choice{ID: s.EntityID, Name: s.name(), Value: h.value(in, s), Group: s.domain()})
+		if len(out) == 200 {
 			break
 		}
 	}

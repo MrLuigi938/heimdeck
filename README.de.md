@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <a href="https://blum.ing/heimdeck/"><img src="https://img.shields.io/badge/Website-blum.ing%2Fheimdeck-3ecf8e?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Projekt-Webseite"></a>
+</p>
+
+<p align="center">
   <a href="README.md">English</a> · <b>Deutsch</b>
 </p>
 
@@ -19,8 +23,8 @@
 
 - **Alles in der Oberfläche** – keine YAML-Dateien. Kacheln hinzufügen, verschieben und bearbeiten per Klick und Drag & Drop.
 - **Findet deine Dienste** – liest deine Docker-Container und (wenn verbunden) deine Proxmox-VMs und LXC-Container aus und schlägt Kacheln mit Icon, Adresse und Dienst-Typ vor.
-- **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss und mehr für rund 40 Dienste.
-- **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Geräte in Home Assistant oder ioBroker schalten, UniFi-Geräte neu starten, Speedtest starten …
+- **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss und mehr für mehr als 40 Dienste.
+- **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Geräte in Home Assistant oder ioBroker schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Speedtest starten …
 - **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld.
 - **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy oder Browser gemeldet.
 - **Zuhause oder unterwegs** – jede Kachel kann eine lokale und eine öffentliche Adresse haben; Heimdeck nimmt automatisch die richtige.
@@ -83,7 +87,7 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken, um d
 
 ## Unterstützte Dienste (Auszug)
 
-Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · UniFi · Speedtest Tracker · Anubis · Docker · Proxmox VE · Home Assistant · ioBroker · evcc · beliebige JSON-API
+Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · PhotoPrism · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · UniFi · UniFi Protect · Speedtest Tracker · Anubis · Docker · Proxmox VE · openmediavault · Home Assistant · ioBroker · evcc · WLED · Norish · beliebige JSON-API
 
 → [Vollständige Liste mit Live-Daten, Suche und Aktionen](docs/de/dienste.md)
 

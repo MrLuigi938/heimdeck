@@ -1,5 +1,25 @@
+<script module>
+  // Live data of all tiles shares at most four connections, so the browser
+  // (six connections per server) always has some left for clicks and saving.
+  let active = 0;
+  const waiting = [];
+  function limited(fn) {
+    return new Promise((resolve, reject) => {
+      const run = () => {
+        active++;
+        fn().then(resolve, reject).finally(() => {
+          active--;
+          waiting.shift()?.();
+        });
+      };
+      if (active < 4) run();
+      else waiting.push(run);
+    });
+  }
+</script>
+
 <script>
-  import { get, post } from './api.js';
+  import { get, post, faviconUrl } from './api.js';
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
@@ -18,24 +38,46 @@
   // Compact tiles (icon only) never load live data.
   let live = $derived(!compact && def?.hasWidget && tile.showWidget && missing.length === 0);
 
+  // Never more than one request per tile; the server answers right away and
+  // says "pending" while a slow service is still being asked.
+  let busy = false;
+  let again = false; // a load was requested while one was running (e.g. after an action)
+  let retry;
   async function load() {
+    if (busy) {
+      again = true;
+      return;
+    }
+    busy = true;
+    clearTimeout(retry);
     try {
-      const res = await get(`/tiles/${tile.id}/widget`);
-      widget = res.widget;
-      error = res.error || '';
+      const res = await limited(() => get(`/tiles/${tile.id}/widget`));
+      if (res.pending) {
+        retry = setTimeout(load, 2500);
+      } else {
+        widget = res.widget;
+        error = res.error || '';
+        loaded = true;
+      }
     } catch (e) {
       error = e.message;
+      loaded = true;
+    } finally {
+      busy = false;
+      if (again) {
+        again = false;
+        load();
+      }
     }
-    loaded = true;
   }
 
   $effect(() => {
     if (!live) return;
-    tile.id; tile.apiUrl; tile.url; tile.integration; tile.config; tile.secretsSet; i18n.lang; // reload when the tile or language changes
+    tile.id; def?.refresh; tile.apiUrl; tile.url; tile.integration; tile.config; tile.secretsSet; i18n.lang; // reload when the tile or language changes
     loaded = false;
     load();
-    const timer = setInterval(() => document.visibilityState === 'visible' && load(), 15000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => document.visibilityState === 'visible' && load(), (def?.refresh || 15) * 1000);
+    return () => { clearInterval(timer); clearTimeout(retry); };
   });
 
   async function action(a) {
@@ -70,7 +112,7 @@
   <a class="square" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
      title={tile.description ? `${tile.name} – ${tile.description}` : tile.name} aria-label={tile.name}
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
-    <Icon icon={tile.icon} name={tile.name} size={44} />
+    <Icon icon={tile.icon} name={tile.name} favicon={faviconUrl(tile)} size={44} />
     <span class="cname">{tile.name}</span>
   </a>
   {#if dot}<span class="dot corner {dot}" title={dotTitle}></span>{/if}
@@ -82,7 +124,7 @@
 <div class="tile card" class:wide={!uniform && (live || (missing.length > 0 && def?.hasWidget && tile.showWidget))} class:uniform class:editing={editMode} {...dragProps}>
   <a class="head" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
-    <Icon icon={tile.icon} name={tile.name} size={live ? 34 : 40} />
+    <Icon icon={tile.icon} name={tile.name} favicon={faviconUrl(tile)} size={live ? 34 : 40} />
     <div class="titles">
       <div class="name">{tile.name}</div>
       {#if tile.description}<div class="desc">{tile.description}</div>{/if}

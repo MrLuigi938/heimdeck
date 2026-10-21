@@ -1,5 +1,5 @@
 <script>
-  import { get, post } from './api.js';
+  import { get, post, faviconUrl } from './api.js';
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
@@ -8,7 +8,7 @@
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
   // Jellyseerr, Paperless …) in the background.
-  let { tiles, newTab, searchEngine, hasSearchServices, local, boardId } = $props();
+  let { tiles, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId } = $props();
 
   let q = $state('');
   let open = $state(false);
@@ -24,6 +24,9 @@
     google: 'https://www.google.com/search?q=',
     startpage: 'https://www.startpage.com/do/search?q=',
     bing: 'https://www.bing.com/search?q=',
+    ecosia: 'https://www.ecosia.org/search?q=',
+    qwant: 'https://www.qwant.com/?q=',
+    kagi: 'https://kagi.com/search?q=',
   };
 
   let tileHits = $derived(
@@ -58,8 +61,13 @@
   }
 
   function webSearch() {
-    const base = engines[searchEngine] || engines.duckduckgo;
-    window.open(base + encodeURIComponent(q.trim()), newTab ? '_blank' : '_self');
+    const term = encodeURIComponent(q.trim());
+    // A custom engine (e.g. your own SearXNG) marks the search term with {q} or %s.
+    const custom = searchEngine === 'custom' && /^https?:\/\//i.test(searchUrl || '') ? searchUrl : '';
+    const href = custom
+      ? (/\{q\}|%s/.test(custom) ? custom.replace(/\{q\}|%s/g, term) : custom + term)
+      : (engines[searchEngine] || engines.duckduckgo) + term;
+    window.open(href, newTab ? '_blank' : '_self');
   }
 
   function onKey(e) {
@@ -120,7 +128,7 @@
         <div class="section">{t('Kacheln')}</div>
         {#each tileHits as hit}
           <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
-            <Icon icon={hit.icon} name={hit.name} size={24} /> <span>{hit.name}</span>
+            <Icon icon={hit.icon} name={hit.name} favicon={faviconUrl(hit)} size={24} /> <span>{hit.name}</span>
           </a>
         {/each}
       {/if}
@@ -128,7 +136,7 @@
       {#each results as g}
         {@const tile = tileById[g.tileId]}
         {#if g.items?.length || g.error}
-          <div class="section"><Icon icon={g.icon} name={g.name} size={16} /> {g.name}</div>
+          <div class="section"><Icon icon={g.icon} name={g.name} favicon={faviconUrl(tile)} size={16} /> {g.name}</div>
           {#if g.error}
             <div class="err">{g.error}</div>
           {:else}

@@ -23,7 +23,7 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 ## Dashboards and groups
 
 - **Multiple dashboards**, e.g. “Home” and “Work”: switch next to the title at the top. Each dashboard can have its own background image. Every browser remembers the last one used; `?board=<id>` links to a specific one.
-- **Groups** sort your tiles. The tile size (automatic, uniform or compact as an icon square) can be set for all groups or per group.
+- **Groups** sort your tiles. The tile size (automatic, uniform or compact as an icon square) can be set for all groups or per group. With the arrangement **In columns** (per group) tiles fill the columns from top to bottom instead of lining up in rows, so there are no gaps below shorter tiles; all tiles then have the same width.
 - **Hidden groups** are only shown after clicking 👁 (for the current session). **Protected groups** need their own password.
 - **Link-only tiles**: every tile can be a plain link and still shows whether the service is reachable. The status check can be turned off per tile.
 
@@ -41,6 +41,8 @@ Each tile can have a second, public address. If you open the dashboard via a loc
 <sub>Demo data</sub>
 
 Press `/` anywhere (or click the search box). One search covers your tiles and every connected service that supports search – media libraries, requests, documents, photos and people, games, audiobooks, comics, files, smart-home devices, network clients, DNS queries and more, with covers and thumbnails. Paste a video URL to send it straight to Tubesy.
+
+Pressing Enter without a matching tile searches the web. Choose the search engine in the settings – besides DuckDuckGo, Brave, Startpage, Google, Bing, Ecosia, Qwant and Kagi you can enter your own address (e.g. SearXNG), with `{q}` for the search term.
 
 Which services can be searched is listed in [Supported services](services.md).
 

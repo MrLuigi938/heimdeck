@@ -103,6 +103,7 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		Password   string  `json:"password"`
 		BoardID    int64   `json:"boardId"`
 		Layout     *string `json:"layout"`
+		Arrange    *string `json:"arrange"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, 400, err)
@@ -135,6 +136,13 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 400, errors.New("unbekannte Kachelgröße"))
 			return
 		}
+	}
+	if body.Arrange != nil {
+		if *body.Arrange != "" && *body.Arrange != "columns" {
+			writeErr(w, 400, errors.New("unbekannte Anordnung"))
+			return
+		}
+		g.Arrange = *body.Arrange
 	}
 	switch body.Visibility {
 	case "":

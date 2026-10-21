@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -26,9 +28,15 @@ func (iobroker) Def() Definition {
 	return Definition{
 		ID: "iobroker", Name: "ioBroker", Icon: "iobroker", Category: "Smart Home",
 		Description: "Gewählte Datenpunkte auf der Kachel, Schalter umschalten, Adapter-Status, Suche nach Datenpunkten (über den REST-API- oder Simple-API-Adapter)",
+		Setup: []string{
+			"ioBroker hat keine eigene Daten-Schnittstelle – sie kommt von einem Adapter. Öffne ioBroker Admin → Adapter, suche „REST API“ und installiere ihn (eine Instanz reicht, Standard-Einstellungen passen).",
+			"Als lokale Adresse http://<ioBroker-IP>:8093 eintragen. Die Admin-Oberfläche (Port 8081) liefert keine Daten. Läuft der Adapter im Web-Adapter, lautet die Adresse http://<ioBroker-IP>:8082/rest-api. Der ältere Simple-API-Adapter (Port 8087) geht auch.",
+			"Benutzer und Passwort nur angeben, wenn im Adapter „Authentifizierung“ aktiv ist.",
+			"Mit „Auswählen“ unter den Datenpunkten Werte für die Kachel suchen und anhaken – ohne Auswahl zeigt die Kachel den Status deiner Adapter.",
+		},
 		Fields: []Field{
-			{Key: "states", Label: "Datenpunkte auf der Kachel", Type: "text",
-				Help: "Optional, durch Komma getrennt, z. B. hm-rpc.0.ABC123.1.STATE. Leer: Adapter-Status anzeigen. Als Adresse den REST-API-Adapter (Port 8093) oder Simple-API-Adapter (Port 8087) eintragen."},
+			{Key: "states", Label: "Datenpunkte auf der Kachel", Type: "text", Pick: true,
+				Help: "Optional, durch Komma getrennt, z. B. hm-rpc.0.ABC123.1.STATE. Leer: Adapter-Status anzeigen."},
 			{Key: "username", Label: "Benutzername", Type: "text", Help: "Nur nötig, wenn im Adapter die Authentifizierung aktiv ist"},
 			{Key: "password", Label: "Passwort", Type: "password", Secret: true},
 		},
@@ -36,7 +44,7 @@ func (iobroker) Def() Definition {
 	}
 }
 
-var iobrokerSimple sync.Map // BaseURL -> true when only simple-api answers
+var iobrokerSimple sync.Map // BaseURL -> true for simple-api, false for rest-api
 
 func (iobroker) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
 	h := map[string]string{}
@@ -46,21 +54,49 @@ func (iobroker) get(ctx context.Context, in *Instance, path string, q url.Values
 	return in.do(ctx, request{path: path, query: q, headers: h}, out)
 }
 
-// call picks the endpoint of the adapter in use: rest is the rest-api path,
+// wrongAddress reports answers that show there is no such adapter at the
+// address (a 404 or a web page instead of JSON).
+func wrongAddress(err error) bool {
+	var he *HTTPError
+	return errors.As(err, &he) && (he.Status == 404 || he.Status == 405) || errors.Is(err, ErrNotJSON)
+}
+
+// simple finds out which adapter answers: rest-api or the older simple-api.
+func (b iobroker) simple(ctx context.Context, in *Instance) (bool, error) {
+	if v, ok := iobrokerSimple.Load(in.BaseURL); ok {
+		return v.(bool), nil
+	}
+	var objs map[string]json.RawMessage
+	err := b.get(ctx, in, "/v1/objects", url.Values{"filter": {"system.config"}}, &objs)
+	if err == nil {
+		iobrokerSimple.Store(in.BaseURL, false)
+		return false, nil
+	}
+	if !wrongAddress(err) {
+		return false, err
+	}
+	err = b.get(ctx, in, "/objects", url.Values{"pattern": {"system.config"}}, &objs)
+	if err == nil {
+		iobrokerSimple.Store(in.BaseURL, true)
+		return true, nil
+	}
+	if !wrongAddress(err) {
+		return false, err
+	}
+	return false, in.Errorf("Unter dieser Adresse antwortet keine ioBroker-Schnittstelle. Installiere in ioBroker unter „Adapter“ den Adapter „REST API“ und trage http://<ioBroker-IP>:8093 ein – die Admin-Oberfläche (Port 8081) liefert keine Daten.")
+}
+
+// call uses the endpoint of the adapter in use: rest is the rest-api path,
 // simple the simple-api one.
 func (b iobroker) call(ctx context.Context, in *Instance, rest, simple string, q, qs url.Values, out any) error {
-	if _, ok := iobrokerSimple.Load(in.BaseURL); ok {
+	isSimple, err := b.simple(ctx, in)
+	if err != nil {
+		return err
+	}
+	if isSimple {
 		return b.get(ctx, in, simple, qs, out)
 	}
-	err := b.get(ctx, in, rest, q, out)
-	var he *HTTPError
-	if errors.As(err, &he) && he.Status == 404 && strings.HasPrefix(rest, "/v1/") {
-		if err2 := b.get(ctx, in, simple, qs, out); err2 == nil {
-			iobrokerSimple.Store(in.BaseURL, true)
-			return nil
-		}
-	}
-	return err
+	return b.get(ctx, in, rest, q, out)
 }
 
 type ioCommon struct {
@@ -95,6 +131,7 @@ func (c ioCommon) name(lang string) string {
 func (c ioCommon) switchable() bool { return c.Type == "boolean" && (c.Write == nil || *c.Write) }
 
 type ioState struct {
+	Error  string    `json:"error"` // simple-api: unknown id in a list
 	ID     string    `json:"id"`
 	ID2    string    `json:"_id"`
 	Val    any       `json:"val"`
@@ -121,7 +158,8 @@ func splitIDs(list string) []string {
 	return ids
 }
 
-// states loads values and object info for the given ids.
+// states loads values and object info for the given ids. Unknown ids are
+// missing from the result.
 func (b iobroker) states(ctx context.Context, in *Instance, ids []string) (map[string]ioState, error) {
 	escaped := make([]string, len(ids))
 	for i, id := range ids {
@@ -129,7 +167,26 @@ func (b iobroker) states(ctx context.Context, in *Instance, ids []string) (map[s
 	}
 	joined := strings.Join(escaped, ",")
 	var raw json.RawMessage
-	if err := b.call(ctx, in, "/v1/state/"+joined, "/get/"+joined, url.Values{"withInfo": {"true"}}, nil, &raw); err != nil {
+	err := b.call(ctx, in, "/v1/state/"+joined, "/get/"+joined, url.Values{"withInfo": {"true"}}, nil, &raw)
+	var he *HTTPError
+	if errors.As(err, &he) && he.Status == 404 && len(ids) > 1 {
+		// rest-api answers 404 for the whole list when one id is unknown.
+		out := map[string]ioState{}
+		for _, id := range ids {
+			one, err := b.states(ctx, in, []string{id})
+			if errors.As(err, &he) && he.Status == 404 {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+			maps.Copy(out, one)
+		}
+		return out, nil
+	}
+	if errors.As(err, &he) && he.Status == 404 {
+		return map[string]ioState{}, nil
+	}
+	if err != nil {
 		return nil, err
 	}
 	var list []ioState
@@ -142,6 +199,9 @@ func (b iobroker) states(ctx context.Context, in *Instance, ids []string) (map[s
 	}
 	out := map[string]ioState{}
 	for i, s := range list {
+		if s.Error != "" {
+			continue
+		}
 		id := firstNonEmpty(s.ID, s.ID2)
 		if id == "" && i < len(ids) {
 			id = ids[i]
@@ -247,38 +307,81 @@ func (b iobroker) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	return w, nil
 }
 
+// find returns data points whose ID contains the query (in the spelling
+// given, lower case or capitalised, as ioBroker's filter is case-sensitive).
+// Without a query it lists the user's own data points and aliases.
+func (b iobroker) find(ctx context.Context, in *Instance, query string, limit int) (map[string]ioCommon, []string, error) {
+	query = strings.TrimSpace(query)
+	patterns := []string{"0_userdata.0.*", "alias.0.*"}
+	if query != "" {
+		q := strings.ReplaceAll(query, " ", "*")
+		if !ioIDRe.MatchString(q) {
+			return nil, nil, nil
+		}
+		patterns = []string{"*" + q + "*"}
+		for _, v := range []string{strings.ToLower(q), strings.ToUpper(q[:1]) + strings.ToLower(q[1:])} {
+			if !slices.Contains(patterns, "*"+v+"*") {
+				patterns = append(patterns, "*"+v+"*")
+			}
+		}
+	}
+	found := map[string]ioCommon{}
+	for _, p := range patterns {
+		var objs map[string]struct {
+			Common ioCommon `json:"common"`
+		}
+		if err := b.call(ctx, in, "/v1/objects", "/objects", url.Values{"filter": {p}, "type": {"state"}},
+			url.Values{"pattern": {p}, "type": {"state"}}, &objs); err != nil {
+			return nil, nil, err
+		}
+		for id, o := range objs {
+			found[id] = o.Common
+		}
+	}
+	ids := slices.Sorted(maps.Keys(found))
+	if len(ids) > limit {
+		ids = ids[:limit]
+	}
+	return found, ids, nil
+}
+
 // Search finds data points whose ID contains the search term.
 func (b iobroker) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
-	query = strings.TrimSpace(query)
-	if !ioIDRe.MatchString(strings.ReplaceAll(query, " ", "_")) {
+	if strings.TrimSpace(query) == "" {
 		return []Item{}, nil
 	}
-	pattern := "*" + strings.ReplaceAll(query, " ", "*") + "*"
-	var objs map[string]struct {
-		Common ioCommon `json:"common"`
+	found, ids, err := b.find(ctx, in, query, 8)
+	if err != nil || len(ids) == 0 {
+		return []Item{}, err
 	}
-	if err := b.call(ctx, in, "/v1/objects", "/objects", url.Values{"filter": {pattern}, "type": {"state"}},
-		url.Values{"pattern": {pattern}, "type": {"state"}}, &objs); err != nil {
+	states, _ := b.states(ctx, in, ids)
+	out := []Item{}
+	for _, id := range ids {
+		s := states[id]
+		c := found[id]
+		s.Common = &c
+		out = append(out, b.item(in, id, s))
+	}
+	return out, nil
+}
+
+// Choices lists data points for the "states" field, grouped by adapter instance.
+func (b iobroker) Choices(ctx context.Context, in *Instance, field, query string) ([]Choice, error) {
+	found, ids, err := b.find(ctx, in, query, 60)
+	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, 0, len(objs))
-	for id := range objs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	if len(ids) > 8 {
-		ids = ids[:8]
-	}
-	out := []Item{}
+	out := []Choice{}
 	if len(ids) == 0 {
 		return out, nil
 	}
 	states, _ := b.states(ctx, in, ids)
 	for _, id := range ids {
 		s := states[id]
-		s.Common = &ioCommon{}
-		*s.Common = objs[id].Common
-		out = append(out, b.item(in, id, s))
+		c := found[id]
+		s.Common = &c
+		parts := strings.SplitN(id, ".", 3)
+		out = append(out, Choice{ID: id, Name: c.name(in.Lang), Value: ioValue(in, s), Group: strings.Join(parts[:min(2, len(parts))], ".")})
 	}
 	return out, nil
 }

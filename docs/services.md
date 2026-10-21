@@ -27,6 +27,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Bazarr | missing subtitles (episodes/movies), throttled providers | ✓ series and movies | search missing subtitles |
 | Prowlarr | active and failing indexers | | |
 | Immich | photos, videos, storage per user | ✓ people, file names, optional smart search by image content | |
+| PhotoPrism (app password) | photos, videos, albums, people, recently added | ✓ photos (place, person, subject, date) | |
 | Audiobookshelf | audiobooks, podcasts, hours, continue listening | ✓ titles, authors, series | |
 | Kavita | series, volumes, files, continue reading | ✓ with covers | |
 | Komga | series, books, books in progress | ✓ with covers | |
@@ -45,26 +46,40 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Tubesy (API key from Tubesy → Account) | speed, active, queued, failed downloads, free space | ✓ library; paste a URL to download | cancel download, download URL |
 | **Documents** | | | |
 | Paperless-ngx | documents, inbox | ✓ | |
+| Norish (API key) | meals planned today, open groceries, number of recipes | ✓ recipes | |
 | Nextcloud (app password) | files, users, active users, free space (without admin: own storage) | ✓ files, calendar, contacts, Talk, notes, Deck … | |
 | **Network** | | | |
 | AdGuard Home | DNS queries, block rate, response time, top blocked domains | ✓ query log | pause/disable protection, block or allow a domain |
 | Pi-hole (v6 with app password, v5 with API token) | DNS queries, block rate, clients | ✓ query log (v6) | pause blocking, block or allow a domain |
 | OPNsense (API key + secret) | WAN throughput, RAM, load, uptime, gateways, updates | | |
 | UniFi (Network API key) | clients, Wi-Fi, devices online, firmware updates | ✓ clients and devices | restart device |
+| UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
 | Speedtest Tracker | download, upload, ping, history | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
 | Docker (mounted socket) | running/stopped containers, optional updates | ✓ containers | optional start, stop, restart |
 | Proxmox VE (API token) | CPU, RAM, active guests, nodes or stopped guests | ✓ VMs and containers | start, shut down, reboot |
+| openmediavault (admin user) | CPU, RAM, uptime, updates, file systems, disk health (S.M.A.R.T.) | | |
 | **Smart home & energy** | | | |
 | Home Assistant (long-lived access token) | chosen sensors/switches or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |
 | ioBroker (REST API or Simple API adapter) | chosen data points or adapter status | ✓ data points | toggle switches |
-| evcc | PV, home, grid, battery, charge points | | change charge mode (off, PV, min+PV, fast) |
+| evcc | PV, home, grid, battery, charge points (refreshes every 5 s) | | change charge mode (off, PV, min+PV, fast, smart) |
+| WLED | on/off, brightness, effect, presets | ✓ presets | on/off, brightness, apply preset |
 | **Other** | | | |
 | Custom API | any values, list and buttons from a JSON response | ✓ if configured | custom buttons |
 | JDownloader, FRITZ!Box, Zoraxy, Portainer, … | online status | | |
 
 Missing a service? Use the [custom API tile](#custom-api-tile) or [open an issue](https://github.com/MrLuigi938/heimdeck/issues).
+
+## Connecting ioBroker
+
+ioBroker has no data interface of its own – it comes from an adapter:
+
+1. In ioBroker Admin → **Adapters**, install **REST API** (one instance, default settings).
+2. In Heimdeck, enter `http://<ioBroker-IP>:8093` as the address. The admin interface on port 8081 does not provide data. If the adapter runs inside the web adapter, use `http://<ioBroker-IP>:8082/rest-api`; the older Simple API adapter (port 8087) works as well.
+3. Click **Choose** next to “Data points on the tile” to search your data points and tick the ones you want – no need to type IDs. Without a selection the tile shows the status of your adapters.
+
+Home Assistant entities are chosen the same way.
 
 ## Connecting Proxmox
 

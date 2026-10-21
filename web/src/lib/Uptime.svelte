@@ -1,5 +1,5 @@
 <script>
-  import { get } from './api.js';
+  import { get, faviconUrl } from './api.js';
   import Icon from './Icon.svelte';
   import { t, locale } from './i18n.svelte.js';
 
@@ -120,7 +120,7 @@
           {@const tile = byId[r.tileId]}
           <div class="row-u">
             <div class="who">
-              <Icon icon={tile.icon} name={tile.name} size={22} />
+              <Icon icon={tile.icon} name={tile.name} favicon={faviconUrl(tile)} size={22} />
               <div class="names">
                 <div class="name">{tile.name}</div>
                 <div class="kind" title={r.url}>{r.kind === 'ext' ? '🌐 ' + t('Öffentlich') : '🏠 ' + t('Lokal')}</div>

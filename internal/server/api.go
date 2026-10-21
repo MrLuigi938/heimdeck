@@ -230,7 +230,7 @@ var tileLayouts = map[string]bool{"uniform": true, "auto": true, "icons": true, 
 
 var allowedSettings = map[string]bool{
 	"title": true, "theme": true, "accent": true, "background": true,
-	"columns": true, "searchEngine": true, "openInNewTab": true, "showGreeting": true,
+	"columns": true, "searchEngine": true, "searchUrl": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 }
@@ -252,6 +252,14 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		m["ntfyUrl"] = u
+	}
+	if m["searchEngine"] == "custom" {
+		u := strings.TrimSpace(m["searchUrl"])
+		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
+			writeErr(w, 400, errors.New("Websuche: bitte eine vollständige Adresse angeben, z. B. https://searx.example.com/search?q={q}"))
+			return
+		}
+		m["searchUrl"] = u
 	}
 	if err := s.store.SaveSettings(m); err != nil {
 		writeErr(w, 500, err)
@@ -478,25 +486,109 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "ms": time.Since(start).Milliseconds(), "widget": widget})
 }
 
+// handleChoices fills the pick list of a field (e.g. Home Assistant entities)
+// for the tile being edited, saved or not.
+func (s *Server) handleChoices(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		tileInput
+		Field string `json:"field"`
+		Query string `json:"query"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	t, err := s.buildTile(in.tileInput)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	integ, _ := integrations.Get(t.Integration)
+	chooser, ok := integ.(integrations.Chooser)
+	if !ok {
+		writeErr(w, 400, errors.New("keine Auswahl für diesen Dienst"))
+		return
+	}
+	if t.URL == "" && t.APIURL == "" && !integ.Def().NoURL {
+		writeErr(w, 400, errors.New(tr(r, "Bitte eine Adresse angeben")))
+		return
+	}
+	ctx, cancel := timeout(r, 15*time.Second)
+	defer cancel()
+	list, err := chooser.Choices(ctx, s.instance(t, langOf(r)), in.Field, strings.TrimSpace(in.Query))
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	writeJSON(w, list)
+}
+
 // ---- live data ----
 
-func (s *Server) widget(ctx context.Context, t store.Tile, lang string) (*integrations.Widget, error) {
+// widget returns the live data of a tile. Requests never wait for a slow
+// service: a fresh result comes from the cache, a stale one is returned at
+// once while it is refreshed in the background, and without any result the
+// caller waits at most `wait` and then gets pending=true. Only one fetch per
+// tile runs at a time, and failures are kept longer before trying again.
+// (Waiting requests used to fill the browser's six connections per host, so
+// with a few unreachable services every other request, e.g. deleting a group,
+// queued behind them for minutes.)
+func (s *Server) widget(t store.Tile, lang string, wait time.Duration) (w *integrations.Widget, pending bool, err error) {
 	key := widgetKey(t.ID, lang)
 	s.mu.Lock()
 	c, ok := s.widgets[key]
+	ttl := widgetTTL
+	if integ, ok := integrations.Get(t.Integration); ok && integ.Def().Refresh > 0 {
+		// a bit shorter than the tile's own interval, so each reload gets fresh data
+		ttl = time.Duration(integ.Def().Refresh) * time.Second * 4 / 5
+	}
+	if c.err != nil {
+		ttl = widgetErrTTL
+	}
+	if ok && time.Since(c.at) < ttl {
+		s.mu.Unlock()
+		return c.val, false, c.err
+	}
+	done, running := s.fetching[key]
+	if !running {
+		done = make(chan struct{})
+		s.fetching[key] = done
+		gen := s.widgetGen[key]
+		go s.fetchWidget(t, lang, key, gen, done)
+	}
 	s.mu.Unlock()
-	if ok && time.Since(c.at) < widgetTTL {
-		return c.val, c.err
+	if ok {
+		return c.val, false, c.err // stale, refreshed in the background
 	}
-	integ, ok := integrations.Get(t.Integration)
-	if !ok {
-		return nil, errors.New("unbekannter Dienst-Typ")
+	select {
+	case <-done:
+	case <-time.After(wait):
+		return nil, true, nil
 	}
-	w, err := integ.Fetch(ctx, s.instance(t, lang))
 	s.mu.Lock()
-	s.widgets[key] = cached[*integrations.Widget]{at: time.Now(), val: w, err: err}
+	c = s.widgets[key]
 	s.mu.Unlock()
-	return w, err
+	return c.val, false, c.err
+}
+
+func (s *Server) fetchWidget(t store.Tile, lang, key string, gen int, done chan struct{}) {
+	defer close(done)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	var w *integrations.Widget
+	var err error
+	if integ, ok := integrations.Get(t.Integration); ok {
+		w, err = integ.Fetch(ctx, s.instance(t, lang))
+	} else {
+		err = errors.New("unbekannter Dienst-Typ")
+	}
+	s.mu.Lock()
+	// A tile that was edited or used in the meantime (forget) gets a fresh fetch instead.
+	if s.widgetGen[key] == gen {
+		s.widgets[key] = cached[*integrations.Widget]{at: time.Now(), val: w, err: err}
+	}
+	delete(s.fetching, key)
+	s.mu.Unlock()
 }
 
 func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
@@ -510,14 +602,15 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, code, err)
 		return
 	}
-	ctx, cancel := timeout(r, 15*time.Second)
-	defer cancel()
-	data, err := s.widget(ctx, t, langOf(r))
-	if err != nil {
-		writeJSON(w, map[string]any{"error": err.Error()})
-		return
+	data, pending, err := s.widget(t, langOf(r), 3*time.Second)
+	switch {
+	case pending:
+		writeJSON(w, map[string]any{"pending": true})
+	case err != nil:
+		writeJSON(w, map[string]any{"error": tr(r, err.Error())})
+	default:
+		writeJSON(w, map[string]any{"widget": data})
 	}
-	writeJSON(w, map[string]any{"widget": data})
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -802,6 +895,7 @@ type exportData struct {
 type exportGroup struct {
 	Board      string       `json:"board,omitempty"`
 	Layout     string       `json:"layout,omitempty"`
+	Arrange    string       `json:"arrange,omitempty"`
 	Name       string       `json:"name"`
 	Visibility string       `json:"visibility,omitempty"`
 	Tiles      []exportTile `json:"tiles"`
@@ -829,7 +923,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		if locked[g.ID] {
 			continue
 		}
-		eg := exportGroup{Name: g.Name, Board: boardNames[g.BoardID], Layout: g.Layout, Tiles: []exportTile{}}
+		eg := exportGroup{Name: g.Name, Board: boardNames[g.BoardID], Layout: g.Layout, Arrange: g.Arrange, Tiles: []exportTile{}}
 		if g.Visibility != store.Visible {
 			eg.Visibility = store.Hidden
 		}
@@ -889,12 +983,15 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 500, err)
 			return
 		}
-		if eg.Visibility == store.Hidden || tileLayouts[eg.Layout] {
+		if eg.Visibility == store.Hidden || tileLayouts[eg.Layout] || eg.Arrange == "columns" {
 			if eg.Visibility == store.Hidden {
 				g.Visibility = store.Hidden
 			}
 			if tileLayouts[eg.Layout] {
 				g.Layout = eg.Layout
+			}
+			if eg.Arrange == "columns" {
+				g.Arrange = "columns"
 			}
 			logErr("import group", s.store.UpdateGroup(g))
 		}

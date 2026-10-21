@@ -92,6 +92,7 @@
   const layoutOf = (g) => g.layout || settings.tileLayout || (settings.uniformTiles === 'true' ? 'uniform' : 'auto');
   const isUniform = (g) => layoutOf(g) === 'uniform';
   const compactOf = (g) => (layoutOf(g).startsWith('icons') ? layoutOf(g) : '');
+  const columnsOf = (g) => g.arrange === 'columns' && !compactOf(g);
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -314,7 +315,7 @@
           </div>
         {/if}
       </div>
-      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} {hasSearchServices} {local} boardId={board?.id} />
+      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id} />
       <div class="tools on-bg">
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
@@ -392,7 +393,7 @@
               </div>
             {/if}
           </div>
-          <div class="grid" class:uniform={isUniform(group)} class:compact={!!compactOf(group)}>
+          <div class="grid" class:uniform={isUniform(group)} class:compact={!!compactOf(group)} class:columns={columnsOf(group)}>
             {#if !group.tiles.length && !editMode}
               <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
             {/if}
@@ -474,6 +475,12 @@
   /* Compact: small square tiles with the icon. */
   .grid.compact { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: stretch; }
   .grid.compact .add { min-height: 0; aspect-ratio: 1; }
+  /* Columns: tiles of one width fill the columns from top to bottom, so no
+     row waits for its tallest tile. */
+  .grid.columns { display: block; columns: 300px; column-gap: 12px; }
+  .grid.columns > * { break-inside: avoid; margin-bottom: 12px; }
+  .grid.columns > .slot { display: block; }
+  .grid.columns .add { width: 100%; }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: translateZ(0) scale(1.02); }
   .slot.dragging > :global(.tile) { opacity: .4; }

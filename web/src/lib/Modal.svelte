@@ -1,16 +1,13 @@
 <script>
   import { t } from './i18n.svelte.js';
 
+  // Closes only via ✕ (or the dialog's own Cancel button): clicking next to it
+  // or pressing Esc (e.g. to dismiss the browser's autocomplete) used to throw
+  // away everything typed so far, also when a text selection ended outside.
   let { title, onClose, children, footer, wide = false } = $props();
-
-  function onKey(e) {
-    if (e.key === 'Escape') onClose();
-  }
 </script>
 
-<svelte:window onkeydown={onKey} />
-
-<div class="backdrop" onclick={(e) => e.target === e.currentTarget && onClose()} role="presentation">
+<div class="backdrop" role="presentation">
   <div class="modal card" class:wide role="dialog" aria-modal="true" aria-label={title}>
     <header>
       <h2>{title}</h2>

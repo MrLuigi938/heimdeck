@@ -28,3 +28,6 @@ export const get = (p) => api('GET', p);
 export const post = (p, b) => api('POST', p, b ?? {});
 export const put = (p, b) => api('PUT', p, b ?? {});
 export const del = (p) => api('DELETE', p);
+
+// The service's own favicon, the icon fallback for tiles with an address.
+export const faviconUrl = (tile) => (tile?.id && (tile.url || tile.apiUrl) ? `/api/tiles/${tile.id}/favicon` : '');

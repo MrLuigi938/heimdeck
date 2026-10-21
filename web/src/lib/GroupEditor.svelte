@@ -15,6 +15,8 @@
   // svelte-ignore state_referenced_locally
   let layout = $state(group.layout || '');
   // svelte-ignore state_referenced_locally
+  let arrange = $state(group.arrange || '');
+  // svelte-ignore state_referenced_locally
   let boardId = $state(group.boardId);
   let saving = $state(false);
   // svelte-ignore state_referenced_locally
@@ -30,7 +32,7 @@
     e?.preventDefault();
     saving = true;
     try {
-      await put(`/groups/${group.id}`, { name, visibility, password, layout, boardId });
+      await put(`/groups/${group.id}`, { name, visibility, password, layout, arrange, boardId });
       toast(t('Gruppe gespeichert'));
       onSaved();
     } catch (err) {
@@ -84,6 +86,16 @@
         <option value="icons-hover">{t('Kompakt – nur Icon, Name beim Darüberfahren')}</option>
       </select>
     </label>
+    {#if !layout.startsWith('icons')}
+      <label class="field">
+        <span>{t('Anordnung')}</span>
+        <select bind:value={arrange}>
+          <option value="">{t('In Reihen – jede Reihe so hoch wie ihre höchste Kachel')}</option>
+          <option value="columns">{t('In Spalten – keine Lücken, Reihenfolge von oben nach unten')}</option>
+        </select>
+        {#if arrange === 'columns'}<span class="help">{t('Alle Kacheln sind dann gleich breit.')}</span>{/if}
+      </label>
+    {/if}
     {#if boards.length > 1}
       <label class="field">
         <span>{t('Dashboard')}</span>

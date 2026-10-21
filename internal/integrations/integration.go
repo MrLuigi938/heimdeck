@@ -31,6 +31,22 @@ type Field struct {
 	Secret   bool   `json:"secret"`
 	// Options are the choices of a select field; the first is the default.
 	Options []string `json:"options,omitempty"`
+	// Pick offers a searchable list (from a Chooser) to fill a comma-separated field.
+	Pick bool `json:"pick,omitempty"`
+}
+
+// Choice is one entry of a field's pick list.
+type Choice struct {
+	ID    string `json:"id"`
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+	Group string `json:"group,omitempty"`
+}
+
+// Chooser is implemented by integrations with Pick fields. An empty query
+// returns a useful selection to start with.
+type Chooser interface {
+	Choices(ctx context.Context, in *Instance, field, query string) ([]Choice, error)
 }
 
 // Definition describes a service: how to recognise it, which icon it uses and
@@ -50,6 +66,11 @@ type Definition struct {
 	Port int `json:"port,omitempty"`
 	// NoURL marks integrations that work without an address (e.g. local Docker).
 	NoURL bool `json:"noUrl,omitempty"`
+	// Setup lists the steps to prepare the service, shown in the tile editor.
+	Setup []string `json:"setup,omitempty"`
+	// Refresh is how often the tile reloads, in seconds (default 15), for
+	// values that change quickly such as energy flows.
+	Refresh int `json:"refresh,omitempty"`
 }
 
 // Instance is a configured tile, as seen by an integration.
@@ -127,6 +148,8 @@ type Widget struct {
 	Items      []Item   `json:"items,omitempty"`
 	Alerts     []string `json:"alerts,omitempty"`
 	Actions    []Action `json:"actions,omitempty"`
+	// Thumbs shows the items as a grid of their pictures (snapshots, photos).
+	Thumbs bool `json:"thumbs,omitempty"`
 }
 
 type Integration interface {
@@ -231,6 +254,11 @@ func Localize(d Definition, lang string) Definition {
 		fields[i] = f
 	}
 	d.Fields = fields
+	setup := make([]string, len(d.Setup))
+	for i, step := range d.Setup {
+		setup[i] = i18n.T(lang, step)
+	}
+	d.Setup = setup
 	return d
 }
 
@@ -365,10 +393,18 @@ func (in *Instance) do(ctx context.Context, r request, out any) error {
 		return nil
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return in.Errorf("unerwartete Antwort (kein gültiges JSON) – stimmt der Dienst-Typ? (%v)", err)
+		return notJSON{in.Errorf("unerwartete Antwort (kein gültiges JSON) – stimmt der Dienst-Typ? (%v)", err)}
 	}
 	return nil
 }
+
+// ErrNotJSON matches answers that are not the expected JSON, usually because
+// the address belongs to a web page or a different service.
+var ErrNotJSON = errors.New("not json")
+
+type notJSON struct{ error }
+
+func (notJSON) Is(target error) bool { return target == ErrNotJSON }
 
 func friendlyNetErr(lang string, err error) error {
 	s := err.Error()

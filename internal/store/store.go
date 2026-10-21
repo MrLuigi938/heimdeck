@@ -34,7 +34,8 @@ type Group struct {
 	Name         string `json:"name"`
 	Position     int    `json:"position"`
 	Visibility   string `json:"visibility"`
-	Layout       string `json:"layout"` // "" = follow the global setting, "uniform" or "auto"
+	Layout       string `json:"layout"`  // "" = follow the global setting, "uniform" or "auto"
+	Arrange      string `json:"arrange"` // "" = in rows, "columns" = filled column by column
 	PasswordHash string `json:"-"`
 }
 
@@ -111,6 +112,7 @@ CREATE TABLE IF NOT EXISTS status_log (
 	ms INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS status_log_ts ON status_log (ts);
+CREATE INDEX IF NOT EXISTS status_log_tile ON status_log (tile_id);
 CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -135,6 +137,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE groups ADD COLUMN board_id INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE groups ADD COLUMN layout TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE boards ADD COLUMN background TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE groups ADD COLUMN arrange TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
@@ -280,7 +283,7 @@ func (s *Store) Groups() ([]Group, error) {
 	out := []Group{}
 	for rows.Next() {
 		var g Group
-		if err := rows.Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.PasswordHash); err != nil {
+		if err := rows.Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.Arrange, &g.PasswordHash); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -288,7 +291,7 @@ func (s *Store) Groups() ([]Group, error) {
 	return out, rows.Err()
 }
 
-const groupCols = `id, board_id, name, position, visibility, layout, password_hash`
+const groupCols = `id, board_id, name, position, visibility, layout, arrange, password_hash`
 
 // CreateGroup adds a group to a board; boardID 0 means the first board.
 func (s *Store) CreateGroup(name string, boardID int64) (Group, error) {
@@ -310,7 +313,7 @@ func (s *Store) CreateGroup(name string, boardID int64) (Group, error) {
 func (s *Store) Group(id int64) (Group, error) {
 	var g Group
 	err := s.db.QueryRow(`SELECT `+groupCols+` FROM groups WHERE id = ?`, id).
-		Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.PasswordHash)
+		Scan(&g.ID, &g.BoardID, &g.Name, &g.Position, &g.Visibility, &g.Layout, &g.Arrange, &g.PasswordHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -318,8 +321,8 @@ func (s *Store) Group(id int64) (Group, error) {
 }
 
 func (s *Store) UpdateGroup(g Group) error {
-	_, err := s.db.Exec(`UPDATE groups SET board_id = ?, name = ?, visibility = ?, layout = ?, password_hash = ? WHERE id = ?`,
-		g.BoardID, g.Name, g.Visibility, g.Layout, g.PasswordHash, g.ID)
+	_, err := s.db.Exec(`UPDATE groups SET board_id = ?, name = ?, visibility = ?, layout = ?, arrange = ?, password_hash = ? WHERE id = ?`,
+		g.BoardID, g.Name, g.Visibility, g.Layout, g.Arrange, g.PasswordHash, g.ID)
 	return err
 }
 
@@ -391,6 +394,9 @@ func (s *Store) DeleteGroup(id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM status_log WHERE tile_id IN (SELECT id FROM tiles WHERE group_id = ?)`, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM tiles WHERE group_id = ?`, id); err != nil {
 		return err
 	}

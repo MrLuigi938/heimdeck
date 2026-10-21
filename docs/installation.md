@@ -93,6 +93,8 @@ Options can be passed as environment variables, e.g. `sudo HEIMDECK_PORT=8080 sh
 | Variable | Default | Meaning |
 |---|---|---|
 | `HEIMDECK_PORT` | `3000` | Port of the web interface |
+| `ROOT_PASSWORD` | random, shown at the end | root password for the container console |
+| `SSH_KEY_FILE` | – | Public SSH key for root, e.g. `~/.ssh/id_ed25519.pub` |
 | `HEIMDECK_TAG` | `latest` | Version to install, e.g. `1.0.0` |
 | `HEIMDECK_DOCKER` | asks | `1` = discover Docker containers, `0` = don't |
 
@@ -130,6 +132,24 @@ Change the defaults with environment variables, e.g. `CTID=150 IP=192.168.1.50/2
 | `HEIMDECK_PORT` | `3000` | Port of the web interface |
 
 Update later from the Proxmox host with `pct exec <CTID> -- sh /root/heimdeck-install.sh`.
+
+### Logging in to the container
+
+The script sets a **random root password** and prints it at the end (`user: root`, `password: …`). Use it in the Proxmox web interface under *your container → Console*. Please change it after the first login:
+
+```sh
+passwd
+```
+
+Your own password or an SSH key can be set when creating the container: `ROOT_PASSWORD='…' SSH_KEY_FILE=~/.ssh/id_ed25519.pub sh proxmox-lxc.sh`. SSH logins as root only work with a key on Debian by default.
+
+Lost the password, or created the container with an older version of the script (which set none)? Set a new one from the shell of the Proxmox host – no login needed there:
+
+```sh
+pct exec <CTID> -- passwd
+```
+
+`pct enter <CTID>` opens a root shell inside the container directly.
 
 ## Single binary
 

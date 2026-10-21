@@ -93,6 +93,8 @@ Optionen per Umgebungsvariable, z. B. `sudo HEIMDECK_PORT=8080 sh install.sh`:
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `HEIMDECK_PORT` | `3000` | Port der Weboberfläche |
+| `ROOT_PASSWORD` | zufällig, wird am Ende angezeigt | root-Passwort für die Container-Konsole |
+| `SSH_KEY_FILE` | – | Öffentlicher SSH-Schlüssel für root, z. B. `~/.ssh/id_ed25519.pub` |
 | `HEIMDECK_TAG` | `latest` | Zu installierende Version, z. B. `1.0.0` |
 | `HEIMDECK_DOCKER` | fragt nach | `1` = Docker-Container erkennen, `0` = nicht |
 
@@ -130,6 +132,24 @@ Standardwerte lassen sich per Umgebungsvariable ändern, z. B. `CTID=150 IP=192.
 | `HEIMDECK_PORT` | `3000` | Port der Weboberfläche |
 
 Später aktualisieren auf dem Proxmox-Host mit `pct exec <CTID> -- sh /root/heimdeck-install.sh`.
+
+### Anmelden im Container
+
+Das Skript setzt ein **zufälliges root-Passwort** und zeigt es am Ende an (`user: root`, `password: …`). Damit meldest du dich in der Proxmox-Oberfläche unter *dein Container → Konsole* an. Bitte ändere es nach der ersten Anmeldung:
+
+```sh
+passwd
+```
+
+Ein eigenes Passwort oder einen SSH-Schlüssel kannst du schon beim Anlegen festlegen: `ROOT_PASSWORD='…' SSH_KEY_FILE=~/.ssh/id_ed25519.pub sh proxmox-lxc.sh`. Per SSH kann sich root bei Debian standardmäßig nur mit Schlüssel anmelden.
+
+Passwort vergessen oder den Container mit einer älteren Version des Skripts angelegt (die keins gesetzt hat)? Dann setzt du in der Shell des Proxmox-Hosts ein neues – dort ist keine Anmeldung im Container nötig:
+
+```sh
+pct exec <CTID> -- passwd
+```
+
+`pct enter <CTID>` öffnet direkt eine root-Shell im Container.
 
 ## Einzelnes Programm
 

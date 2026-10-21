@@ -29,11 +29,15 @@ type Server struct {
 	updates *docker.Updates
 	web     fs.FS
 
-	mu      sync.Mutex
-	widgets map[string]cached[*integrations.Widget] // key: tile id + language
-	latest  map[int64]TileStatus
-	outages map[string]*outage // key: tile id + "int"/"ext"
-	recheck chan int64
+	mu           sync.Mutex
+	widgets      map[string]cached[*integrations.Widget] // key: tile id + language
+	fetching     map[string]chan struct{}                // widget fetches in progress
+	widgetGen    map[string]int                          // bumped by forget, drops outdated fetches
+	favicons     map[string]favicon                      // key: tile address
+	faviconFetch map[string]chan struct{}                // favicon lookups in progress
+	latest       map[int64]TileStatus
+	outages      map[string]*outage // key: tile id + "int"/"ext"
+	recheck      chan int64
 	// unlocked holds, per login session, the protected groups opened with their password.
 	unlocked map[string]map[int64]time.Time
 }
@@ -45,13 +49,14 @@ type cached[T any] struct {
 }
 
 const (
-	widgetTTL = 10 * time.Second
-	unlockTTL = 12 * time.Hour
+	widgetTTL    = 10 * time.Second
+	widgetErrTTL = 30 * time.Second // unreachable services are asked less often
+	unlockTTL    = 12 * time.Hour
 )
 
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	srv := &Server{store: s, auth: a, docker: d, updates: docker.NewUpdates(), web: web,
-		widgets: map[string]cached[*integrations.Widget]{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
+		widgets: map[string]cached[*integrations.Widget]{}, fetching: map[string]chan struct{}{}, widgetGen: map[string]int{}, favicons: map[string]favicon{}, faviconFetch: map[string]chan struct{}{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
 	integrations.Register(dockerTile{srv})
 	return srv
@@ -82,9 +87,11 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/tiles/{id}", s.handleSaveTile)
 	api.HandleFunc("DELETE /api/tiles/{id}", s.handleDeleteTile)
 	api.HandleFunc("POST /api/tiles/test", s.handleTestTile)
+	api.HandleFunc("POST /api/tiles/choices", s.handleChoices)
 	api.HandleFunc("GET /api/tiles/{id}/widget", s.handleWidget)
 	api.HandleFunc("POST /api/tiles/{id}/action", s.handleAction)
 	api.HandleFunc("GET /api/tiles/{id}/image", s.handleImage)
+	api.HandleFunc("GET /api/tiles/{id}/favicon", s.handleFavicon)
 	api.HandleFunc("PUT /api/layout", s.handleLayout)
 	api.HandleFunc("GET /api/status", s.handleStatus)
 	api.HandleFunc("GET /api/uptime", s.handleUptime)
@@ -244,6 +251,7 @@ func (s *Server) forget(id int64) {
 	s.mu.Lock()
 	for _, lang := range []string{i18n.DE, i18n.EN} {
 		delete(s.widgets, widgetKey(id, lang))
+		s.widgetGen[widgetKey(id, lang)]++
 	}
 	delete(s.latest, id)
 	s.mu.Unlock()

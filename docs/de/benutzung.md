@@ -23,7 +23,7 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
 ## Dashboards und Gruppen
 
 - **Mehrere Dashboards**, z. B. „Privat“ und „Arbeit“: oben neben dem Titel umschalten. Jedes Dashboard kann ein eigenes Hintergrundbild haben. Jeder Browser merkt sich das zuletzt benutzte, per `?board=<id>` lässt sich eines direkt verlinken.
-- **Gruppen** ordnen deine Kacheln. Die Kachelgröße (automatisch, einheitlich oder kompakt als Icon-Quadrat) lässt sich für alle oder pro Gruppe einstellen.
+- **Gruppen** ordnen deine Kacheln. Die Kachelgröße (automatisch, einheitlich oder kompakt als Icon-Quadrat) lässt sich für alle oder pro Gruppe einstellen. Mit der Anordnung **In Spalten** (pro Gruppe) füllen die Kacheln die Spalten von oben nach unten, statt in Reihen zu stehen – so bleiben unter kürzeren Kacheln keine Lücken; alle Kacheln sind dann gleich breit.
 - **Ausgeblendete Gruppen** erscheinen erst nach Klick auf 👁 (für die aktuelle Sitzung). **Geschützte Gruppen** brauchen ein eigenes Passwort.
 - **Nur-Link-Kacheln**: Jede Kachel kann ein einfacher Link sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
 
@@ -41,6 +41,8 @@ Als „zuhause“ gilt, wenn das Dashboard über eine private IP (`192.168.…`,
 <sub>Demo-Daten, Oberfläche auf Englisch</sub>
 
 Taste `/` drücken (oder ins Suchfeld klicken). Eine Suche umfasst deine Kacheln und jeden verbundenen Dienst mit Suchfunktion – Medienbibliotheken, Anfragen, Dokumente, Fotos und Personen, Spiele, Hörbücher, Comics, Dateien, Smart-Home-Geräte, Netzwerk-Clients, DNS-Abfragen und mehr, mit Covern und Vorschaubildern. Eine eingefügte Video-URL lässt sich direkt an Tubesy schicken.
+
+Enter ohne passende Kachel startet die Websuche. Die Suchmaschine wählst du in den Einstellungen – neben DuckDuckGo, Brave, Startpage, Google, Bing, Ecosia, Qwant und Kagi auch eine eigene Adresse (z. B. SearXNG), mit `{q}` für den Suchbegriff.
 
 Welche Dienste durchsucht werden können, steht unter [Unterstützte Dienste](dienste.md).
 

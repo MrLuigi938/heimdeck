@@ -288,4 +288,19 @@ export const en = {
   'Kompakt – Icon mit Namen darunter': 'Compact – icon with name below',
   'Kompakt – nur Icon, Name beim Darüberfahren': 'Compact – icon only, name on hover',
   'Kompakte Kacheln zeigen keine Live-Daten, nur Icon und Status.': 'Compact tiles show no live data, only icon and status.',
+  // tile editor: setup guide and pick list
+  'So richtest du {name} ein': 'How to set up {name}',
+  'Auswählen': 'Choose',
+  'Suchen … (Name oder ID)': 'Search … (name or ID)',
+  'Nichts gefunden.': 'Nothing found.',
+  'Gib einen Suchbegriff ein, z. B. einen Raum oder Gerätenamen.': 'Enter a search term, e.g. a room or device name.',
+  // custom web search
+  'Benutzerdefiniert …': 'Custom …',
+  'Adresse der Suchmaschine': 'Search engine address',
+  '{q} wird durch den Suchbegriff ersetzt, z. B. für deine eigene SearXNG-Instanz.': '{q} is replaced with the search term, e.g. for your own SearXNG instance.',
+  // group arrangement
+  'Anordnung': 'Arrangement',
+  'In Reihen – jede Reihe so hoch wie ihre höchste Kachel': 'In rows – each row as tall as its tallest tile',
+  'In Spalten – keine Lücken, Reihenfolge von oben nach unten': 'In columns – no gaps, order runs top to bottom',
+  'Alle Kacheln sind dann gleich breit.': 'All tiles then have the same width.',
 };

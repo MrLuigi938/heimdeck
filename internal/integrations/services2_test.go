@@ -2,7 +2,9 @@ package integrations
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -187,8 +189,9 @@ func TestIoBroker(t *testing.T) {
 			{"id": "hm-rpc.0.ABC.1.STATE", "val": true, "common": obj{"name": obj{"de": "Stehlampe", "en": "Lamp"}, "type": "boolean", "write": true}},
 			{"id": "javascript.0.temp", "val": 21.456, "common": obj{"name": "Temperatur", "unit": "°C", "type": "number"}},
 		},
-		"GET /v1/objects": obj{"system.adapter.admin.0": obj{"common": obj{"enabled": true}}, "system.adapter.hm-rpc.0": obj{"common": obj{"enabled": true}}, "system.adapter.old.0": obj{"common": obj{"enabled": false}}},
-		"GET /v1/states":  obj{"system.adapter.admin.0.alive": obj{"val": true}, "system.adapter.hm-rpc.0.alive": obj{"val": false}},
+		"GET /v1/objects":                           obj{"system.adapter.admin.0": obj{"common": obj{"enabled": true}}, "system.adapter.hm-rpc.0": obj{"common": obj{"enabled": true}}, "system.adapter.old.0": obj{"common": obj{"enabled": false}}},
+		"GET /v1/states":                            obj{"system.adapter.admin.0.alive": obj{"val": true}, "system.adapter.hm-rpc.0.alive": obj{"val": false}},
+		"GET /v1/state/hm-rpc.0.ABC.1.STATE":        obj{"id": "hm-rpc.0.ABC.1.STATE", "val": false, "common": obj{"name": "Stehlampe", "type": "boolean"}},
 		"GET /v1/state/hm-rpc.0.ABC.1.STATE/toggle": obj{},
 	}, nil)
 	in := f.instance(map[string]string{"states": "hm-rpc.0.ABC.1.STATE, javascript.0.temp"})
@@ -207,10 +210,32 @@ func TestIoBroker(t *testing.T) {
 	if err != nil || stats(w)["Adapter aktiv"] != "1/2" || len(w.Items) != 1 || w.Items[0].Title != "hm-rpc.0" {
 		t.Fatalf("%v %+v", err, w)
 	}
+	// rest-api answers 404 for the whole list when one id is unknown
+	in.Values["states"] = "hm-rpc.0.ABC.1.STATE, gibts.0.nicht"
+	w, err = iobroker{}.Fetch(context.Background(), in)
+	if err != nil || len(w.Items) != 1 || w.Items[0].Badge != "Aus" || len(w.Alerts) != 1 {
+		t.Fatalf("unknown id: %v %+v", err, w)
+	}
+	choices, err := iobroker{}.Choices(context.Background(), in, "states", "")
+	if err != nil || len(choices) != 3 || choices[0].Group != "system.adapter" {
+		t.Fatalf("choices: %v %+v", err, choices)
+	}
 	// simple-api only
-	simple := newFake(t, map[string]any{"GET /get/javascript.0.temp": obj{"_id": "javascript.0.temp", "val": 5, "common": obj{"name": "T", "type": "number"}}}, nil)
+	simple := newFake(t, map[string]any{
+		"GET /objects":               obj{"system.config": obj{}},
+		"GET /get/javascript.0.temp": obj{"_id": "javascript.0.temp", "val": 5, "common": obj{"name": "T", "type": "number"}},
+	}, nil)
 	w, err = iobroker{}.Fetch(context.Background(), simple.instance(map[string]string{"states": "javascript.0.temp"}))
 	if err != nil || stats(w)["T"] != "5" {
 		t.Fatalf("simple: %v %+v", err, w)
+	}
+	// the admin page (a web page for every path) gets a setup hint
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "<!doctype html><title>ioBroker.admin</title>")
+	}))
+	defer admin.Close()
+	_, err = iobroker{}.Fetch(context.Background(), &Instance{BaseURL: admin.URL, Values: map[string]string{}, Client: admin.Client(), Lang: "de"})
+	if err == nil || !strings.Contains(err.Error(), "REST API") {
+		t.Fatalf("admin page: %v", err)
 	}
 }

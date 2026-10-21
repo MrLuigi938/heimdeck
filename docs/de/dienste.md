@@ -27,6 +27,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Bazarr | fehlende Untertitel (Folgen/Filme), gedrosselte Anbieter | ✓ Serien und Filme | fehlende Untertitel suchen |
 | Prowlarr | aktive und gestörte Indexer | | |
 | Immich | Fotos, Videos, Speicher pro Benutzer | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
+| PhotoPrism (App-Passwort) | Fotos, Videos, Alben, Personen, zuletzt hinzugefügt | ✓ Fotos (Ort, Person, Motiv, Datum) | |
 | Audiobookshelf | Hörbücher, Podcasts, Stunden, Weiterhören | ✓ Titel, Autoren, Serien | |
 | Kavita | Serien, Bände, Dateien, Weiterlesen | ✓ mit Covern | |
 | Komga | Serien, Bücher, angefangene Bücher | ✓ mit Covern | |
@@ -45,21 +46,25 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
 | **Dokumente** | | | |
 | Paperless-ngx | Dokumente, Posteingang | ✓ | |
+| Norish (API-Schlüssel) | heute geplante Gerichte, offene Einkäufe, Anzahl Rezepte | ✓ Rezepte | |
 | Nextcloud (App-Passwort) | Dateien, Benutzer, aktive Nutzer, freier Speicher (ohne Admin: eigener Speicher) | ✓ Dateien, Kalender, Kontakte, Talk, Notizen, Deck … | |
 | **Netzwerk** | | | |
 | AdGuard Home | DNS-Anfragen, Blockierquote, Antwortzeit, meistblockierte Domains | ✓ Abfrage-Log | Schutz pausieren/ausschalten, Domain sperren oder freigeben |
 | Pi-hole (v6 mit App-Passwort, v5 mit API-Token) | DNS-Anfragen, Blockierquote, Clients | ✓ Abfrage-Log (v6) | Blockieren pausieren, Domain sperren oder freigeben |
 | OPNsense (API-Key + Secret) | WAN-Datenrate, RAM, Last, Laufzeit, Gateways, Updates | | |
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
+| UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
 | Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
 | Proxmox VE (API-Token) | CPU, RAM, Gäste aktiv, Nodes bzw. gestoppte Gäste | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| openmediavault (Administrator) | CPU, RAM, Laufzeit, Updates, Dateisysteme, Festplatten-Zustand (S.M.A.R.T.) | | |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
 | ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |
-| evcc | PV, Haus, Netz, Batterie, Ladepunkte | | Lademodus wechseln (Aus, PV, Min+PV, Schnell) |
+| evcc | PV, Haus, Netz, Batterie, Ladepunkte (aktualisiert alle 5 s) | | Lademodus wechseln (Aus, PV, Min+PV, Schnell, Smart) |
+| WLED | An/Aus, Helligkeit, Effekt, Presets | ✓ Presets | An/Aus, Helligkeit, Preset anwenden |
 | **Sonstige** | | | |
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
 | JDownloader, FRITZ!Box, Zoraxy, Portainer, … | Online-Status | | |
@@ -67,6 +72,16 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 Jede Kachel kann außerdem „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist.
 
 Dein Dienst fehlt? Nimm die Kachel [Eigene API](#eigene-api) oder [eröffne ein Issue](https://github.com/MrLuigi938/heimdeck/issues).
+
+## ioBroker verbinden
+
+ioBroker hat keine eigene Daten-Schnittstelle – sie kommt von einem Adapter:
+
+1. In ioBroker Admin → **Adapter** den Adapter **REST API** installieren (eine Instanz, Standard-Einstellungen).
+2. In Heimdeck als Adresse `http://<ioBroker-IP>:8093` eintragen. Die Admin-Oberfläche auf Port 8081 liefert keine Daten. Läuft der Adapter im Web-Adapter, lautet die Adresse `http://<ioBroker-IP>:8082/rest-api`; der ältere Simple-API-Adapter (Port 8087) geht auch.
+3. Neben „Datenpunkte auf der Kachel“ auf **Auswählen** klicken, Datenpunkte suchen und anhaken – IDs abtippen ist nicht nötig. Ohne Auswahl zeigt die Kachel den Status deiner Adapter.
+
+Entitäten von Home Assistant wählst du genauso aus.
 
 ## Proxmox verbinden
 

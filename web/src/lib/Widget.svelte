@@ -36,7 +36,7 @@
       <div class="stats">
         {#each widget.stats as s}
           <div class="stat" title="{s.label}: {s.value}">
-            <div class="value {s.tone || ''}">{s.value}</div>
+            <div class="value {s.tone || ''}" style="--n:{[...String(s.value)].length}">{s.value}</div>
             <div class="label">{s.label}</div>
           </div>
         {/each}
@@ -49,7 +49,20 @@
       </ul>
     {/if}
 
-    {#if items.length}
+    {#if items.length && widget.thumbs}
+      <!-- Pictures (camera snapshots, photos): a small grid instead of a list. -->
+      <div class="items">
+        {#if widget.itemsTitle}<div class="items-title">{widget.itemsTitle}</div>{/if}
+        <div class="thumbs">
+          {#each items.slice(0, 4) as it}
+            <a class="thumb" href={it.url ? link(it.url) : undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer" title={it.title}>
+              {#if it.image}<img src={link(it.image)} alt="" loading="lazy" onerror={(e) => (e.currentTarget.style.visibility = 'hidden')} />{/if}
+              <span class="thumb-caption">{it.title}{#if it.badge} · {it.badge}{/if}</span>
+            </a>
+          {/each}
+        </div>
+      </div>
+    {:else if items.length}
       <div class="items">
         {#if widget.itemsTitle}<div class="items-title">{widget.itemsTitle}</div>{/if}
         {#each items.slice(0, items.length - hiddenItems) as it}
@@ -100,8 +113,9 @@
   /* minmax(0, 1fr) keeps long, unbreakable text from widening the tile. */
   .widget { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }
-  .stat { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0; }
-  .value { font-size: 17px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  /* The value shrinks with its length so it fits the box (100cqi = box width). */
+  .stat { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0; container-type: inline-size; }
+  .value { font-size: clamp(11px, calc(100cqi / (var(--n, 4) * 0.6)), 17px); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .label { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .alerts { margin: 0; padding: 8px 10px; list-style: none; font-size: 12.5px; line-height: 1.4; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: 10px; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
   .alerts.clamped li { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -118,6 +132,11 @@
   .bar { height: 4px; background: var(--surface-2); border-radius: 4px; margin-top: 5px; overflow: hidden; }
   .bar > div { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s; }
   .item-actions { display: flex; gap: 4px; flex: none; margin-left: auto; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+  .thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: var(--surface-2); display: block; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb-caption { position: absolute; inset: auto 0 0 0; padding: 14px 7px 4px; font-size: 11.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .65)); }
   .fold { justify-self: start; background: none; border: 0; padding: 0; font-size: 12.5px; color: var(--muted); }
   .fold:hover { color: var(--accent); }
 </style>
