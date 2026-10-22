@@ -1,20 +1,29 @@
 <script module>
-  // Icon addresses that failed recently (e.g. a name the icon collection does
-  // not have). Remembered for a week, so a tile with a favicon fallback shows
-  // it right away instead of trying the collection again on every visit.
-  const MISS_KEY = 'heimdeck-icon-miss';
+  // Icon addresses the icon collection does not have (e.g. anubis.svg, while
+  // anubis.png exists). Remembered for a week, so a tile shows the right
+  // picture right away instead of trying the missing ones on every visit.
+  // Only a confirmed 404 counts: a load that failed because the network
+  // hiccuped must not hide an icon that exists (that happened with v1).
+  const MISS_KEY = 'heimdeck-icon-miss-v2';
   const MISS_TTL = 7 * 24 * 3600 * 1000;
   let misses = {};
   try {
+    localStorage.removeItem('heimdeck-icon-miss');
     misses = JSON.parse(localStorage.getItem(MISS_KEY) || '{}');
     const now = Date.now();
     for (const [url, at] of Object.entries(misses)) if (now - at > MISS_TTL) delete misses[url];
   } catch {
     misses = {};
   }
-  function rememberMiss(url) {
+  async function checkMiss(url) {
     // Only addresses of the icon collection; Heimdeck's own favicon route may work again any time.
     if (!url.startsWith('https://')) return;
+    try {
+      const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (res.status !== 404) return;
+    } catch {
+      return; // offline or blocked: not a reason to give up on the icon
+    }
     misses[url] = Date.now();
     try {
       localStorage.setItem(MISS_KEY, JSON.stringify(misses));
@@ -80,7 +89,12 @@
     {#if src}
       {#key src}
         <img {src} alt="" class:hidden={!loaded} use:checkComplete
-          onload={() => (loadedSrc = src)} onerror={() => { failed[src] = true; rememberMiss(src); }} />
+          onload={() => (loadedSrc = src)} onerror={(e) => {
+            // The address of the image that failed – `src` already points to the next one afterwards.
+            const bad = e.currentTarget.getAttribute('src');
+            failed[bad] = true;
+            checkMiss(bad);
+          }} />
       {/key}
     {/if}
   {/if}

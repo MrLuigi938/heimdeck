@@ -307,8 +307,22 @@ export const en = {
   // Telegram
   'Telegram-Bot-Token': 'Telegram bot token',
   'Telegram-Chat-ID': 'Telegram chat ID',
-  'Telegram: bei @BotFather mit /newbot einen Bot anlegen und den Token kopieren. Dem Bot einmal schreiben (oder ihn in eine Gruppe aufnehmen); die Chat-ID verrät z. B. @userinfobot.':
-    'Telegram: create a bot with /newbot at @BotFather and copy its token. Write to the bot once (or add it to a group); @userinfobot, for example, tells you the chat ID.',
+  'So richtest du Telegram ein': 'How to set up Telegram',
+  'Öffne in Telegram den Kontakt @BotFather (das offizielle Werkzeug von Telegram für Bots) und schick ihm /newbot.':
+    "Open the contact @BotFather in Telegram (Telegram's official tool for bots) and send it /newbot.",
+  'Gib einen Namen und einen Benutzernamen für deinen Bot ein (der Benutzername muss auf „bot“ enden). BotFather antwortet mit einem Token wie 123456789:AAH… – den hier bei „Bot-Token“ eintragen.':
+    'Enter a name and a username for your bot (the username must end in "bot"). BotFather answers with a token like 123456789:AAH… – enter it here as "Bot token".',
+  'Öffne deinen neuen Bot (BotFather schickt den Link mit, t.me/…) und tippe auf „Starten“ oder schreib ihm irgendeine Nachricht. Für eine Gruppe: den Bot in die Gruppe aufnehmen und dort etwas schreiben.':
+    'Open your new bot (BotFather sends the link, t.me/…) and tap "Start" or write it any message. For a group: add the bot to the group and write something there.',
+  'Klick unten auf „Chat-ID suchen“ – Heimdeck fragt Telegram, wer deinem Bot geschrieben hat, und trägt die ID ein.':
+    'Click "Find chat ID" below – Heimdeck asks Telegram who wrote to your bot and fills in the ID.',
+  'Speichern und mit „Test senden“ ausprobieren.': 'Save and try it with "Send test".',
+  'Chat-ID suchen': 'Find chat ID',
+  'Mehrere Chats gefunden – welcher soll die Meldungen bekommen?': 'Several chats found – which one should get the messages?',
+  'Noch keine Nachricht an deinen Bot gefunden. Schreib ihm in Telegram etwas (z. B. „Hallo“) und klick dann nochmal auf „Chat-ID suchen“.':
+    'No message to your bot found yet. Write it something in Telegram (e.g. "Hello") and click "Find chat ID" again.',
+  'Chat-ID von „{name}“ eingetragen – jetzt speichern.': 'Chat ID of "{name}" filled in – now save.',
+  '{n} Chats gefunden – bitte unten auswählen.': '{n} chats found – please pick one below.',
   // logout button
   'Abmelden?': 'Log out?',
   'Zum Abmelden nochmal klicken': 'Click again to log out',

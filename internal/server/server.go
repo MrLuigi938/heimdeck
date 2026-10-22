@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/password", s.handlePassword)
 	api.HandleFunc("PUT /api/notify", s.handleSaveNotify)
 	api.HandleFunc("POST /api/notify/test", s.handleTestNotify)
+	api.HandleFunc("POST /api/notify/telegram/chats", s.handleTelegramChats)
 	api.HandleFunc("POST /api/boards", s.handleCreateBoard)
 	api.HandleFunc("PUT /api/boards/{id}", s.handleUpdateBoard)
 	api.HandleFunc("DELETE /api/boards/{id}", s.handleDeleteBoard)

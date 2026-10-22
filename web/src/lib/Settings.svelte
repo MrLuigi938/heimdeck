@@ -131,6 +131,28 @@
     }
   }
 
+  // Asks Telegram which chats wrote to the bot and fills in the chat ID.
+  let findingChats = $state(false);
+  let chatChoices = $state([]);
+  async function findChats() {
+    findingChats = true;
+    try {
+      const res = await post('/notify/telegram/chats', { token: nf.telegramToken || '' });
+      chatChoices = res.chats;
+      if (!res.chats.length) {
+        toast(t('Noch keine Nachricht an deinen Bot gefunden. Schreib ihm in Telegram etwas (z. B. „Hallo“) und klick dann nochmal auf „Chat-ID suchen“.'), 'bad');
+      } else {
+        s.telegramChat = res.chats[0].id;
+        toast(res.chats.length === 1
+          ? t('Chat-ID von „{name}“ eingetragen – jetzt speichern.', { name: res.chats[0].name || res.chats[0].id })
+          : t('{n} Chats gefunden – bitte unten auswählen.', { n: res.chats.length }));
+      }
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+    findingChats = false;
+  }
+
   async function testNotify() {
     testing = true;
     try {
@@ -330,6 +352,16 @@
       </label>
     </div>
     <span class="help">{t('ntfy: App installieren, ein Thema abonnieren und dessen Adresse hier eintragen. Eigener ntfy-Server geht genauso.')}</span>
+    <details class="howto">
+      <summary>{t('So richtest du Telegram ein')}</summary>
+      <ol>
+        <li>{t('Öffne in Telegram den Kontakt @BotFather (das offizielle Werkzeug von Telegram für Bots) und schick ihm /newbot.')}</li>
+        <li>{t('Gib einen Namen und einen Benutzernamen für deinen Bot ein (der Benutzername muss auf „bot“ enden). BotFather antwortet mit einem Token wie 123456789:AAH… – den hier bei „Bot-Token“ eintragen.')}</li>
+        <li>{t('Öffne deinen neuen Bot (BotFather schickt den Link mit, t.me/…) und tippe auf „Starten“ oder schreib ihm irgendeine Nachricht. Für eine Gruppe: den Bot in die Gruppe aufnehmen und dort etwas schreiben.')}</li>
+        <li>{t('Klick unten auf „Chat-ID suchen“ – Heimdeck fragt Telegram, wer deinem Bot geschrieben hat, und trägt die ID ein.')}</li>
+        <li>{t('Speichern und mit „Test senden“ ausprobieren.')}</li>
+      </ol>
+    </details>
     <div class="grid2">
       <label class="field">
         <span>{t('Telegram-Bot-Token')}</span>
@@ -340,10 +372,22 @@
       </label>
       <label class="field">
         <span>{t('Telegram-Chat-ID')}</span>
-        <input bind:value={s.telegramChat} placeholder="123456789 / -100…" inputmode="numeric" />
+        <div class="secret-row">
+          <input bind:value={s.telegramChat} placeholder="123456789 / -100…" inputmode="numeric" />
+          <button class="small" onclick={findChats} disabled={findingChats || (!nf.telegramToken && !nf.telegramSet)}>{t('Chat-ID suchen')}</button>
+        </div>
       </label>
     </div>
-    <span class="help">{t('Telegram: bei @BotFather mit /newbot einen Bot anlegen und den Token kopieren. Dem Bot einmal schreiben (oder ihn in eine Gruppe aufnehmen); die Chat-ID verrät z. B. @userinfobot.')}</span>
+    {#if chatChoices.length > 1}
+      <div class="chat-choices">
+        <span class="help">{t('Mehrere Chats gefunden – welcher soll die Meldungen bekommen?')}</span>
+        {#each chatChoices as c (c.id)}
+          <button class="small" class:primary={s.telegramChat === c.id} onclick={() => (s.telegramChat = c.id)}>
+            {c.type === 'private' ? '👤' : '👥'} {c.name || c.id}
+          </button>
+        {/each}
+      </div>
+    {/if}
     <label class="field">
       <span>{t('Melden, wenn ein Dienst so lange nicht antwortet')}</span>
       <select bind:value={s.notifyAfter}>
@@ -415,6 +459,12 @@
   .swatch.active { border-color: var(--text); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .indent { margin: -6px 0 0 26px; }
+  /* Same look as the setup guides in the tile editor. */
+  .howto { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+  .howto summary { cursor: pointer; font-weight: 600; }
+  .howto ol { margin: 8px 0 2px; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); }
+  .chat-choices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chat-choices .help { flex-basis: 100%; }
   .board-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
   .board-row input.emoji { text-align: center; padding-left: 4px; padding-right: 4px; }
   .board-actions { display: flex; gap: 6px; justify-content: flex-end; }

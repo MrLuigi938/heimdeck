@@ -183,7 +183,13 @@
      from a taller row and overlap the next tile (seen on small iPhones). */
   .tile.compact { position: relative; aspect-ratio: 1; width: 100%; }
   .square { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; min-width: 0; min-height: 0; }
-  .cname { font-size: 12px; font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  /* Up to two lines, so names like "Proton Apps" or "Twitch Follows" fit in a
+     narrow square; longer ones end with an ellipsis after the second line. */
+  .cname {
+    font-size: 12px; font-weight: 500; line-height: 1.25; max-width: 100%; color: var(--muted);
+    text-align: center; overflow-wrap: anywhere; hyphens: auto;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+  }
   .tile.compact:not(.editing) .square[href]:hover .cname { color: var(--accent); }
   .icons-hover .cname {
     position: absolute; left: 6px; right: 6px; bottom: 8px; text-align: center; opacity: 0; transform: translateY(4px);
@@ -195,4 +201,9 @@
   .corner { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; }
   .cedit { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; padding: 0; justify-content: center; }
   @media (max-width: 520px) { .tile.wide { grid-column: 1 / -1; } }
+  /* Phones: a slightly smaller icon leaves room for a two-line name in the square. */
+  @media (max-width: 640px) {
+    .tile.compact { --icon-max: 36px; }
+    .square { padding: 8px 6px; gap: 6px; }
+  }
 </style>

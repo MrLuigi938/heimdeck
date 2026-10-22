@@ -339,6 +339,109 @@ func (ns notifySecrets) status() map[string]any {
 	return map[string]any{"ok": true, "discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""}
 }
 
+type telegramChat struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"` // private, group, supergroup, channel
+}
+
+// handleTelegramChats lists the chats that recently wrote to the bot (or added
+// it to a group), so nobody has to look up a chat ID by hand. It uses the
+// token from the request, or the stored one.
+func (s *Server) handleTelegramChats(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token string `json:"token"`
+	}
+	readJSON(r, &in)
+	token := strings.TrimSpace(in.Token)
+	if token == "" {
+		token = s.notifySecrets().TelegramToken
+	}
+	if !telegramTokenRe.MatchString(token) {
+		writeErr(w, 400, errors.New("Bitte zuerst den Bot-Token eintragen"))
+		return
+	}
+	ctx, cancel := timeout(r, 15*time.Second)
+	defer cancel()
+	chats, err := telegramChats(ctx, token)
+	if err != nil {
+		writeErr(w, 502, errors.New(tr(r, logging.Redact(err.Error()))))
+		return
+	}
+	writeJSON(w, map[string]any{"chats": chats})
+}
+
+func telegramChats(ctx context.Context, token string) ([]telegramChat, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, telegramAPI+"/bot"+token+"/getUpdates?limit=100", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := notifyClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusUnauthorized, http.StatusNotFound:
+		return nil, errors.New("Telegram kennt diesen Bot-Token nicht")
+	case http.StatusConflict:
+		return nil, errors.New("Für diesen Bot ist ein Webhook eingerichtet – dann gibt Telegram die Chats nicht heraus. Die Chat-ID bitte von Hand eintragen")
+	default:
+		return nil, fmt.Errorf("Status %d", resp.StatusCode)
+	}
+	type chat struct {
+		ID        int64  `json:"id"`
+		Type      string `json:"type"`
+		Title     string `json:"title"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Username  string `json:"username"`
+	}
+	type withChat struct {
+		Chat *chat `json:"chat"`
+	}
+	var body struct {
+		Result []struct {
+			Message       *withChat `json:"message"`
+			EditedMessage *withChat `json:"edited_message"`
+			ChannelPost   *withChat `json:"channel_post"`
+			MyChatMember  *withChat `json:"my_chat_member"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, err
+	}
+	out := []telegramChat{}
+	seen := map[int64]bool{}
+	// Newest first: the chat written to last is most likely the one wanted.
+	for i := len(body.Result) - 1; i >= 0; i-- {
+		u := body.Result[i]
+		for _, wc := range []*withChat{u.Message, u.EditedMessage, u.ChannelPost, u.MyChatMember} {
+			if wc == nil || wc.Chat == nil || seen[wc.Chat.ID] {
+				continue
+			}
+			c := wc.Chat
+			seen[c.ID] = true
+			name := strings.TrimSpace(firstNonEmptyStr(c.Title, strings.TrimSpace(c.FirstName+" "+c.LastName)))
+			if c.Username != "" {
+				name = strings.TrimSpace(name + " (@" + c.Username + ")")
+			}
+			out = append(out, telegramChat{ID: strconv.FormatInt(c.ID, 10), Name: name, Type: c.Type})
+		}
+	}
+	return out, nil
+}
+
+func firstNonEmptyStr(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // handleTestNotify sends a test message to every configured channel.
 func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {
 	settings, _ := s.store.Settings()

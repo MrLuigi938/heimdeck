@@ -532,6 +532,9 @@ var en = map[string]string{
 	"Telegram kennt diesen Bot-Token nicht":                                     "Telegram does not know this bot token",
 	"Das sieht nicht nach einem Bot-Token aus – er hat die Form 123456789:AAH…": "That does not look like a bot token – it has the form 123456789:AAH…",
 
+	"Bitte zuerst den Bot-Token eintragen": "Please enter the bot token first",
+	"Für diesen Bot ist ein Webhook eingerichtet – dann gibt Telegram die Chats nicht heraus. Die Chat-ID bitte von Hand eintragen": "This bot has a webhook set up – then Telegram does not hand out the chats. Please enter the chat ID by hand",
+
 	// debug mode
 	"interner Fehler – Details stehen im Protokoll":                    "internal error – details are in the log",
 	"interner Fehler in der Integration – Details stehen im Protokoll": "internal error in the integration – details are in the log",

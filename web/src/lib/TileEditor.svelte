@@ -315,7 +315,9 @@
   .form { display: grid; gap: 14px; }
   .type { display: flex; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; }
   .grow { flex: 1; min-width: 0; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* align-items: start keeps both inputs of a row at the same height and line,
+     even when only one of them has a help text below. */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
   .more { justify-self: start; color: var(--muted); padding-left: 0; }
   .advanced { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
   .help a { color: var(--accent); }

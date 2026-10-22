@@ -146,3 +146,32 @@ func TestTelegram(t *testing.T) {
 		t.Fatal("token not stored")
 	}
 }
+
+func TestTelegramChats(t *testing.T) {
+	const token = "123456789:AAH1234567890abcdefghijklmnopqrstu"
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/bot"+token+"/getUpdates" {
+			w.WriteHeader(404)
+			return
+		}
+		w.Write([]byte(`{"ok":true,"result":[
+			{"update_id":1,"message":{"chat":{"id":111,"type":"private","first_name":"Luis","username":"luis"}}},
+			{"update_id":2,"my_chat_member":{"chat":{"id":-100222,"type":"supergroup","title":"Homelab"}}},
+			{"update_id":3,"message":{"chat":{"id":111,"type":"private","first_name":"Luis","username":"luis"}}}]}`))
+	}))
+	defer api.Close()
+	old := telegramAPI
+	telegramAPI = api.URL
+	defer func() { telegramAPI = old }()
+
+	chats, err := telegramChats(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 2 || chats[0].ID != "111" || chats[0].Name != "Luis (@luis)" || chats[1].ID != "-100222" || chats[1].Name != "Homelab" {
+		t.Fatalf("chats %+v", chats)
+	}
+	if _, err := telegramChats(context.Background(), "999999:AAH1234567890abcdefghijklmnopqrstu"); err == nil || !strings.Contains(err.Error(), "kennt diesen Bot-Token nicht") {
+		t.Fatalf("unknown token: %v", err)
+	}
+}
