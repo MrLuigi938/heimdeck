@@ -21,17 +21,17 @@
 
 ## Das kann Heimdeck
 
-- **Alles in der Oberfläche** – keine YAML-Dateien. Kacheln hinzufügen, verschieben und bearbeiten per Klick und Drag & Drop.
+- **Alles in der Oberfläche** – keine YAML-Dateien. Kacheln hinzufügen, verschieben und bearbeiten per Klick und Drag & Drop – oder frei auf einem Raster platzieren und in der Größe ändern.
 - **Findet deine Dienste** – liest deine Docker-Container und (wenn verbunden) deine Proxmox-VMs und LXC-Container aus und schlägt Kacheln mit Icon, Adresse und Dienst-Typ vor.
-- **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss und mehr für mehr als 40 Dienste.
-- **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Geräte in Home Assistant oder ioBroker schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Speedtest starten …
-- **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld.
+- **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss, Anruflisten und mehr für mehr als 40 Dienste. Pro Kachel wählbar, welche Werte sie zeigt.
+- **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Smart-Home-Geräte in Home Assistant, ioBroker, Shelly oder der FRITZ!Box schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Webhooks aufrufen …
+- **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld. Dazu weitere Tastenkürzel, alle änderbar.
 - **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy, Telegram oder Browser gemeldet.
 - **Zuhause oder unterwegs** – jede Kachel kann eine lokale und eine öffentliche Adresse haben; Heimdeck nimmt automatisch die richtige.
-- **Eigene API** – jede JSON-Schnittstelle wird zur Live-Kachel mit Werten, Liste und Knöpfen.
+- **Eigene API und Webhooks** – jede JSON-Schnittstelle wird zur Live-Kachel mit Werten, Liste und Knöpfen, oder Skripte schicken Meldungen an eine Kachel.
 - **Mehrere Dashboards**, ausgeblendete oder per Passwort geschützte Gruppen, Hintergrundbild pro Dashboard.
 - **Umstieg von Heimdall** – Heimdall-Export importieren; bekannte Dienste werden zu Live-Kacheln.
-- **Deutsch und Englisch**, sicher von Haus aus (Passwörter mit bcrypt, API-Keys mit AES-256 verschlüsselt und nie im Browser).
+- **Deutsch und Englisch**, sicher von Haus aus (Passwörter mit bcrypt, API-Keys mit AES-256 verschlüsselt und nie im Browser), mit Debug-Modus, wenn etwas nicht klappt.
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).
 
 <details>
@@ -81,13 +81,13 @@ Dann `http://<server>:3000` öffnen, Benutzer anlegen und auf 🐳 klicken, um d
 | | |
 |---|---|
 | [Installation](docs/de/installation.md) | Docker Compose, Debian/Ubuntu, Proxmox-LXC, Programmdatei, Aktualisieren, Einstellungen, Reverse Proxy |
-| [Benutzung](docs/de/benutzung.md) | Umstieg von Heimdall, zuhause/unterwegs, Benachrichtigungen, Docker-Labels, Icons, Sicherung, Tipps |
+| [Benutzung](docs/de/benutzung.md) | Umstieg von Heimdall, zuhause/unterwegs, Benachrichtigungen, Docker-Labels, Icons, Sicherung, Fehlersuche, Tastenkürzel, Tipps |
 | [Unterstützte Dienste](docs/de/dienste.md) | Alle Integrationen, Proxmox verbinden, Docker-Kachel, Kachel „Eigene API“ |
 | [Entwicklung](docs/de/entwicklung.md) | Selbst bauen, eigene Integration hinzufügen |
 
 ## Unterstützte Dienste (Auszug)
 
-Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · PhotoPrism · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · UniFi · UniFi Protect · Speedtest Tracker · Anubis · Docker · Proxmox VE · openmediavault · Home Assistant · ioBroker · evcc · WLED · Norish · beliebige JSON-API
+Jellyfin · Plex · Emby · Jellyseerr/Overseerr · Sonarr · Radarr · Lidarr · Readarr · Bazarr · Prowlarr · Immich · PhotoPrism · Audiobookshelf · Kavita · Komga · Navidrome · RomM · Tdarr · Stash · SABnzbd · NZBGet · qBittorrent · Transmission · Deluge · MeTube · Tubesy · Paperless-ngx · Nextcloud · AdGuard Home · Pi-hole · OPNsense · FRITZ!Box · UniFi · UniFi Protect · Speedtest Tracker · Anubis · Docker · Proxmox VE · openmediavault · Home Assistant · ioBroker · Shelly · evcc · WLED · Norish · Webhooks · beliebige JSON-API
 
 → [Vollständige Liste mit Live-Daten, Suche und Aktionen](docs/de/dienste.md)
 
