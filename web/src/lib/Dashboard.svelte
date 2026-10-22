@@ -15,6 +15,8 @@
   import { network, isLocal, setOverride, detectLocal } from './network.svelte.js';
   import { t, locale } from './i18n.svelte.js';
   import { promptDialog } from './dialog.svelte.js';
+  import Modal from './Modal.svelte';
+  import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
 
   let data = $state(null);
   let status = $state({});
@@ -193,6 +195,40 @@
   let dateText = $derived(now.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));
   let timeText = $derived(now.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }));
 
+  // ---- keyboard shortcuts ----
+  let searchBox;
+  let showKeys = $state(false);
+  let keys = $derived(keymap(settings));
+  let shortcutsOn = $derived(settings.shortcutsOff !== 'true');
+  function onShortcut(e) {
+    if (!data || !shortcutsOn || blocked(e)) return;
+    if (isBoardKey(e.key)) {
+      const b = boards[Number(e.key) - 1];
+      if (b) {
+        e.preventDefault();
+        switchBoard(b.id);
+      }
+      return;
+    }
+    const action = Object.keys(keys).find((a) => keys[a] && keys[a] === e.key);
+    if (!action) return;
+    e.preventDefault();
+    const step = (dir) => {
+      const i = boards.findIndex((b) => b.id === board?.id);
+      if (boards.length > 1) switchBoard(boards[(i + dir + boards.length) % boards.length].id);
+    };
+    ({
+      search: () => searchBox?.focus(),
+      edit: () => (editMode = !editMode),
+      settings: () => (showSettings = true),
+      hidden: () => hasHidden && toggleHidden(),
+      network: () => hasExternal && toggleNetwork(),
+      prevBoard: () => step(-1),
+      nextBoard: () => step(1),
+      help: () => (showKeys = true),
+    })[action]?.();
+  }
+
   // Log out with two clicks: the first one asks, so a slip of the finger does not log out.
   let logoutArmed = $state(false);
   let logoutTimer;
@@ -354,7 +390,7 @@
   }
 </script>
 
-<svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} />
+<svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} onkeydown={onShortcut} />
 
 {#if data}
   <div class="page">
@@ -384,7 +420,8 @@
           </div>
         {/if}
       </div>
-      <Search tiles={allTiles} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id} />
+      <Search bind:this={searchBox} tiles={allTiles} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+        shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
@@ -526,6 +563,17 @@
   {#if showSettings}
     <Settings {settings} {boards} boardId={board?.id} notify={data.notify} docker={data.docker} username={data.username} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
+  {#if showKeys}
+    <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
+      <div class="keylist">
+        {#each ACTIONS as a (a.id)}
+          {#if keys[a.id]}<div><kbd>{keyLabel(keys[a.id])}</kbd><span>{t(a.label)}</span></div>{/if}
+        {/each}
+        {#if boards.length > 1}<div><kbd>1</kbd>–<kbd>{Math.min(9, boards.length)}</kbd><span>{t('Dashboard direkt öffnen')}</span></div>{/if}
+      </div>
+      <p class="help">{t('Ändern unter Einstellungen → Tastenkürzel. Kürzel wirken nicht, während du in ein Feld tippst.')}</p>
+    </Modal>
+  {/if}
 {/if}
 
 <style>
@@ -569,6 +617,10 @@
   /* Compact: small square tiles with the icon. */
   .grid.compact { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: stretch; }
   .grid.compact .add { min-height: 0; aspect-ratio: 1; }
+  .keylist { display: grid; gap: 8px; }
+  .keylist div { display: flex; align-items: center; gap: 8px; }
+  .keylist span { margin-left: 4px; }
+  kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 6px; font: 600 13px ui-monospace, monospace; background: var(--surface-2); }
   .free-add { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
   .slot { display: contents; }
   .slot.drop > :global(.tile) { border-color: var(--accent); transform: translateZ(0) scale(1.02); }

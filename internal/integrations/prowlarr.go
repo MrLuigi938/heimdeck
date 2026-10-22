@@ -12,7 +12,7 @@ func init() { register(prowlarr{}) }
 func (prowlarr) Def() Definition {
 	return Definition{
 		ID: "prowlarr", Name: "Prowlarr", Icon: "prowlarr", Category: "Medien",
-		Description: "Indexer: wie viele aktiv sind und welche gerade ausfallen",
+		Description: "Indexer: wie viele aktiv sind und welche gerade ausfallen, Suchanfragen, Grabs, Fehlerquote, Antwortzeit, verbundene Apps",
 		Fields:      []Field{apiKeyField}, HasWidget: true, Images: []string{"prowlarr"}, Port: 9696,
 	}
 }
@@ -56,6 +56,42 @@ func (p prowlarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			{Label: in.T("Gestört"), Value: fmt.Sprint(len(status)), Tone: toneIf(len(status) > 0, "bad")},
 		},
 		ItemsTitle: in.T("Gestörte Indexer"),
+	}
+	// Totals over all indexers since Prowlarr keeps statistics.
+	var ixStats struct {
+		Indexers []struct {
+			Queries      int     `json:"numberOfQueries"`
+			Grabs        int     `json:"numberOfGrabs"`
+			Failed       int     `json:"numberOfFailedQueries"`
+			ResponseTime float64 `json:"averageResponseTime"`
+		} `json:"indexers"`
+	}
+	if p.get(ctx, in, "/indexerstats", &ixStats) == nil && len(ixStats.Indexers) > 0 {
+		queries, grabs, failed := 0, 0, 0
+		var rt float64
+		rtN := 0
+		for _, s := range ixStats.Indexers {
+			queries += s.Queries
+			grabs += s.Grabs
+			failed += s.Failed
+			if s.ResponseTime > 0 {
+				rt += s.ResponseTime
+				rtN++
+			}
+		}
+		w.Stats = append(w.Stats,
+			Stat{Label: in.T("Suchanfragen"), Value: in.Num(queries)},
+			Stat{Label: in.T("Grabs"), Value: in.Num(grabs)},
+			Stat{Label: in.T("Fehlgeschlagen"), Value: in.Num(failed), Tone: toneIf(queries > 0 && float64(failed)/float64(queries) > 0.2, "warn")})
+		if rtN > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Antwortzeit"), Value: fmt.Sprintf("%.0f ms", rt/float64(rtN))})
+		}
+	}
+	var apps []struct {
+		Name string `json:"name"`
+	}
+	if p.get(ctx, in, "/applications", &apps) == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Verbundene Apps"), Value: fmt.Sprint(len(apps))})
 	}
 	for _, s := range status {
 		sub := ""

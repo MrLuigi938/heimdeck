@@ -85,7 +85,7 @@ func init() { register(romm{}) }
 func (romm) Def() Definition {
 	return Definition{
 		ID: "romm", Name: "RomM", Icon: "romm", Category: "Spiele",
-		Description: "Plattformen, Spiele und Speicherstände, Suche nach Spielen",
+		Description: "Plattformen, Spiele, Spielstände, Save-States, Screenshots, zuletzt hinzugefügte Spiele, Suche nach Spielen",
 		Fields: []Field{
 			{Key: "apiKey", Label: "API-Token", Type: "password", Secret: true,
 				Help: "Empfohlen: in RomM unter Administration → Client API Tokens erstellen (Rechte roms.read und platforms.read). Dann bleiben Benutzername und Passwort leer."},
@@ -133,7 +133,8 @@ func (r romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		return 0, false
 	}
 	w := &Widget{}
-	for _, s := range []struct{ label, key string }{{"Plattformen", "platforms"}, {"Spiele", "roms"}, {"Spielstände", "saves"}} {
+	for _, s := range []struct{ label, key string }{{"Plattformen", "platforms"}, {"Spiele", "roms"}, {"Spielstände", "saves"},
+		{"Save-States", "states"}, {"Screenshots", "screenshots"}} {
 		if v, ok := val(s.key); ok {
 			w.Stats = append(w.Stats, Stat{Label: in.T(s.label), Value: in.Num(int(v))})
 		}
@@ -141,7 +142,63 @@ func (r romm) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if v, ok := val("total_filesize_bytes", "filesize", "total_filesize"); ok {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Größe"), Value: in.Bytes(v)})
 	}
+	// The newest games, with their covers.
+	var raw json.RawMessage
+	if r.get(ctx, in, "/api/roms", url.Values{"order_by": {"id"}, "order_dir": {"desc"}, "limit": {"5"}}, &raw) == nil {
+		for _, rom := range rommList(raw) {
+			w.Items = append(w.Items, rommItem(in, rom))
+			if len(w.Items) == 5 {
+				break
+			}
+		}
+		if len(w.Items) > 0 {
+			w.ItemsTitle = in.T("Neu hinzugefügt")
+		}
+	}
 	return w, nil
+}
+
+// rommList reads a game list, plain or wrapped in {"items": [...]} depending on the version.
+func rommList(raw json.RawMessage) []rommRom {
+	var roms []rommRom
+	if json.Unmarshal(raw, &roms) == nil {
+		return roms
+	}
+	var page struct {
+		Items []rommRom `json:"items"`
+	}
+	json.Unmarshal(raw, &page)
+	return page.Items
+}
+
+func rommItem(in *Instance, rom rommRom) Item {
+	name := rom.Name
+	if name == "" {
+		name = rom.FsName
+	}
+	sub := rom.PlatformDisplayName
+	if sub == "" {
+		sub = rom.PlatformName
+	}
+	if rom.FirstReleaseDate != nil && *rom.FirstReleaseDate > 0 {
+		year := time.UnixMilli(*rom.FirstReleaseDate).Year()
+		if sub != "" {
+			sub += " · "
+		}
+		sub += fmt.Sprint(year)
+	}
+	it := Item{Title: name, Subtitle: sub, URL: in.Link(fmt.Sprintf("/rom/%d", rom.ID))}
+	// Prefer RomM's own copy of the cover; IGDB's address is the fallback.
+	if p := rom.PathCoverSmall + rom.PathCoverS; p != "" {
+		p = strings.TrimLeft(p, "/")
+		if !strings.HasPrefix(p, "assets/") {
+			p = "assets/romm/resources/" + p
+		}
+		it.Image = in.Link("/" + p)
+	} else if rom.URLCover != "" {
+		it.Image = rom.URLCover
+	}
+	return it
 }
 
 type rommRom struct {
@@ -180,7 +237,6 @@ func (r romm) Search(ctx context.Context, in *Instance, query string) ([]Item, e
 		}
 	}
 
-	// Depending on the RomM version the list is either plain or wrapped in {"items": [...]}.
 	var raw json.RawMessage
 	if err := r.get(ctx, in, "/api/roms", url.Values{"search_term": {query}, "limit": {"8"}}, &raw); err != nil {
 		if len(out) > 0 {
@@ -188,47 +244,11 @@ func (r romm) Search(ctx context.Context, in *Instance, query string) ([]Item, e
 		}
 		return nil, err
 	}
-	var roms []rommRom
-	if err := json.Unmarshal(raw, &roms); err != nil {
-		var page struct {
-			Items []rommRom `json:"items"`
-		}
-		if err := json.Unmarshal(raw, &page); err != nil {
-			return out, nil
-		}
-		roms = page.Items
-	}
-	for i, rom := range roms {
+	for i, rom := range rommList(raw) {
 		if i == 8 {
 			break
 		}
-		name := rom.Name
-		if name == "" {
-			name = rom.FsName
-		}
-		sub := rom.PlatformDisplayName
-		if sub == "" {
-			sub = rom.PlatformName
-		}
-		if rom.FirstReleaseDate != nil && *rom.FirstReleaseDate > 0 {
-			year := time.UnixMilli(*rom.FirstReleaseDate).Year()
-			if sub != "" {
-				sub += " · "
-			}
-			sub += fmt.Sprint(year)
-		}
-		it := Item{Title: name, Subtitle: sub, URL: in.Link(fmt.Sprintf("/rom/%d", rom.ID))}
-		// Prefer RomM's own copy of the cover; IGDB's address is the fallback.
-		if p := rom.PathCoverSmall + rom.PathCoverS; p != "" {
-			p = strings.TrimLeft(p, "/")
-			if !strings.HasPrefix(p, "assets/") {
-				p = "assets/romm/resources/" + p
-			}
-			it.Image = in.Link("/" + p)
-		} else if rom.URLCover != "" {
-			it.Image = rom.URLCover
-		}
-		out = append(out, it)
+		out = append(out, rommItem(in, rom))
 	}
 	return out, nil
 }
@@ -242,23 +262,31 @@ func init() { register(stash{}) }
 func (stash) Def() Definition {
 	return Definition{
 		ID: "stash", Name: "Stash", Icon: "stash", Category: "Medien",
-		Description: "Bibliotheksstatistik",
+		Description: "Bibliotheksstatistik: Szenen, Bilder, Galerien, Darsteller, Studios, Tags, Laufzeit, Größe und Wiedergaben",
 		Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Secret: true,
 			Help: "Settings → Security → API Key (leer lassen, wenn kein Login aktiv ist)"}},
 		HasWidget: true, Images: []string{"stash"}, Port: 9999,
 	}
 }
 
-func (stash) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
+type stashStats struct {
+	Scenes     int     `json:"scene_count"`
+	Size       float64 `json:"scenes_size"`
+	Duration   float64 `json:"scenes_duration"` // seconds
+	Images     int     `json:"image_count"`
+	ImagesSize float64 `json:"images_size"`
+	Galleries  int     `json:"gallery_count"`
+	Performers int     `json:"performer_count"`
+	Studios    int     `json:"studio_count"`
+	Tags       int     `json:"tag_count"`
+	Plays      *int    `json:"total_play_count"` // newer versions only
+	Played     *int    `json:"scenes_played"`
+}
+
+// query runs a GraphQL query against Stash.
+func (stash) query(ctx context.Context, in *Instance, q string, out any) error {
 	var res struct {
-		Data struct {
-			Stats struct {
-				Scenes     int     `json:"scene_count"`
-				Images     int     `json:"image_count"`
-				Performers int     `json:"performer_count"`
-				Size       float64 `json:"scenes_size"`
-			} `json:"stats"`
-		} `json:"data"`
+		Data   json.RawMessage `json:"data"`
 		Errors []struct {
 			Message string `json:"message"`
 		} `json:"errors"`
@@ -267,19 +295,46 @@ func (stash) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if k := in.V("apiKey"); k != "" {
 		h["ApiKey"] = k
 	}
-	body := map[string]string{"query": "{ stats { scene_count image_count performer_count scenes_size } }"}
-	if err := in.do(ctx, request{method: "POST", path: "/graphql", headers: h, body: body}, &res); err != nil {
-		return nil, err
+	if err := in.do(ctx, request{method: "POST", path: "/graphql", headers: h, body: map[string]string{"query": q}}, &res); err != nil {
+		return err
 	}
 	if len(res.Errors) > 0 {
-		return nil, fmt.Errorf("Stash: %s", res.Errors[0].Message)
+		return fmt.Errorf("Stash: %s", res.Errors[0].Message)
 	}
-	s := res.Data.Stats
-	return &Widget{Stats: []Stat{
-		{Label: in.T("Szenen"), Value: in.Num(s.Scenes)},
-		{Label: in.T("Bilder"), Value: in.Num(s.Images)},
-		{Label: in.T("Größe"), Value: in.Bytes(s.Size)},
-	}}, nil
+	return json.Unmarshal(res.Data, out)
+}
+
+func (s stash) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
+	var res struct {
+		Stats stashStats `json:"stats"`
+	}
+	// Fields every supported version knows; a field unknown to the server would fail the whole query.
+	if err := s.query(ctx, in, "{ stats { scene_count scenes_size scenes_duration image_count images_size gallery_count performer_count studio_count tag_count } }", &res); err != nil {
+		return nil, err
+	}
+	st := res.Stats
+	w := &Widget{Stats: []Stat{
+		{Label: in.T("Szenen"), Value: in.Num(st.Scenes)},
+		{Label: in.T("Bilder"), Value: in.Num(st.Images)},
+		{Label: in.T("Galerien"), Value: in.Num(st.Galleries)},
+		{Label: in.T("Darsteller"), Value: in.Num(st.Performers)},
+		{Label: in.T("Studios"), Value: in.Num(st.Studios)},
+		{Label: in.T("Tags"), Value: in.Num(st.Tags)},
+		{Label: in.T("Laufzeit"), Value: in.T("%d Std.", int(st.Duration/3600))},
+		{Label: in.T("Größe"), Value: in.Bytes(st.Size)},
+		{Label: in.T("Bilder-Größe"), Value: in.Bytes(st.ImagesSize)},
+	}}
+	// Play statistics exist since Stash 0.24; older versions just leave them out.
+	var plays struct {
+		Stats stashStats `json:"stats"`
+	}
+	if s.query(ctx, in, "{ stats { total_play_count scenes_played } }", &plays) == nil && plays.Stats.Plays != nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Wiedergaben"), Value: in.Num(*plays.Stats.Plays)})
+		if plays.Stats.Played != nil {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Gesehene Szenen"), Value: in.Num(*plays.Stats.Played)})
+		}
+	}
+	return w, nil
 }
 
 // ---- MeTube ----
@@ -291,7 +346,7 @@ func init() { register(metube{}) }
 func (metube) Def() Definition {
 	return Definition{
 		ID: "metube", Name: "MeTube", Icon: "metube", Category: "Downloads",
-		Description: "Laufende und fertige Video-Downloads",
+		Description: "Laufende Video-Downloads mit Tempo und Restzeit, fertige und fehlgeschlagene Downloads",
 		HasWidget:   true, Images: []string{"metube"}, Port: 8081,
 	}
 }
@@ -300,6 +355,9 @@ type metubeEntry struct {
 	Title   string   `json:"title"`
 	Status  string   `json:"status"`
 	Percent *float64 `json:"percent"`
+	Speed   *float64 `json:"speed"` // bytes per second
+	ETA     *float64 `json:"eta"`   // seconds
+	Msg     string   `json:"msg"`
 }
 
 func (metube) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
@@ -317,16 +375,31 @@ func (metube) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			failed++
 		}
 	}
+	var speed float64
+	for _, q := range res.Queue {
+		if q.Speed != nil {
+			speed += *q.Speed
+		}
+	}
 	w := &Widget{
 		Stats: []Stat{
 			{Label: in.T("Aktiv"), Value: fmt.Sprint(len(res.Queue) + len(res.Pending))},
 			{Label: in.T("Fertig"), Value: fmt.Sprint(len(res.Done) - failed)},
 			{Label: in.T("Fehler"), Value: fmt.Sprint(failed), Tone: toneIf(failed > 0, "bad")},
+			{Label: in.T("Tempo"), Value: in.Bytes(speed) + "/s"},
 		},
 		ItemsTitle: in.T("Läuft"),
+		Alerts:     failedMsgs(res.Done),
 	}
 	for _, q := range append(res.Queue, res.Pending...) {
-		it := Item{Title: q.Title, Subtitle: q.Status, URL: in.Link("/")}
+		sub := []string{in.Status(q.Status)}
+		if q.Speed != nil && *q.Speed > 0 {
+			sub = append(sub, in.Bytes(*q.Speed)+"/s")
+		}
+		if q.ETA != nil && *q.ETA > 0 {
+			sub = append(sub, in.T("noch %s", shortDuration(int(*q.ETA))))
+		}
+		it := Item{Title: q.Title, Subtitle: strings.Join(sub, " · "), URL: in.Link("/")}
 		if q.Percent != nil {
 			it.Progress = pct(*q.Percent)
 		}
@@ -335,5 +408,35 @@ func (metube) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			break
 		}
 	}
+	// Nothing running: the latest finished downloads instead of an empty list.
+	if len(w.Items) == 0 && len(res.Done) > 0 {
+		w.ItemsTitle = in.T("Zuletzt fertig")
+		for i := len(res.Done) - 1; i >= 0 && len(w.Items) < 5; i-- {
+			d := res.Done[i]
+			it := Item{Title: d.Title, URL: in.Link("/")}
+			if d.Status == "error" {
+				it.Badge = in.T("Fehlgeschlagen")
+			}
+			w.Items = append(w.Items, it)
+		}
+	}
 	return w, nil
+}
+
+// failedMsgs lists the newest failed downloads with MeTube's reason (at most three).
+func failedMsgs(done []metubeEntry) []string {
+	var out []string
+	for i := len(done) - 1; i >= 0 && len(out) < 3; i-- {
+		if d := done[i]; d.Status == "error" {
+			msg := d.Title
+			if d.Msg != "" {
+				msg += ": " + d.Msg
+			}
+			if r := []rune(msg); len(r) > 160 {
+				msg = string(r[:160]) + "…"
+			}
+			out = append(out, msg)
+		}
+	}
+	return out
 }

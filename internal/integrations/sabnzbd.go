@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type sabnzbd struct{}
@@ -16,7 +17,7 @@ func init() { register(sabnzbd{}) }
 func (sabnzbd) Def() Definition {
 	return Definition{
 		ID: "sabnzbd", Name: "SABnzbd", Icon: "sabnzbd", Category: "Downloads",
-		Description: "Download-Geschwindigkeit, Warteschlange, Pause/Fortsetzen",
+		Description: "Download-Geschwindigkeit, Warteschlange, freier Speicher, heute und diese Woche geladen, fehlgeschlagene Downloads, Pause/Fortsetzen",
 		Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
 			Help: "Config → General → Security → API Key"}},
 		HasWidget: true, Images: []string{"sabnzbd"}, Port: 8080,
@@ -61,12 +62,15 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var res struct {
 		Error string `json:"error"`
 		Queue struct {
-			Paused   bool   `json:"paused"`
-			KBPerSec string `json:"kbpersec"`
-			MBLeft   string `json:"mbleft"`
-			Timeleft string `json:"timeleft"`
-			Total    int    `json:"noofslots_total"`
-			Slots    []struct {
+			Paused     bool   `json:"paused"`
+			KBPerSec   string `json:"kbpersec"`
+			MBLeft     string `json:"mbleft"`
+			Timeleft   string `json:"timeleft"`
+			Total      int    `json:"noofslots_total"`
+			DiskFree   string `json:"diskspace1"` // GB on the download folder
+			SpeedLimit string `json:"speedlimit"` // percent of the maximum, 100 = none
+			Warnings   string `json:"have_warnings"`
+			Slots      []struct {
 				ID         string `json:"nzo_id"`
 				Filename   string `json:"filename"`
 				Percentage string `json:"percentage"`
@@ -119,6 +123,21 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if total > 0 && !paused && q.Timeleft != "" && q.Timeleft != "0:00:00" {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Restzeit"), Value: q.Timeleft})
 	}
+	if gb, err := strconv.ParseFloat(q.DiskFree, 64); err == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(gb * 1024 * 1024 * 1024), Tone: toneIf(gb < 10, "warn")})
+	}
+	if l, err := strconv.Atoi(strings.TrimSpace(q.SpeedLimit)); err == nil && l > 0 && l < 100 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Tempolimit"), Value: fmt.Sprintf("%d %%", l)})
+	}
+	if n, _ := strconv.Atoi(q.Warnings); n > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Warnungen"), Value: fmt.Sprint(n), Tone: "warn"})
+	}
+	recent := s.history(ctx, in, w)
+	if len(q.Slots) == 0 && len(recent) > 0 {
+		// Nothing to download: what finished last instead of an empty list.
+		w.ItemsTitle = in.T("Zuletzt fertig")
+		w.Items = recent
+	}
 	for i, sl := range q.Slots {
 		if i == 5 {
 			break
@@ -146,6 +165,64 @@ func (s sabnzbd) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Actions = []Action{{ID: "pause", Label: in.T("Pausieren")}}
 	}
 	return w, nil
+}
+
+// history adds what was downloaded today and this week, alerts for failed
+// downloads of the last day, and returns the latest finished jobs.
+func (s sabnzbd) history(ctx context.Context, in *Instance, w *Widget) []Item {
+	var res struct {
+		History struct {
+			DaySize  string `json:"day_size"` // e.g. "12.3 G"
+			WeekSize string `json:"week_size"`
+			Slots    []struct {
+				Name      string `json:"name"`
+				Status    string `json:"status"` // Completed | Failed | …
+				Bytes     int64  `json:"bytes"`
+				Completed int64  `json:"completed"` // unix seconds
+				FailMsg   string `json:"fail_message"`
+			} `json:"slots"`
+		} `json:"history"`
+	}
+	if s.api(ctx, in, "history", url.Values{"limit": {"10"}}, &res) != nil {
+		return nil
+	}
+	h := res.History
+	// SABnzbd writes sizes like "1.2 G"; shown like every other size here.
+	size := func(v string) string {
+		num, unit, _ := strings.Cut(strings.TrimSpace(v), " ")
+		f, _ := strconv.ParseFloat(num, 64)
+		mult := map[string]float64{"K": 1 << 10, "M": 1 << 20, "G": 1 << 30, "T": 1 << 40, "P": 1 << 50}[strings.ToUpper(strings.TrimSuffix(strings.TrimSpace(unit), "B"))]
+		if mult == 0 {
+			mult = 1
+		}
+		return in.Bytes(f * mult)
+	}
+	if h.DaySize != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Heute geladen"), Value: size(h.DaySize)})
+	}
+	if h.WeekSize != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Diese Woche"), Value: size(h.WeekSize)})
+	}
+	var items []Item
+	for _, sl := range h.Slots {
+		done := time.Unix(sl.Completed, 0)
+		failed := strings.EqualFold(sl.Status, "Failed")
+		if failed && sl.Completed > 0 && time.Since(done) < 24*time.Hour {
+			w.Alerts = append(w.Alerts, in.T("Fehlgeschlagen: %s", strings.ReplaceAll(sl.Name, ".", " ")))
+		}
+		if len(items) < 5 {
+			sub := in.Bytes(float64(sl.Bytes))
+			if sl.Completed > 0 {
+				sub += " · " + in.Since(done)
+			}
+			badge := ""
+			if failed {
+				badge = in.T("Fehlgeschlagen")
+			}
+			items = append(items, Item{Title: strings.ReplaceAll(sl.Name, ".", " "), Subtitle: sub, Badge: badge, URL: in.Link("/")})
+		}
+	}
+	return items
 }
 
 var nzoID = regexp.MustCompile(`^[A-Za-z0-9_]+$`)

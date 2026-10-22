@@ -113,6 +113,21 @@ sudo journalctl -u heimdeck --since "30 min ago"
 
 Bei einer Fehlermeldung bitte dieses Protokoll anhängen – es enthält keine Passwörter oder API-Keys.
 
+## Tastenkürzel
+
+| Taste | Aktion |
+|---|---|
+| `/` | Suche öffnen |
+| `E` | Bearbeitungsmodus an/aus |
+| `,` | Einstellungen öffnen |
+| `H` | Ausgeblendete Gruppen zeigen/verbergen |
+| `N` | Zuhause/unterwegs umschalten |
+| `[` / `]` | Vorheriges / nächstes Dashboard |
+| `1`–`9` | Dashboard mit dieser Nummer öffnen |
+| `?` | Alle Kürzel anzeigen |
+
+Ändern unter **Einstellungen → Tastenkürzel**: auf eine Taste klicken und die neue drücken (Entf löscht ein Kürzel, Esc bricht ab), oder ganz abschalten. Kürzel wirken nicht, während du in ein Feld tippst oder ein Dialog offen ist.
+
 ## Tipps
 
 - **Sprache**: Deutsch oder Englisch bei der Einrichtung oder später in den Einstellungen wählen. Auch Live-Daten und Fehlermeldungen werden übersetzt.

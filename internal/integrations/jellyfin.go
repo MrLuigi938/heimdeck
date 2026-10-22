@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 )
 
 // jellyfin also covers Emby, which shares the API (below /emby, with its own
@@ -20,7 +21,7 @@ func (j jellyfin) Def() Definition {
 	if j.emby {
 		return Definition{
 			ID: "emby", Name: "Emby", Icon: "emby", Category: "Medien",
-			Description: "Wer gerade was schaut, Größe der Bibliothek, Suche",
+			Description: "Wer gerade was schaut (mit Transkodierung), neu Hinzugefügtes, Größe der Bibliothek, Updates, Suche",
 			Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
 				Help: "Einstellungen → Erweitert → API-Schlüssel → Neuer API-Schlüssel"}},
 			HasWidget: true, HasSearch: true, Images: []string{"emby"}, Port: 8096,
@@ -28,7 +29,7 @@ func (j jellyfin) Def() Definition {
 	}
 	return Definition{
 		ID: "jellyfin", Name: "Jellyfin", Icon: "jellyfin", Category: "Medien",
-		Description: "Wer gerade was schaut, Größe der Bibliothek, Suche",
+		Description: "Wer gerade was schaut (mit Transkodierung), neu Hinzugefügtes, Größe der Bibliothek, Updates, Suche",
 		Fields: []Field{{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
 			Help: "Dashboard → API-Schlüssel → „+“"}},
 		HasWidget: true, HasSearch: true, Images: []string{"jellyfin"}, Port: 8096,
@@ -61,8 +62,9 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			RunTimeTicks      int64  `json:"RunTimeTicks"`
 		} `json:"NowPlayingItem"`
 		PlayState struct {
-			PositionTicks int64 `json:"PositionTicks"`
-			IsPaused      bool  `json:"IsPaused"`
+			PositionTicks int64  `json:"PositionTicks"`
+			IsPaused      bool   `json:"IsPaused"`
+			PlayMethod    string `json:"PlayMethod"` // DirectPlay | DirectStream | Transcode
 		} `json:"PlayState"`
 	}
 	if err := j.get(ctx, in, "/Sessions", url.Values{"activeWithinSeconds": {"960"}}, &sessions); err != nil {
@@ -72,10 +74,20 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		MovieCount   int `json:"MovieCount"`
 		SeriesCount  int `json:"SeriesCount"`
 		EpisodeCount int `json:"EpisodeCount"`
+		AlbumCount   int `json:"AlbumCount"`
+		SongCount    int `json:"SongCount"`
+		BookCount    int `json:"BookCount"`
 	}
 	j.get(ctx, in, "/Items/Counts", nil, &counts)
+	var info struct {
+		Version            string `json:"Version"`
+		HasPendingRestart  bool   `json:"HasPendingRestart"`
+		HasUpdateAvailable bool   `json:"HasUpdateAvailable"`
+	}
+	j.get(ctx, in, "/System/Info", nil, &info)
 
 	w := &Widget{ItemsTitle: in.T("Läuft gerade")}
+	transcodes := 0
 	for _, s := range sessions {
 		np := s.NowPlayingItem
 		if np == nil {
@@ -89,6 +101,10 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		if np.RunTimeTicks > 0 {
 			it.Progress = pct(float64(s.PlayState.PositionTicks) / float64(np.RunTimeTicks) * 100)
 		}
+		if s.PlayState.PlayMethod == "Transcode" {
+			transcodes++
+			it.Badge = in.T("Transkodiert")
+		}
 		if s.PlayState.IsPaused {
 			it.Badge = in.T("Pausiert")
 		}
@@ -96,11 +112,69 @@ func (j jellyfin) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	w.Stats = []Stat{
 		{Label: in.T("Streams"), Value: fmt.Sprint(len(w.Items))},
+		{Label: in.T("Transkodiert"), Value: fmt.Sprint(transcodes), Tone: toneIf(transcodes > 0, "warn")},
+		{Label: in.T("Geräte aktiv"), Value: fmt.Sprint(len(sessions))},
 		{Label: in.T("Filme"), Value: in.Num(counts.MovieCount)},
 		{Label: in.T("Serien"), Value: in.Num(counts.SeriesCount)},
 		{Label: in.T("Folgen"), Value: in.Num(counts.EpisodeCount)},
 	}
+	// Music and books only when the server has any.
+	for _, c := range []struct {
+		label string
+		n     int
+	}{{"Alben", counts.AlbumCount}, {"Titel", counts.SongCount}, {"Bücher", counts.BookCount}} {
+		if c.n > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T(c.label), Value: in.Num(c.n)})
+		}
+	}
+	if info.HasUpdateAvailable {
+		w.Alerts = append(w.Alerts, in.T("Ein Update ist verfügbar"))
+	}
+	if info.HasPendingRestart {
+		w.Alerts = append(w.Alerts, in.T("Ein Neustart ist nötig"))
+	}
+	// Nobody watching: what was added last instead of an empty list.
+	if len(w.Items) == 0 {
+		w.ItemsTitle = in.T("Neu hinzugefügt")
+		w.Items = j.latest(ctx, in)
+	}
 	return w, nil
+}
+
+// latest lists the newest movies and episodes.
+func (j jellyfin) latest(ctx context.Context, in *Instance) []Item {
+	var res struct {
+		Items []struct {
+			ID                string `json:"Id"`
+			Name              string `json:"Name"`
+			Type              string `json:"Type"`
+			SeriesName        string `json:"SeriesName"`
+			ParentIndexNumber int    `json:"ParentIndexNumber"`
+			IndexNumber       int    `json:"IndexNumber"`
+			ProductionYear    int    `json:"ProductionYear"`
+			DateCreated       string `json:"DateCreated"`
+		} `json:"Items"`
+	}
+	q := url.Values{"SortBy": {"DateCreated"}, "SortOrder": {"Descending"}, "Recursive": {"true"},
+		"IncludeItemTypes": {"Movie,Episode"}, "Limit": {"5"}, "Fields": {"DateCreated"}}
+	if j.get(ctx, in, "/Items", q, &res) != nil {
+		return nil
+	}
+	var out []Item
+	for _, it := range res.Items {
+		title, sub := it.Name, in.T("Film")
+		if it.Type == "Episode" {
+			title = fmt.Sprintf("%s · S%02dE%02d", firstNonEmpty(it.SeriesName, it.Name), it.ParentIndexNumber, it.IndexNumber)
+			sub = it.Name
+		} else if it.ProductionYear > 0 {
+			sub = fmt.Sprintf("%s · %d", sub, it.ProductionYear)
+		}
+		if t, err := time.Parse(time.RFC3339Nano, it.DateCreated); err == nil {
+			sub += " · " + in.Since(t)
+		}
+		out = append(out, Item{Title: title, Subtitle: sub, URL: j.link(ctx, in, it.ID)})
+	}
+	return out
 }
 
 func (j jellyfin) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {

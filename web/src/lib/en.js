@@ -323,6 +323,26 @@ export const en = {
     'No message to your bot found yet. Write it something in Telegram (e.g. "Hello") and click "Find chat ID" again.',
   'Chat-ID von „{name}“ eingetragen – jetzt speichern.': 'Chat ID of "{name}" filled in – now save.',
   '{n} Chats gefunden – bitte unten auswählen.': '{n} chats found – please pick one below.',
+  // keyboard shortcuts
+  'Tastenkürzel': 'Keyboard shortcuts',
+  'Tastenkürzel verwenden': 'Use keyboard shortcuts',
+  'Suche öffnen': 'Open the search',
+  'Bearbeitungsmodus an/aus': 'Edit mode on/off',
+  'Einstellungen öffnen': 'Open the settings',
+  'Ausgeblendete Gruppen zeigen/verbergen': 'Show/hide hidden groups',
+  'Zuhause/unterwegs umschalten': 'Switch home/away',
+  'Vorheriges Dashboard': 'Previous dashboard',
+  'Nächstes Dashboard': 'Next dashboard',
+  'Tastenkürzel anzeigen': 'Show keyboard shortcuts',
+  'Dashboard direkt öffnen': 'Open a dashboard directly',
+  'Ändern unter Einstellungen → Tastenkürzel. Kürzel wirken nicht, während du in ein Feld tippst.': 'Change them under Settings → Keyboard shortcuts. Shortcuts do nothing while you type in a field.',
+  'Auf eine Taste klicken und die neue drücken. Entf löscht ein Kürzel, Esc bricht ab. Die Ziffern 1–9 öffnen immer das Dashboard mit dieser Nummer.':
+    'Click a key and press the new one. Delete removes a shortcut, Esc cancels. The digits 1–9 always open the dashboard with that number.',
+  'Taste drücken …': 'Press a key …',
+  'Standard wiederherstellen': 'Restore defaults',
+  'Diese Taste geht nicht – bitte eine Buchstaben-, Zeichen- oder Satzzeichen-Taste wählen (Ziffern 1–9 wechseln das Dashboard).':
+    'This key cannot be used – please choose a letter, symbol or punctuation key (digits 1–9 switch the dashboard).',
+  '„{key}“ war für „{action}“ belegt – dort ist es jetzt leer.': '"{key}" was used for "{action}" – that one is empty now.',
   // choosing live data
   'Live-Daten auswählen': 'Choose live data',
   '{n} ausgeblendet': '{n} hidden',

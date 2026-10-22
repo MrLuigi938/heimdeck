@@ -62,6 +62,7 @@ func (a adguard) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		Parental   int                  `json:"num_replaced_parental"`
 		AvgTime    float64              `json:"avg_processing_time"`
 		TopBlocked []map[string]float64 `json:"top_blocked_domains"`
+		TopClients []map[string]float64 `json:"top_clients"`
 	}
 	if err := a.call(ctx, in, "GET", "/stats", nil, nil, &stats); err != nil {
 		return nil, err
@@ -95,6 +96,28 @@ func (a adguard) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	if !st.Running {
 		w.Alerts = append(w.Alerts, in.T("Der DNS-Server läuft nicht"))
+	}
+	if clients := adguardTop(stats.TopClients, 100); len(clients) > 0 {
+		w.Stats = append(w.Stats,
+			Stat{Label: in.T("Aktive Geräte"), Value: in.Num(len(clients))},
+			Stat{Label: in.T("Meiste Anfragen"), Value: clients[0].key})
+	}
+	var filtering struct {
+		Filters []struct {
+			Enabled    bool `json:"enabled"`
+			RulesCount int  `json:"rules_count"`
+		} `json:"filters"`
+		UserRules []string `json:"user_rules"`
+	}
+	if a.call(ctx, in, "GET", "/filtering/status", nil, nil, &filtering) == nil {
+		lists, rules := 0, len(filtering.UserRules)
+		for _, f := range filtering.Filters {
+			if f.Enabled {
+				lists++
+				rules += f.RulesCount
+			}
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Filterlisten"), Value: in.Num(lists)}, Stat{Label: in.T("Regeln"), Value: in.Num(rules)})
 	}
 	w.ItemsTitle = in.T("Am häufigsten blockiert")
 	for _, e := range adguardTop(stats.TopBlocked, 5) {

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,12 +22,12 @@ type arr struct {
 func init() {
 	register(&arr{def: Definition{
 		ID: "sonarr", Name: "Sonarr", Icon: "sonarr", Category: "Medien",
-		Description: "Serien: Download-Warteschlange, kommende Folgen, Warnungen",
+		Description: "Serien: Download-Warteschlange, kommende und fehlende Folgen, Größe der Bibliothek, freier Speicher, Warnungen",
 		Fields:      []Field{apiKeyField}, HasWidget: true, Images: []string{"sonarr"}, Port: 8989,
 	}})
 	register(&arr{movie: true, def: Definition{
 		ID: "radarr", Name: "Radarr", Icon: "radarr", Category: "Medien",
-		Description: "Filme: Download-Warteschlange, kommende Veröffentlichungen, Warnungen",
+		Description: "Filme: Download-Warteschlange, kommende Veröffentlichungen, fehlende Filme, Größe der Bibliothek, freier Speicher, Warnungen",
 		Fields:      []Field{apiKeyField}, HasWidget: true, Images: []string{"radarr"}, Port: 7878,
 	}})
 }
@@ -132,6 +133,31 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	w.Stats = append([]Stat{{Label: in.T("In Warteschlange"), Value: fmt.Sprint(queue.TotalRecords)}}, w.Stats...)
 
+	var missing struct {
+		TotalRecords int `json:"totalRecords"`
+	}
+	if a.get(ctx, in, "/wanted/missing", url.Values{"pageSize": {"1"}, "monitored": {"true"}}, &missing) == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Fehlend"), Value: in.Num(missing.TotalRecords), Tone: toneIf(missing.TotalRecords > 0, "warn")})
+	}
+	if lib, ok := a.library(ctx, in); ok {
+		kind := in.T("Serien")
+		if a.movie {
+			kind = in.T("Filme")
+		}
+		w.Stats = append(w.Stats, Stat{Label: kind, Value: in.Num(lib.count)}, Stat{Label: in.T("Auf der Platte"), Value: in.Bytes(lib.size)})
+	}
+	var roots []struct {
+		Path      string  `json:"path"`
+		FreeSpace float64 `json:"freeSpace"`
+	}
+	if a.get(ctx, in, "/rootfolder", nil, &roots) == nil && len(roots) > 0 {
+		free := roots[0].FreeSpace
+		for _, r := range roots[1:] {
+			free = min(free, r.FreeSpace) // the fullest folder matters
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(free), Tone: toneIf(free < 50e9, "warn")})
+	}
+
 	if len(w.Items) == 0 && len(upcoming) > 0 {
 		w.ItemsTitle = in.T("Demnächst")
 		w.Items = upcoming
@@ -152,6 +178,51 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Warnungen"), Value: fmt.Sprint(len(health)), Tone: map[bool]string{true: "bad", false: "warn"}[errs > 0]})
 	}
 	return w, nil
+}
+
+type arrLibrary struct {
+	at    time.Time
+	count int
+	size  float64
+}
+
+// arrLibraries caches the library size per address: the full series or
+// movie list can be large, so it is loaded at most every ten minutes.
+var arrLibraries sync.Map
+
+func (a *arr) library(ctx context.Context, in *Instance) (arrLibrary, bool) {
+	key := a.def.ID + "\x00" + in.BaseURL
+	if v, ok := arrLibraries.Load(key); ok && time.Since(v.(arrLibrary).at) < 10*time.Minute {
+		return v.(arrLibrary), true
+	}
+	lib := arrLibrary{at: time.Now()}
+	if a.movie {
+		var movies []struct {
+			SizeOnDisk float64 `json:"sizeOnDisk"`
+		}
+		if a.get(ctx, in, "/movie", nil, &movies) != nil {
+			return lib, false
+		}
+		lib.count = len(movies)
+		for _, m := range movies {
+			lib.size += m.SizeOnDisk
+		}
+	} else {
+		var series []struct {
+			Statistics struct {
+				SizeOnDisk float64 `json:"sizeOnDisk"`
+			} `json:"statistics"`
+		}
+		if a.get(ctx, in, "/series", nil, &series) != nil {
+			return lib, false
+		}
+		lib.count = len(series)
+		for _, s := range series {
+			lib.size += s.Statistics.SizeOnDisk
+		}
+	}
+	arrLibraries.Store(key, lib)
+	return lib, true
 }
 
 func (a *arr) upcoming(ctx context.Context, in *Instance) ([]Item, error) {

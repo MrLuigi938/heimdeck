@@ -57,13 +57,28 @@ type seerrRequest struct {
 
 func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var counts struct {
+		Total      int `json:"total"`
+		Movie      int `json:"movie"`
+		TV         int `json:"tv"`
 		Pending    int `json:"pending"`
 		Processing int `json:"processing"`
 		Available  int `json:"available"`
+		Declined   int `json:"declined"`
 	}
 	if err := j.call(ctx, in, "GET", "/request/count", nil, nil, &counts); err != nil {
 		return nil, err
 	}
+	// Reported problems (wrong audio, missing subtitles …) and server status;
+	// both optional, older versions may not have them.
+	var issues struct {
+		Open *int `json:"open"`
+	}
+	j.call(ctx, in, "GET", "/issue/count", nil, nil, &issues)
+	var status struct {
+		UpdateAvailable bool `json:"updateAvailable"`
+		RestartRequired bool `json:"restartRequired"`
+	}
+	j.call(ctx, in, "GET", "/status", nil, nil, &status)
 	var list struct {
 		Results []seerrRequest `json:"results"`
 	}
@@ -105,15 +120,29 @@ func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	wg.Wait()
 
-	return &Widget{
+	w := &Widget{
 		Stats: []Stat{
 			{Label: in.T("Offen"), Value: fmt.Sprint(counts.Pending), Tone: toneIf(counts.Pending > 0, "warn")},
 			{Label: in.T("In Arbeit"), Value: fmt.Sprint(counts.Processing)},
 			{Label: in.T("Verfügbar"), Value: fmt.Sprint(counts.Available)},
+			{Label: in.T("Abgelehnt"), Value: fmt.Sprint(counts.Declined)},
+			{Label: in.T("Anfragen gesamt"), Value: in.Num(counts.Total)},
+			{Label: in.T("Filme"), Value: in.Num(counts.Movie)},
+			{Label: in.T("Serien"), Value: in.Num(counts.TV)},
 		},
 		ItemsTitle: in.T("Offene Anfragen"),
 		Items:      items,
-	}, nil
+	}
+	if issues.Open != nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Offene Probleme"), Value: fmt.Sprint(*issues.Open), Tone: toneIf(*issues.Open > 0, "warn")})
+	}
+	if status.UpdateAvailable {
+		w.Alerts = append(w.Alerts, in.T("Ein Update ist verfügbar"))
+	}
+	if status.RestartRequired {
+		w.Alerts = append(w.Alerts, in.T("Ein Neustart ist nötig"))
+	}
+	return w, nil
 }
 
 func (j *jellyseerr) title(ctx context.Context, in *Instance, mediaType string, tmdbID int) string {

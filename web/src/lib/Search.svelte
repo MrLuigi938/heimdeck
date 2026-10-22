@@ -8,7 +8,12 @@
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
   // Jellyseerr, Paperless …) in the background.
-  let { tiles, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId } = $props();
+  // shortcut is only shown in the placeholder; the dashboard handles the key and calls focus().
+  let { tiles, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+
+  export function focus() {
+    input.focus();
+  }
 
   let q = $state('');
   let open = $state(false);
@@ -101,14 +106,6 @@
     if (e.persisted) reset();
   }
 
-  function globalKey(e) {
-    const tag = document.activeElement?.tagName;
-    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-      e.preventDefault();
-      input.focus();
-    }
-  }
-
   function makeAction(tileId) {
     return async (a) => {
       try {
@@ -122,7 +119,7 @@
   }
 </script>
 
-<svelte:window onkeydown={globalKey} onpageshow={onPageShow} />
+<svelte:window onpageshow={onPageShow} />
 
 <div class="search" onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
   <svg class="glass" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
@@ -132,7 +129,7 @@
     oninput={onInput}
     onfocus={() => (open = q.length > 0)}
     onkeydown={onKey}
-    placeholder={hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') + '  ( / )' : t('Dienste suchen oder im Web suchen …') + '  ( / )'}
+    placeholder={(hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') : t('Dienste suchen oder im Web suchen …')) + (shortcut ? `  ( ${shortcut} )` : '')}
     aria-label={t('Suche')}
     autocomplete="off"
   />

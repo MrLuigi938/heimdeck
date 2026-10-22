@@ -113,6 +113,21 @@ sudo journalctl -u heimdeck --since "30 min ago"
 
 When reporting a problem, please attach this log – it contains no passwords or API keys.
 
+## Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `/` | Open the search |
+| `E` | Edit mode on/off |
+| `,` | Open the settings |
+| `H` | Show/hide hidden groups |
+| `N` | Switch home/away |
+| `[` / `]` | Previous / next dashboard |
+| `1`–`9` | Open the dashboard with that number |
+| `?` | Show all shortcuts |
+
+Change them under **Settings → Keyboard shortcuts**: click a key and press the new one (Delete removes a shortcut, Esc cancels), or turn them off. Shortcuts do nothing while you type in a field or a dialog is open.
+
 ## Tips
 
 - **Language**: choose English or German during setup or later in the settings. Live data and error messages are translated too.

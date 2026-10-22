@@ -7,6 +7,7 @@
   import { confirmDialog } from './dialog.svelte.js';
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
+  import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
 
   let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, onClose, onSaved, onSwitchBoard } = $props();
 
@@ -73,6 +74,45 @@
     } catch (err) {
       toast(err.message, 'bad');
     }
+  }
+
+  // Keyboard shortcuts: a click on a key waits for the next key press. Saved right away.
+  let keys = $state(keymap(settings));
+  let shortcutsOn = $state(settings.shortcutsOff !== 'true');
+  let recording = $state('');
+  async function saveKeys(extra = {}) {
+    try {
+      await put('/settings', { shortcuts: JSON.stringify($state.snapshot(keys)), shortcutsOff: String(!shortcutsOn), ...extra });
+      onSaved({ keepOpen: true });
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+  function recordKey(e) {
+    if (!recording) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = recording;
+    recording = '';
+    if (e.key === 'Escape') return;
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      keys[id] = '';
+    } else if (!usableKey(e.key)) {
+      toast(t('Diese Taste geht nicht – bitte eine Buchstaben-, Zeichen- oder Satzzeichen-Taste wählen (Ziffern 1–9 wechseln das Dashboard).'), 'bad');
+      return;
+    } else {
+      const other = ACTIONS.find((a) => a.id !== id && keys[a.id] === e.key);
+      if (other) {
+        keys[other.id] = ''; // a key does one thing; the other action loses it
+        toast(t('„{key}“ war für „{action}“ belegt – dort ist es jetzt leer.', { key: keyLabel(e.key), action: t(other.label) }));
+      }
+      keys[id] = e.key;
+    }
+    saveKeys();
+  }
+  function resetKeys() {
+    keys = keymap({});
+    saveKeys();
   }
 
   // The debug mode switches right away and is saved on its own, like the language.
@@ -203,6 +243,9 @@
     location.reload();
   }
 </script>
+
+<!-- Capture phase: a key being recorded never reaches the dialog's own Esc handling. -->
+<svelte:window onkeydowncapture={recordKey} />
 
 <Modal title={t('Einstellungen')} {onClose}>
   <section>
@@ -439,6 +482,23 @@
   </section>
 
   <section>
+    <h3>{t('Tastenkürzel')}</h3>
+    <label class="check"><input type="checkbox" bind:checked={shortcutsOn} onchange={() => saveKeys()} /> {t('Tastenkürzel verwenden')}</label>
+    {#if shortcutsOn}
+      <p class="help">{t('Auf eine Taste klicken und die neue drücken. Entf löscht ein Kürzel, Esc bricht ab. Die Ziffern 1–9 öffnen immer das Dashboard mit dieser Nummer.')}</p>
+      <div class="keys">
+        {#each ACTIONS as a (a.id)}
+          <span>{t(a.label)}</span>
+          <button class="small key" class:primary={recording === a.id} onclick={() => (recording = recording === a.id ? '' : a.id)}>
+            {recording === a.id ? t('Taste drücken …') : keyLabel(keys[a.id])}
+          </button>
+        {/each}
+      </div>
+      <div class="row"><span class="spacer"></span><button class="small" onclick={resetKeys}>{t('Standard wiederherstellen')}</button></div>
+    {/if}
+  </section>
+
+  <section>
     <h3>{t('Fehlersuche')}</h3>
     <label class="check"><input type="checkbox" checked={debug} onchange={toggleDebug} disabled={debugForced} /> {t('Debug-Modus')}</label>
     <p class="help indent">{t('Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.')}</p>
@@ -459,6 +519,8 @@
   .swatch.active { border-color: var(--text); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .indent { margin: -6px 0 0 26px; }
+  .keys { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; font-size: 14px; }
+  .key { min-width: 64px; justify-content: center; font-family: ui-monospace, monospace; font-weight: 600; }
   /* Same look as the setup guides in the tile editor. */
   .howto { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
   .howto summary { cursor: pointer; font-weight: 600; }
