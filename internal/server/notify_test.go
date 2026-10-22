@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -93,5 +94,55 @@ func TestOutageNotifications(t *testing.T) {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in\n%s", want, all)
 		}
+	}
+}
+
+func TestTelegram(t *testing.T) {
+	const token = "123456789:AAH1234567890abcdefghijklmnopqrstu"
+	var got struct {
+		path string
+		body map[string]any
+	}
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.path = r.URL.Path
+		json.NewDecoder(r.Body).Decode(&got.body)
+		if got.body["chat_id"] != "-100123" {
+			w.WriteHeader(400)
+		}
+	}))
+	defer api.Close()
+	old := telegramAPI
+	telegramAPI = api.URL
+	defer func() { telegramAPI = old }()
+
+	m := notification{Down: true, Title: "Radarr <intern> ist nicht erreichbar", Body: "Seit 12:00", URL: "http://radarr:7878"}
+	if err := sendTelegram(context.Background(), token, "-100123", m); err != nil {
+		t.Fatal(err)
+	}
+	text, _ := got.body["text"].(string)
+	if got.path != "/bot"+token+"/sendMessage" || got.body["parse_mode"] != "HTML" || !strings.Contains(text, "<b>Radarr &lt;intern&gt;") || !strings.HasPrefix(text, "🔴") {
+		t.Fatalf("path %s body %v", got.path, got.body)
+	}
+	if err := sendTelegram(context.Background(), token, "42", m); err == nil || !strings.Contains(err.Error(), "Chat-ID") {
+		t.Fatalf("wrong chat: %v", err)
+	}
+
+	// Tokens are checked before they are stored, and never sent back.
+	s := testServer(t)
+	put := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("PUT", "/api/notify", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		http.HandlerFunc(s.handleSaveNotify).ServeHTTP(rec, req)
+		return rec
+	}
+	if rec := put(`{"telegramToken":"nope"}`); rec.Code != 400 {
+		t.Fatalf("invalid token accepted: %d", rec.Code)
+	}
+	if rec := put(`{"telegramToken":"` + token + `"}`); rec.Code != 200 || strings.Contains(rec.Body.String(), token) || !strings.Contains(rec.Body.String(), `"telegram":true`) {
+		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
+	}
+	if s.notifySecrets().TelegramToken != token {
+		t.Fatal("token not stored")
 	}
 }

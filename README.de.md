@@ -26,7 +26,7 @@
 - **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss und mehr für mehr als 40 Dienste.
 - **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Geräte in Home Assistant oder ioBroker schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Speedtest starten …
 - **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld.
-- **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy oder Browser gemeldet.
+- **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy, Telegram oder Browser gemeldet.
 - **Zuhause oder unterwegs** – jede Kachel kann eine lokale und eine öffentliche Adresse haben; Heimdeck nimmt automatisch die richtige.
 - **Eigene API** – jede JSON-Schnittstelle wird zur Live-Kachel mit Werten, Liste und Knöpfen.
 - **Mehrere Dashboards**, ausgeblendete oder per Passwort geschützte Gruppen, Hintergrundbild pro Dashboard.

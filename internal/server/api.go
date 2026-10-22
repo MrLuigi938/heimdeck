@@ -225,8 +225,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"docker":       s.docker != nil,
 		"proxmox":      hasProxmox,
 		"proxmoxHint":  proxmoxHint(),
-		"notify":       map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != ""},
+		"notify":       map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""},
 		"username":     name,
+		"version":      s.version,
+		"update":       s.newerRelease(),
 		"debug":        logging.Debug(),
 		"debugForced":  logging.Forced(), // HEIMDECK_DEBUG=true, the setting cannot turn it off
 	})
@@ -240,7 +242,7 @@ var allowedSettings = map[string]bool{
 	"columns": true, "searchEngine": true, "searchUrl": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
-	"debug": true,
+	"debug": true, "telegramChat": true, "updateCheck": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -275,6 +277,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if v, ok := m["debug"]; ok {
 		logging.SetDebug(v == "true")
+	}
+	if _, ok := m["updateCheck"]; ok && s.version != "" && s.version != "dev" {
+		go s.checkUpdate(context.Background()) // show or hide the hint right away
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

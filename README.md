@@ -26,7 +26,7 @@
 - **Live data** – download queues, active streams, pending requests, broken indexers, energy flow and more for more than 40 services.
 - **Actions** – approve Jellyseerr requests, pause SABnzbd or AdGuard, switch the evcc charge mode, toggle Home Assistant or ioBroker devices, switch WLED presets, restart UniFi devices, start a speed test …
 - **One search** (press `/`) – tiles, media libraries, documents, photos, games, files, smart-home devices, DNS queries and more in a single search box.
-- **Uptime and alerts** – every service is checked once a minute, with a 24 h / 3 day history. Outages are reported via Discord, ntfy or browser notifications.
+- **Uptime and alerts** – every service is checked once a minute, with a 24 h / 3 day history. Outages are reported via Discord, ntfy, Telegram or browser notifications.
 - **Home or away** – each tile can have a local and a public address; Heimdeck picks the right one automatically.
 - **Custom API tile** – turn any JSON endpoint into a live tile with values, a list and buttons.
 - **Multiple dashboards**, hidden or password-protected groups, background images per dashboard.

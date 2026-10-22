@@ -194,6 +194,24 @@
   let dateText = $derived(now.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));
   let timeText = $derived(now.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }));
 
+  // Log out with two clicks: the first one asks, so a slip of the finger does not log out.
+  let logoutArmed = $state(false);
+  let logoutTimer;
+  async function logoutClick() {
+    if (!logoutArmed) {
+      logoutArmed = true;
+      clearTimeout(logoutTimer);
+      logoutTimer = setTimeout(() => (logoutArmed = false), 4000);
+      return;
+    }
+    clearTimeout(logoutTimer);
+    try {
+      await post('/logout');
+    } finally {
+      location.reload();
+    }
+  }
+
   // ---- groups ----
   async function addGroup() {
     const name = await promptDialog(t('Name der neuen Gruppe'), { title: t('Neue Gruppe'), confirmLabel: t('Anlegen') });
@@ -392,6 +410,14 @@
         <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
         </button>
+        <button class="ghost icon logout" class:armed={logoutArmed} onclick={logoutClick}
+          title={logoutArmed ? t('Zum Abmelden nochmal klicken') : t('Abmelden')} aria-label={logoutArmed ? t('Zum Abmelden nochmal klicken') : t('Abmelden')}>
+          {#if logoutArmed}
+            <span class="logout-ask">{t('Abmelden?')}</span><span class="logout-check" aria-hidden="true">✓</span>
+          {:else}
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
+          {/if}
+        </button>
         <button class="ghost icon" title={t('Einstellungen')} aria-label={t('Einstellungen')} onclick={() => (showSettings = true)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
@@ -492,7 +518,7 @@
     {#if allTiles.length && settings.showUptime !== 'false'}
       <Uptime tiles={allTiles} {status} />
     {/if}
-    <Credit app />
+    <Credit app version={data.version} update={data.update} />
   </div>
 
   {#if editing}
@@ -528,6 +554,9 @@
   .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
   .tools .on { background: var(--accent); color: #fff; }
+  .logout.armed { width: auto; padding: 0 10px; background: var(--bad); color: #fff; }
+  .logout-ask { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .logout-check { display: none; font-weight: 700; }
   .hidden-hint { justify-self: center; background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 13px; padding: 6px 14px; border-radius: 999px; }
 
   .editbar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14px; flex-wrap: wrap; }
@@ -566,6 +595,10 @@
     /* Icons in a compact block (3 + 2) that matches the height of the title block. */
     .tools { display: grid; grid-template-columns: repeat(3, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }
     .tools :global(button) { width: 38px; height: 38px; padding: 0; justify-content: center; }
+    /* No room for the question in the icon block: a check mark asks instead. */
+    .logout.armed { width: 38px; padding: 0; }
+    .logout-ask { display: none; }
+    .logout-check { display: inline; }
     .locked { display: grid; grid-template-columns: minmax(0, 1fr); }
     .locked .spacer { display: none; }
     .locked input { width: 100%; }

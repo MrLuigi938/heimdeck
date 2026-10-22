@@ -41,6 +41,8 @@ type Server struct {
 	recheck      chan int64
 	// unlocked holds, per login session, the protected groups opened with their password.
 	unlocked map[string]map[int64]time.Time
+	version  string       // set at build time, "dev" otherwise
+	update   *releaseInfo // newer release found by CheckUpdates, nil if none
 }
 
 type cached[T any] struct {

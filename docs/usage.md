@@ -52,6 +52,7 @@ Settings → Notifications:
 
 - **Discord**: create a webhook in Discord (Server settings → Integrations → Webhooks) and paste its URL.
 - **ntfy**: subscribe to a topic in the ntfy app and enter its address (e.g. `https://ntfy.sh/my-heimdeck` or your own ntfy server), optionally with a token.
+- **Telegram**: create a bot with `/newbot` at [@BotFather](https://t.me/BotFather), enter its token and your chat ID (write to the bot once first, or add it to a group; [@userinfobot](https://t.me/userinfobot) tells you your ID).
 - **Browser**: can be enabled per browser. Works as long as a Heimdeck tab is open, and only via HTTPS or `localhost`.
 
 You get a message when a service hasn't answered for the configured time (default 2 minutes) and when it is back. Only tiles with a status check are monitored.

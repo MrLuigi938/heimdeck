@@ -73,6 +73,7 @@ func main() {
 	a := auth.New(st, env("HEIMDECK_SECURE_COOKIE", "") == "true")
 	dock := docker.New()
 	app := server.New(st, a, dock, web.FS())
+	app.SetVersion(version)
 	app.LogStartup(version, dataDir, addr)
 	srv := &http.Server{
 		Addr:              addr,
@@ -84,6 +85,7 @@ func main() {
 	defer stop()
 	go app.Monitor(ctx)
 	go app.Watch(ctx)
+	go app.CheckUpdates(ctx)
 	go func() {
 		slog.Info("Heimdeck läuft", "adresse", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

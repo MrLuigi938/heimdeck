@@ -100,17 +100,18 @@
   // Notification channels. The Discord webhook and the ntfy token are secrets:
   // the server only says whether they are set.
   // svelte-ignore state_referenced_locally
-  let nf = $state({ discordWebhook: '', ntfyToken: '', discordSet: !!notify.discord, ntfyTokenSet: !!notify.ntfyToken });
+  let nf = $state({ discordWebhook: '', ntfyToken: '', telegramToken: '', discordSet: !!notify.discord, ntfyTokenSet: !!notify.ntfyToken, telegramSet: !!notify.telegram });
   let testing = $state(false);
 
   async function saveNotify() {
     try {
-      await put('/settings', { ntfyUrl: s.ntfyUrl || '', notifyAfter: s.notifyAfter || '2', notifyRecovery: s.notifyRecovery || 'true', notifyExternal: s.notifyExternal || 'true' });
+      await put('/settings', { ntfyUrl: s.ntfyUrl || '', telegramChat: (s.telegramChat || '').trim(), notifyAfter: s.notifyAfter || '2', notifyRecovery: s.notifyRecovery || 'true', notifyExternal: s.notifyExternal || 'true' });
       const body = {};
       if (nf.discordWebhook) body.discordWebhook = nf.discordWebhook;
       if (nf.ntfyToken) body.ntfyToken = nf.ntfyToken;
+      if (nf.telegramToken) body.telegramToken = nf.telegramToken;
       const res = await put('/notify', body);
-      nf = { discordWebhook: '', ntfyToken: '', discordSet: res.discord, ntfyTokenSet: res.ntfyToken };
+      nf = { discordWebhook: '', ntfyToken: '', telegramToken: '', discordSet: res.discord, ntfyTokenSet: res.ntfyToken, telegramSet: res.telegram };
       toast(t('Gespeichert'));
       onSaved({ keepOpen: true });
     } catch (e) {
@@ -123,6 +124,7 @@
       const res = await put('/notify', { [key]: '' });
       nf.discordSet = res.discord;
       nf.ntfyTokenSet = res.ntfyToken;
+      nf.telegramSet = res.telegram;
       onSaved({ keepOpen: true });
     } catch (e) {
       toast(e.message, 'bad');
@@ -252,6 +254,8 @@
       </label>
     {/if}
     <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={setFlag('showUptime')} /> {t('Verfügbarkeits-Übersicht unten anzeigen')}</label>
+    <label class="check"><input type="checkbox" checked={s.updateCheck !== 'false'} onchange={setFlag('updateCheck')} /> {t('Auf neue Heimdeck-Versionen hinweisen')}</label>
+    <p class="help indent">{t('Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.')}</p>
     <div class="row"><span class="spacer"></span><button class="primary" onclick={save}>{t('Speichern')}</button></div>
   </section>
 
@@ -326,6 +330,20 @@
       </label>
     </div>
     <span class="help">{t('ntfy: App installieren, ein Thema abonnieren und dessen Adresse hier eintragen. Eigener ntfy-Server geht genauso.')}</span>
+    <div class="grid2">
+      <label class="field">
+        <span>{t('Telegram-Bot-Token')}</span>
+        <div class="secret-row">
+          <input type="password" bind:value={nf.telegramToken} autocomplete="off" placeholder={nf.telegramSet ? '•••••••• ' + t('gespeichert') : '123456789:AAH…'} />
+          {#if nf.telegramSet}<button class="small" onclick={() => removeSecret('telegramToken')}>{t('Entfernen')}</button>{/if}
+        </div>
+      </label>
+      <label class="field">
+        <span>{t('Telegram-Chat-ID')}</span>
+        <input bind:value={s.telegramChat} placeholder="123456789 / -100…" inputmode="numeric" />
+      </label>
+    </div>
+    <span class="help">{t('Telegram: bei @BotFather mit /newbot einen Bot anlegen und den Token kopieren. Dem Bot einmal schreiben (oder ihn in eine Gruppe aufnehmen); die Chat-ID verrät z. B. @userinfobot.')}</span>
     <label class="field">
       <span>{t('Melden, wenn ein Dienst so lange nicht antwortet')}</span>
       <select bind:value={s.notifyAfter}>

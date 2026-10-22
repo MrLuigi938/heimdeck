@@ -59,10 +59,14 @@ var userInfo = regexp.MustCompile(`(://)[^/@\s"']+:[^/@\s"']+@`)
 // webhookPath matches the token part of Discord webhook addresses.
 var webhookPath = regexp.MustCompile(`(/api/webhooks/[0-9]+/)[^/\s"']+`)
 
+// botPath matches Telegram bot tokens in Bot API addresses (/bot123:AA…/).
+var botPath = regexp.MustCompile(`(/bot)[0-9]+:[A-Za-z0-9_-]+`)
+
 // Redact hides credentials in text that goes to the log.
 func Redact(s string) string {
 	s = secretParam.ReplaceAllString(s, "${1}***")
 	s = webhookPath.ReplaceAllString(s, "${1}***")
+	s = botPath.ReplaceAllString(s, "${1}***")
 	return userInfo.ReplaceAllString(s, "${1}***@")
 }
 

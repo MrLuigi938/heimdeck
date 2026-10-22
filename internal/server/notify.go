@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -20,13 +22,14 @@ import (
 
 // Outage notifications: a service counts as down once it failed the given
 // number of minute checks in a row (setting notifyAfter, default 2). Then
-// Discord and/or ntfy get a message, and another one when it is back.
+// Discord, ntfy and/or Telegram get a message, and another one when it is back.
 // Browsers with the dashboard open show the same alerts (TileStatus.Alert).
 
 // notifySecrets are kept encrypted, like the API keys of the tiles.
 type notifySecrets struct {
 	DiscordWebhook string `json:"discordWebhook,omitempty"`
 	NtfyToken      string `json:"ntfyToken,omitempty"`
+	TelegramToken  string `json:"telegramToken,omitempty"`
 }
 
 const notifySecretsKey = "_notifySecrets"
@@ -172,7 +175,34 @@ func (s *Server) send(settings map[string]string, msgs []notification) {
 		if u := strings.TrimSpace(settings["ntfyUrl"]); u != "" {
 			logErr("ntfy-Benachrichtigung", sendNtfy(ctx, u, sec.NtfyToken, m))
 		}
+		if chat := strings.TrimSpace(settings["telegramChat"]); sec.TelegramToken != "" && chat != "" {
+			logErr("Telegram-Benachrichtigung", sendTelegram(ctx, sec.TelegramToken, chat, m))
+		}
 	}
+}
+
+// telegramAPI is the Bot API; a variable so tests can point it elsewhere.
+var telegramAPI = "https://api.telegram.org"
+
+// sendTelegram posts the message through a bot (core.telegram.org/bots/api#sendmessage).
+func sendTelegram(ctx context.Context, token, chat string, m notification) error {
+	icon := "✅"
+	if m.Down {
+		icon = "🔴"
+	}
+	text := icon + " <b>" + html.EscapeString(m.Title) + "</b>\n" + html.EscapeString(m.Body)
+	if strings.HasPrefix(m.URL, "http") {
+		text += "\n" + html.EscapeString(m.URL)
+	}
+	body, _ := json.Marshal(map[string]any{"chat_id": chat, "text": text, "parse_mode": "HTML", "link_preview_options": map[string]bool{"is_disabled": true}})
+	err := post(ctx, telegramAPI+"/bot"+token+"/sendMessage", body, map[string]string{"Content-Type": "application/json"})
+	if err != nil && strings.Contains(err.Error(), "Status 400") {
+		return errors.New("Telegram lehnt die Nachricht ab – stimmt die Chat-ID? Dem Bot vorher einmal schreiben bzw. ihn in die Gruppe aufnehmen")
+	}
+	if err != nil && (strings.Contains(err.Error(), "Status 401") || strings.Contains(err.Error(), "Status 404")) {
+		return errors.New("Telegram kennt diesen Bot-Token nicht")
+	}
+	return err
 }
 
 var notifyClient = &http.Client{Timeout: 10 * time.Second}
@@ -248,7 +278,11 @@ func basic(userPass string) string { return b64(userPass) }
 type notifyInput struct {
 	DiscordWebhook *string `json:"discordWebhook"`
 	NtfyToken      *string `json:"ntfyToken"`
+	TelegramToken  *string `json:"telegramToken"`
 }
+
+// telegramTokenRe is the shape of a bot token from @BotFather: 123456789:AA…
+var telegramTokenRe = regexp.MustCompile(`^[0-9]{5,}:[A-Za-z0-9_-]{30,}$`)
 
 func validWebhook(u string) error {
 	p, err := url.Parse(u)
@@ -280,6 +314,14 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 	if in.NtfyToken != nil {
 		ns.NtfyToken = strings.TrimSpace(*in.NtfyToken)
 	}
+	if in.TelegramToken != nil {
+		v := strings.TrimSpace(*in.TelegramToken)
+		if v != "" && !telegramTokenRe.MatchString(v) {
+			writeErr(w, 400, errors.New("Das sieht nicht nach einem Bot-Token aus – er hat die Form 123456789:AAH…"))
+			return
+		}
+		ns.TelegramToken = v
+	}
 	plain, _ := json.Marshal(ns)
 	sealed, err := s.store.SealSecret(plain)
 	if err == nil {
@@ -289,7 +331,12 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	writeJSON(w, map[string]any{"ok": true, "discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != ""})
+	writeJSON(w, ns.status())
+}
+
+// status says which secrets are set, without revealing them.
+func (ns notifySecrets) status() map[string]any {
+	return map[string]any{"ok": true, "discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""}
 }
 
 // handleTestNotify sends a test message to every configured channel.
@@ -316,7 +363,18 @@ func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {
 			sent++
 		}
 	}
+	if chat := strings.TrimSpace(settings["telegramChat"]); sec.TelegramToken != "" && chat != "" {
+		if err := sendTelegram(ctx, sec.TelegramToken, chat, m); err != nil {
+			errs = append(errs, "Telegram: "+tr(r, err.Error()))
+		} else {
+			sent++
+		}
+	}
 	if len(errs) > 0 {
+		// Errors of the HTTP client quote the address, which holds the token or webhook.
+		for i := range errs {
+			errs[i] = logging.Redact(errs[i])
+		}
 		writeErr(w, 502, errors.New(strings.Join(errs, " · ")))
 		return
 	}

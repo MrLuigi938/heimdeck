@@ -304,6 +304,20 @@ export const en = {
   'Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.':
     'In edit mode (✎) drag tiles to where you want them and resize them with the bottom-right corner (double-click fits the height to the content). One column wide, a tile becomes an icon. On phones the tiles are listed in this order.',
   'Größe ändern': 'Resize',
+  // Telegram
+  'Telegram-Bot-Token': 'Telegram bot token',
+  'Telegram-Chat-ID': 'Telegram chat ID',
+  'Telegram: bei @BotFather mit /newbot einen Bot anlegen und den Token kopieren. Dem Bot einmal schreiben (oder ihn in eine Gruppe aufnehmen); die Chat-ID verrät z. B. @userinfobot.':
+    'Telegram: create a bot with /newbot at @BotFather and copy its token. Write to the bot once (or add it to a group); @userinfobot, for example, tells you the chat ID.',
+  // logout button
+  'Abmelden?': 'Log out?',
+  'Zum Abmelden nochmal klicken': 'Click again to log out',
+  // version and updates
+  'Version {v} ist da': 'Version {v} is out',
+  'Was ist neu in {v}?': "What's new in {v}?",
+  'Auf neue Heimdeck-Versionen hinweisen': 'Tell me about new Heimdeck versions',
+  'Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.':
+    'The server asks GitHub for the newest version twice a day and shows it in the footer. Nothing is installed automatically.',
   // debug mode
   'Fehlersuche': 'Troubleshooting',
   'Debug-Modus': 'Debug mode',

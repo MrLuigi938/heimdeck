@@ -52,6 +52,7 @@ Einstellungen → Benachrichtigungen:
 
 - **Discord**: In Discord unter Servereinstellungen → Integrationen → Webhooks einen Webhook anlegen und die URL eintragen.
 - **ntfy**: Ein Thema in der ntfy-App abonnieren und dessen Adresse eintragen (z. B. `https://ntfy.sh/mein-heimdeck` oder dein eigener ntfy-Server), optional mit Token.
+- **Telegram**: Bei [@BotFather](https://t.me/BotFather) mit `/newbot` einen Bot anlegen, dessen Token und deine Chat-ID eintragen (dem Bot vorher einmal schreiben oder ihn in eine Gruppe aufnehmen; die eigene ID verrät z. B. [@userinfobot](https://t.me/userinfobot)).
 - **Browser**: Pro Browser einschaltbar. Funktioniert, solange ein Heimdeck-Tab offen ist, und nur über HTTPS oder `localhost`.
 
 Gemeldet wird, wenn ein Dienst die eingestellte Zeit (Standard 2 Minuten) nicht antwortet, und wenn er wieder erreichbar ist. Nur Kacheln mit Statusprüfung.

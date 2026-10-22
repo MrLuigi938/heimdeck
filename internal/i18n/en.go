@@ -527,6 +527,11 @@ var en = map[string]string{
 	"Statt der Schnittstelle kommt eine Webseite – die Anfrage wurde zu %s weitergeleitet, vermutlich eine Anmeldeseite. Bitte die interne Adresse des Dienstes eintragen (Weitere Optionen → Interne Adresse).":                        "A web page came back instead of the API – the request was redirected to %s, probably a login page. Please enter the service's internal address (More options → Internal address).",
 	"Statt der Schnittstelle kommt eine Webseite – liegt eine Anmeldeseite (z. B. Authentik, Cloudflare) davor oder stimmt der Dienst-Typ nicht? Dann die interne Adresse des Dienstes eintragen (Weitere Optionen → Interne Adresse).": "A web page came back instead of the API – is there a login page in front of it (e.g. Authentik, Cloudflare), or is the service type wrong? Then enter the service's internal address (More options → Internal address).",
 
+	// Telegram
+	"Telegram lehnt die Nachricht ab – stimmt die Chat-ID? Dem Bot vorher einmal schreiben bzw. ihn in die Gruppe aufnehmen": "Telegram rejects the message – is the chat ID right? Write to the bot once first or add it to the group",
+	"Telegram kennt diesen Bot-Token nicht":                                     "Telegram does not know this bot token",
+	"Das sieht nicht nach einem Bot-Token aus – er hat die Form 123456789:AAH…": "That does not look like a bot token – it has the form 123456789:AAH…",
+
 	// debug mode
 	"interner Fehler – Details stehen im Protokoll":                    "internal error – details are in the log",
 	"interner Fehler in der Integration – Details stehen im Protokoll": "internal error in the integration – details are in the log",
