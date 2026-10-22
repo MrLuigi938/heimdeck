@@ -53,21 +53,24 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Pi-hole (v6 mit App-Passwort, v5 mit API-Token) | DNS-Anfragen, Blockierquote, Clients | ✓ Abfrage-Log (v6) | Blockieren pausieren, Domain sperren oder freigeben |
 | OPNsense (API-Key + Secret) | WAN-Datenrate, RAM, Last, Laufzeit, Gateways, Updates | | |
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
+| FRITZ!Box (TR-064, Benutzer + Passwort) | wählbar: Internet (Verbindung, Datenrate, Leitung, externe IP), Geräte online, Anrufliste mit verpassten Anrufen, Smart Home (DECT-Steckdosen und Thermostate), WLAN-Netze | | DECT-Steckdosen schalten |
 | UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
 | Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
-| Proxmox VE (API-Token) | CPU, RAM, Gäste aktiv, Nodes bzw. gestoppte Gäste | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, am stärksten ausgelastete und gestoppte Gäste bzw. Nodes | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | openmediavault (Administrator) | CPU, RAM, Laufzeit, Updates, Dateisysteme, Festplatten-Zustand (S.M.A.R.T.) | | |
 | **Smart Home & Energie** | | | |
-| Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
-| ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |
+| Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter mit eigenen Namen oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
+| ioBroker (REST-API- oder Simple-API-Adapter) | gewählte Datenpunkte mit eigenen Namen oder Adapter-Status | ✓ Datenpunkte | Schalter umschalten |
 | evcc | PV, Haus, Netz, Batterie, Ladepunkte (aktualisiert alle 5 s) | | Lademodus wechseln (Aus, PV, Min+PV, Schnell, Smart) |
 | WLED | An/Aus, Helligkeit, Effekt, Presets | ✓ Presets | An/Aus, Helligkeit, Preset anwenden |
+| Shelly (lokal, Gen1 bis Gen4) | Leistung, Energie, Temperatur, Luftfeuchte, Akku, WLAN, Firmware-Updates | | Relais und Lichter schalten, Rollläden öffnen/stoppen/schließen |
 | **Sonstige** | | | |
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
-| JDownloader, FRITZ!Box, Zoraxy, Portainer, … | Online-Status | | |
+| Webhook | Meldungen, die andere Dienste an die eigene Adresse der Kachel schicken (JSON, Formular, Text, Uptime Kuma) | | Knöpfe, die Webhooks aufrufen (Shelly, Home Assistant, Node-RED, IFTTT …) |
+| JDownloader, Zoraxy, Portainer, … | Online-Status | | |
 
 Jede Kachel kann außerdem „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist.
 
@@ -81,11 +84,11 @@ ioBroker hat keine eigene Daten-Schnittstelle – sie kommt von einem Adapter:
 2. In Heimdeck als Adresse `http://<ioBroker-IP>:8093` eintragen. Die Admin-Oberfläche auf Port 8081 liefert keine Daten. Läuft der Adapter im Web-Adapter, lautet die Adresse `http://<ioBroker-IP>:8082/rest-api`; der ältere Simple-API-Adapter (Port 8087) geht auch.
 3. Neben „Datenpunkte auf der Kachel“ auf **Auswählen** klicken, Datenpunkte suchen und anhaken – IDs abtippen ist nicht nötig. Ohne Auswahl zeigt die Kachel den Status deiner Adapter.
 
-Entitäten von Home Assistant wählst du genauso aus.
+Entitäten von Home Assistant wählst du genauso aus. Unter der Auswahl bekommt jeder Eintrag ein Feld für **deinen eigenen Namen** – praktisch, wenn Entitäten z. B. `sensor.0x00158d0001a2b3c4_temperature` heißen. Leer lassen, um den Namen aus dem Dienst zu behalten.
 
 ## Proxmox verbinden
 
-1. In Proxmox: Rechenzentrum → Berechtigungen → **API-Token** → Token anlegen (z. B. `root@pam`, Name `heimdeck`). Rolle **PVEAuditor** zum Anzeigen, zusätzlich **PVEVMUser**, wenn du Gäste aus Heimdeck starten und stoppen willst.
+1. In Proxmox: Rechenzentrum → Berechtigungen → **API-Token** → Token anlegen (z. B. `root@pam`, Name `heimdeck`) und **„Privilegtrennung“ abwählen** – sonst hat der Token keine eigenen Rechte und die Kachel bleibt leer. Mit Privilegtrennung dem Token selbst die Rolle **PVEAuditor** auf `/` geben (Rechenzentrum → Berechtigungen → Hinzufügen → API-Token-Berechtigung), zusätzlich **PVEVMUser** zum Starten und Stoppen von Gästen.
 2. In Heimdeck: Startseite → **Proxmox verbinden** (oder Proxmox-Kachel anlegen) und das Token im Format `benutzer@pam!name=geheimnis` eintragen.
 
 Danach findet 🔍 die Dienste in deinen VMs und Containern: am Namen bzw. an den Tags (z. B. `jellyfin`, `adguard`, `paperless-ngx` – so heißen auch die Container der Proxmox-Community-Skripte), mit der IP-Adresse des Gasts und dem üblichen Port. VMs brauchen dafür den QEMU-Gast-Agenten.

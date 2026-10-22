@@ -138,6 +138,16 @@ func TestHomeAssistant(t *testing.T) {
 	if s := stats(w); s["Wohnzimmer"] != "21.5 °C" || len(w.Items) != 1 || len(w.Alerts) != 1 {
 		t.Fatalf("entities: %+v", w)
 	}
+	// own display names, also in the search
+	in.Values["entities"] = "sensor.temp = Wohnzimmer Temperatur\nlight.kueche=Licht Küche; lock.tuer"
+	w, _ = homeAssistant{}.Fetch(context.Background(), in)
+	if s := stats(w); s["Wohnzimmer Temperatur"] != "21.5 °C" || len(w.Items) != 2 || w.Items[0].Title != "Licht Küche" || w.Items[1].Title != "Haustür" {
+		t.Fatalf("named entities: %v %+v", s, w.Items)
+	}
+	if items, _ := (homeAssistant{}).Search(context.Background(), in, "küche"); len(items) != 1 || items[0].Title != "Licht Küche" {
+		t.Fatalf("named search: %+v", items)
+	}
+	in.Values["entities"] = "sensor.temp, light.kueche, sensor.fehlt"
 	items, _ := homeAssistant{}.Search(context.Background(), in, "haus")
 	if len(items) != 1 || items[0].Actions[0].Confirm == "" {
 		t.Fatalf("search: %+v", items)

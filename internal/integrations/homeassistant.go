@@ -29,7 +29,7 @@ func (homeAssistant) Def() Definition {
 			{Key: "token", Label: "Zugriffstoken", Type: "password", Required: true, Secret: true,
 				Help: "Profil (unten links) → Sicherheit → Langlebige Zugriffstokens → Token erstellen"},
 			{Key: "entities", Label: "Entitäten auf der Kachel", Type: "text", Pick: true,
-				Help: "Optional, durch Komma getrennt, z. B. sensor.wohnzimmer_temperatur, light.kueche. Leer: Übersicht anzeigen."},
+				Help: "Optional, durch Komma getrennt, z. B. sensor.wohnzimmer_temperatur, light.kueche. Eigener Name: sensor.wohnzimmer_temperatur = Wohnzimmer. Leer: Übersicht anzeigen."},
 		},
 		HasWidget: true, HasSearch: true, Images: []string{"home-assistant", "homeassistant", "haos"}, Port: 8123,
 	}
@@ -89,8 +89,9 @@ var haServices = map[string][]struct{ service, label string }{
 	"input_button":  {{"press", "Drücken"}},
 }
 
-func (h homeAssistant) item(in *Instance, s haState) Item {
-	it := Item{Title: s.name(), Subtitle: h.value(in, s), URL: in.Link("/history?entity_id=" + url.QueryEscape(s.EntityID))}
+// item shows an entity; label is the user's own name for it, if any.
+func (h homeAssistant) item(in *Instance, s haState, label string) Item {
+	it := Item{Title: firstNonEmpty(label, s.name()), Subtitle: h.value(in, s), URL: in.Link("/history?entity_id=" + url.QueryEscape(s.EntityID))}
 	for _, sv := range haServices[s.domain()] {
 		// Locks have no toggle: only offer the opposite of the current state.
 		if (sv.service == "lock" && s.State == "locked") || (sv.service == "unlock" && s.State == "unlocked") {
@@ -98,7 +99,7 @@ func (h homeAssistant) item(in *Instance, s haState) Item {
 		}
 		a := Action{ID: "service", Label: in.T(sv.label), Params: map[string]string{"entity": s.EntityID, "service": sv.service}}
 		if s.domain() == "lock" && sv.service == "unlock" {
-			a.Confirm = in.T("„%s“ aufschließen?", s.name())
+			a.Confirm = in.T("„%s“ aufschließen?", it.Title)
 		}
 		it.Actions = append(it.Actions, a)
 	}
@@ -145,17 +146,17 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 
 	if list := in.V("entities"); list != "" {
 		// Values go into the stats row, things you can switch into the list.
-		for _, id := range strings.FieldsFunc(list, func(r rune) bool { return r == ',' || r == ' ' || r == ';' || r == '\n' }) {
-			s, ok := byID[strings.ToLower(id)]
+		for _, e := range namedIDs(list) {
+			s, ok := byID[strings.ToLower(e.ID)]
 			if !ok {
-				w.Alerts = append(w.Alerts, in.T("Entität %s nicht gefunden", id))
+				w.Alerts = append(w.Alerts, in.T("Entität %s nicht gefunden", e.ID))
 				continue
 			}
 			if _, ok := haServices[s.domain()]; ok {
-				w.Items = append(w.Items, h.item(in, s))
+				w.Items = append(w.Items, h.item(in, s, e.Name))
 				continue
 			}
-			w.Stats = append(w.Stats, Stat{Label: s.name(), Value: h.value(in, s), Tone: toneIf(s.State == "unavailable", "warn")})
+			w.Stats = append(w.Stats, Stat{Label: firstNonEmpty(e.Name, s.name()), Value: h.value(in, s), Tone: toneIf(s.State == "unavailable", "warn")})
 		}
 		return w, nil
 	}
@@ -236,8 +237,12 @@ func (h homeAssistant) Search(ctx context.Context, in *Instance, query string) (
 		return a && !b
 	})
 	out := []Item{}
+	names := map[string]string{} // own names from the tile also apply in the search
+	for _, e := range namedIDs(in.V("entities")) {
+		names[strings.ToLower(e.ID)] = e.Name
+	}
 	for _, s := range hits {
-		out = append(out, h.item(in, s))
+		out = append(out, h.item(in, s, names[s.EntityID]))
 		if len(out) == 8 {
 			break
 		}

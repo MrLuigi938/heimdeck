@@ -71,6 +71,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/setup", s.handleSetup)
 	mux.HandleFunc("POST /api/login", s.handleLogin)
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
+	// Messages for webhook tiles; the key in the address replaces the login.
+	mux.HandleFunc("GET /hook/{key}", s.handleHook)
+	mux.HandleFunc("POST /hook/{key}", s.handleHook)
+	mux.HandleFunc("PUT /hook/{key}", s.handleHook)
 
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/dashboard", s.handleDashboard)

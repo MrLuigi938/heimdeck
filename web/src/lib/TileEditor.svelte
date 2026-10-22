@@ -67,7 +67,47 @@
   let pickTimer;
   let pickSeq = 0;
 
-  const ids = (key) => (form.config[key] || '').split(/[\s,;]+/).filter(Boolean);
+  // Pick fields hold entries like "sensor.temp = Wohnzimmer, light.kueche":
+  // an ID with an optional display name of the user's own.
+  function entriesOf(key) {
+    const out = [];
+    for (const part of (form.config[key] || '').split(/[,;\n]+/)) {
+      const eq = part.indexOf('=');
+      if (eq >= 0) {
+        const id = part.slice(0, eq).trim();
+        if (id) out.push({ id, name: part.slice(eq + 1).trim() });
+      } else {
+        for (const id of part.split(/\s+/).filter(Boolean)) out.push({ id, name: '' });
+      }
+    }
+    return out;
+  }
+  function writeEntries(key, list) {
+    form.config[key] = list.map((e) => (e.name ? `${e.id} = ${e.name}` : e.id)).join(', ');
+  }
+  const ids = (key) => entriesOf(key).map((e) => e.id);
+  // Separators would break the list, so they turn into spaces in a name.
+  const setName = (key, id, name) =>
+    writeEntries(key, entriesOf(key).map((e) => (e.id === id ? { id, name: name.replace(/[,;=\n]+/g, ' ').replace(/\s+/g, ' ').trim() } : e)));
+  const removeEntry = (key, id) => writeEntries(key, entriesOf(key).filter((e) => e.id !== id));
+  // The service's own names, seen in the pick list, as hints for the name fields.
+  let knownNames = $state({});
+
+  // Webhook tiles get a secret key for their own address right away.
+  const newHookKey = () =>
+    btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  $effect(() => {
+    for (const f of def?.fields || []) if (f.type === 'hook' && !form.config[f.key]) form.config[f.key] = newHookKey();
+  });
+  const hookUrl = (key) => `${location.origin}/hook/${form.config[key] || ''}`;
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(t('Kopiert'));
+    } catch {
+      toast(t('Kopieren geht hier nicht – bitte die Adresse markieren und von Hand kopieren'), 'bad');
+    }
+  }
 
   function openPicker(key) {
     if (picking === key) {
@@ -85,7 +125,10 @@
     pickError = '';
     try {
       const list = await post('/tiles/choices', { ...payload(), field: picking, query: pickQuery });
-      if (seq === pickSeq) choices = list;
+      if (seq === pickSeq) {
+        choices = list;
+        for (const c of list) if (c.name) knownNames[c.id] = c.name;
+      }
     } catch (e) {
       if (seq === pickSeq) { choices = null; pickError = e.message; }
     }
@@ -98,8 +141,8 @@
   }
 
   function toggleChoice(key, id) {
-    const list = ids(key);
-    form.config[key] = (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]).join(', ');
+    const list = entriesOf(key);
+    writeEntries(key, list.some((e) => e.id === id) ? list.filter((e) => e.id !== id) : [...list, { id, name: '' }]);
   }
 
   let groupedChoices = $derived.by(() => {
@@ -180,7 +223,7 @@
 
       <div class="grid2">
         <label class="field">
-          <span>{t('Lokale Adresse')}</span>
+          <span>{t('Lokale Adresse')}{def?.noUrl ? ` (${t('optional')})` : ''}</span>
           <input bind:value={form.url} placeholder="http://192.168.1.10:7878" inputmode="url" />
           <span class="help">{t('Wird zuhause geöffnet.')}</span>
         </label>
@@ -213,6 +256,13 @@
             <select bind:value={form.config[f.key]}>
               {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
             </select>
+          {:else if f.type === 'hook'}
+            <div class="row">
+              <input value={hookUrl(f.key)} readonly onfocus={(e) => e.currentTarget.select()} />
+              <button type="button" onclick={() => copy(hookUrl(f.key))}>{t('Kopieren')}</button>
+              <button type="button" onclick={() => (form.config[f.key] = newHookKey())} title={t('Die alte Adresse funktioniert danach nicht mehr')}>{t('Neu erzeugen')}</button>
+            </div>
+            <span class="help">{t('POST mit JSON {"title": "…", "message": "…"}, als Formular oder Text – oder GET mit ?title=…&message=…. Gilt nach dem Speichern.')}</span>
           {:else if f.pick}
             <div class="row">
               <input bind:value={form.config[f.key]} autocomplete="off" />
@@ -251,6 +301,19 @@
             {:else}
               <div class="help">{t('Lade …')}</div>
             {/if}
+          </div>
+        {/if}
+        {#if f.pick && entriesOf(f.key).length}
+          <div class="entries">
+            <span class="help">{t('Anzeigenamen auf der Kachel – leer lassen für den Namen aus {name}', { name: def.name })}</span>
+            {#each entriesOf(f.key) as e (e.id)}
+              <div class="entry">
+                <input value={e.name} placeholder={knownNames[e.id] || t('Anzeigename (optional)')} aria-label={t('Anzeigename für {id}', { id: e.id })}
+                  onchange={(ev) => setName(f.key, e.id, ev.currentTarget.value)} />
+                <span class="eid" title={e.id}>{e.id}</span>
+                <button type="button" class="ghost small" onclick={() => removeEntry(f.key, e.id)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button>
+              </div>
+            {/each}
           </div>
         {/if}
         {/if}
@@ -330,6 +393,10 @@
   .row input { flex: 1; min-width: 0; }
   .chooser { display: grid; gap: 8px; margin-top: -6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; }
   .choices { max-height: 280px; overflow: auto; display: grid; gap: 2px; }
+  .entries { display: grid; gap: 6px; margin-top: -6px; }
+  .entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .eid { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 520px) { .entry { grid-template-columns: minmax(0, 1fr) auto; } .eid { grid-row: 2; grid-column: 1 / -1; } }
   .choices.dim { opacity: .6; }
   .cgroup { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 6px 0 2px; }
   .choice { display: flex; gap: 10px; align-items: center; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }

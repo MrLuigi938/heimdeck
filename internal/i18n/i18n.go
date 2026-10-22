@@ -103,6 +103,8 @@ func Date(lang, iso string) string {
 func Since(lang string, t time.Time) string {
 	d := time.Since(t)
 	switch {
+	case d < time.Minute:
+		return T(lang, "gerade eben")
 	case d < time.Hour:
 		return T(lang, "vor %d Min.", int(d.Minutes()))
 	case d < 24*time.Hour:

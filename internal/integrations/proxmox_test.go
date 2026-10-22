@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -10,7 +11,10 @@ func TestProxmox(t *testing.T) {
 	f := newFake(t, map[string]any{
 		"GET /api2/json/version": obj{"data": obj{"version": "9.0.3"}},
 		"GET /api2/json/cluster/resources": obj{"data": []obj{
-			{"type": "node", "node": "pve", "status": "online", "cpu": 0.25, "maxcpu": 8, "mem": 8e9, "maxmem": 32e9},
+			{"type": "node", "node": "pve", "status": "online", "cpu": 0.25, "maxcpu": 8, "mem": 8e9, "maxmem": 32e9, "uptime": 400000},
+			{"type": "storage", "node": "pve", "id": "storage/pve/local-lvm", "storage": "local-lvm", "status": "available", "disk": 95e9, "maxdisk": 100e9},
+			{"type": "storage", "node": "pve", "id": "storage/pve/nas", "storage": "nas", "status": "available", "shared": 1, "disk": 5e9, "maxdisk": 100e9},
+			{"type": "storage", "node": "pve2", "id": "storage/pve2/nas", "storage": "nas", "status": "available", "shared": 1, "disk": 5e9, "maxdisk": 100e9},
 			{"type": "lxc", "node": "pve", "vmid": 101, "name": "jellyfin", "status": "running", "cpu": 0.1, "maxmem": 2e9, "mem": 1e9},
 			{"type": "lxc", "node": "pve", "vmid": 102, "name": "adguard-home", "status": "stopped"},
 			{"type": "qemu", "node": "pve", "vmid": 200, "name": "haos16.0", "status": "running", "tags": "smarthome"},
@@ -31,10 +35,15 @@ func TestProxmox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := stats(w); s["CPU"] != "25 %" || s["RAM"] != "25 %" || s["Gäste aktiv"] != "2/3" || len(w.Items) != 1 || w.Items[0].Actions[0].Label != "Starten" {
-		t.Fatalf("%v %+v", s, w.Items)
+	s := stats(w)
+	if s["CPU"] != "25 %" || s["RAM"] != "25 %" || s["Gäste aktiv"] != "2/3" || s["Speicher"] != "50 %" || s["Laufzeit"] != "4 Tage" {
+		t.Fatalf("stats %v", s)
 	}
-	if err := (proxmox{}).Action(context.Background(), in, "power", w.Items[0].Actions[0].Params); err != nil {
+	// running guests first (busiest on top), then the stopped one; local-lvm is nearly full
+	if len(w.Items) != 3 || w.Items[0].Title != "jellyfin" || w.Items[2].Title != "adguard-home" || w.Items[2].Actions[0].Label != "Starten" || len(w.Alerts) != 1 {
+		t.Fatalf("items %+v alerts %v", w.Items, w.Alerts)
+	}
+	if err := (proxmox{}).Action(context.Background(), in, "power", w.Items[2].Actions[0].Params); err != nil {
 		t.Fatal(err)
 	}
 	if err := (proxmox{}).Action(context.Background(), in, "power", map[string]string{"node": "pve/../x", "type": "lxc", "vmid": "102", "action": "start"}); err == nil {
@@ -47,6 +56,15 @@ func TestProxmox(t *testing.T) {
 	in.Values["token"] = "nur-ein-geheimnis"
 	if err := (proxmox{}).Test(context.Background(), in); err == nil {
 		t.Fatal("token without user accepted")
+	}
+}
+
+// A token created with privilege separation and no rights of its own sees nothing.
+func TestProxmoxTokenWithoutRights(t *testing.T) {
+	f := newFake(t, map[string]any{"GET /api2/json/cluster/resources": obj{"data": []obj{}}}, nil)
+	_, err := proxmox{}.Fetch(context.Background(), f.instance(map[string]string{"token": "root@pam!heimdeck=abc"}))
+	if err == nil || !strings.Contains(err.Error(), "Privilegtrennung") {
+		t.Fatalf("got %v", err)
 	}
 }
 

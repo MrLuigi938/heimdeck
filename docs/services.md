@@ -53,21 +53,24 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Pi-hole (v6 with app password, v5 with API token) | DNS queries, block rate, clients | ✓ query log (v6) | pause blocking, block or allow a domain |
 | OPNsense (API key + secret) | WAN throughput, RAM, load, uptime, gateways, updates | | |
 | UniFi (Network API key) | clients, Wi-Fi, devices online, firmware updates | ✓ clients and devices | restart device |
+| FRITZ!Box (TR-064, user + password) | choose: internet (connection, data rate, line, public IP), devices online, call list with missed calls, smart home (DECT sockets and thermostats), Wi-Fi networks | | switch DECT sockets |
 | UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
 | Speedtest Tracker | download, upload, ping, history | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
 | Docker (mounted socket) | running/stopped containers, optional updates | ✓ containers | optional start, stop, restart |
-| Proxmox VE (API token) | CPU, RAM, active guests, nodes or stopped guests | ✓ VMs and containers | start, shut down, reboot |
+| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, busiest and stopped guests or nodes | ✓ VMs and containers | start, shut down, reboot |
 | openmediavault (admin user) | CPU, RAM, uptime, updates, file systems, disk health (S.M.A.R.T.) | | |
 | **Smart home & energy** | | | |
-| Home Assistant (long-lived access token) | chosen sensors/switches or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |
-| ioBroker (REST API or Simple API adapter) | chosen data points or adapter status | ✓ data points | toggle switches |
+| Home Assistant (long-lived access token) | chosen sensors/switches with your own names, or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |
+| ioBroker (REST API or Simple API adapter) | chosen data points with your own names, or adapter status | ✓ data points | toggle switches |
 | evcc | PV, home, grid, battery, charge points (refreshes every 5 s) | | change charge mode (off, PV, min+PV, fast, smart) |
 | WLED | on/off, brightness, effect, presets | ✓ presets | on/off, brightness, apply preset |
+| Shelly (local, Gen1 to Gen4) | power, energy, temperature, humidity, battery, Wi-Fi, firmware updates | | switch relays and lights, open/stop/close covers |
 | **Other** | | | |
 | Custom API | any values, list and buttons from a JSON response | ✓ if configured | custom buttons |
-| JDownloader, FRITZ!Box, Zoraxy, Portainer, … | online status | | |
+| Webhook | messages other services post to the tile's own address (JSON, form, text, Uptime Kuma) | | buttons that call webhooks (Shelly, Home Assistant, Node-RED, IFTTT …) |
+| JDownloader, Zoraxy, Portainer, … | online status | | |
 
 Missing a service? Use the [custom API tile](#custom-api-tile) or [open an issue](https://github.com/MrLuigi938/heimdeck/issues).
 
@@ -79,11 +82,11 @@ ioBroker has no data interface of its own – it comes from an adapter:
 2. In Heimdeck, enter `http://<ioBroker-IP>:8093` as the address. The admin interface on port 8081 does not provide data. If the adapter runs inside the web adapter, use `http://<ioBroker-IP>:8082/rest-api`; the older Simple API adapter (port 8087) works as well.
 3. Click **Choose** next to “Data points on the tile” to search your data points and tick the ones you want – no need to type IDs. Without a selection the tile shows the status of your adapters.
 
-Home Assistant entities are chosen the same way.
+Home Assistant entities are chosen the same way. Below the selection every entry gets a field for **your own name** – handy when entities are called something like `sensor.0x00158d0001a2b3c4_temperature`. Leave it empty to keep the name from the service.
 
 ## Connecting Proxmox
 
-1. In Proxmox: Datacenter → Permissions → **API Tokens** → add a token (e.g. `root@pam`, name `heimdeck`). Give it the role **PVEAuditor** to view, plus **PVEVMUser** if you want to start and stop guests from Heimdeck.
+1. In Proxmox: Datacenter → Permissions → **API Tokens** → add a token (e.g. `root@pam`, name `heimdeck`) and **untick “Privilege Separation”** – otherwise the token has no rights of its own and the tile stays empty. With privilege separation, give the token itself the role **PVEAuditor** on `/` (Datacenter → Permissions → Add → API Token Permission), plus **PVEVMUser** to start and stop guests.
 2. In Heimdeck: start page → **Connect Proxmox** (or add a Proxmox tile) and enter the token as `user@pam!name=secret`.
 
 After that, 🔍 finds the services running in your VMs and containers: by name or tags (e.g. `jellyfin`, `adguard`, `paperless-ngx` – the containers of the Proxmox community scripts are named like this), with the guest's IP address and the usual port. VMs need the QEMU guest agent for this.

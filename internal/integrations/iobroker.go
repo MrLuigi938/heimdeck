@@ -36,7 +36,7 @@ func (iobroker) Def() Definition {
 		},
 		Fields: []Field{
 			{Key: "states", Label: "Datenpunkte auf der Kachel", Type: "text", Pick: true,
-				Help: "Optional, durch Komma getrennt, z. B. hm-rpc.0.ABC123.1.STATE. Leer: Adapter-Status anzeigen."},
+				Help: "Optional, durch Komma getrennt, z. B. hm-rpc.0.ABC123.1.STATE. Eigener Name: hm-rpc.0.ABC123.1.STATE = Flurlicht. Leer: Adapter-Status anzeigen."},
 			{Key: "username", Label: "Benutzername", Type: "text", Help: "Nur nötig, wenn im Adapter die Authentifizierung aktiv ist"},
 			{Key: "password", Label: "Passwort", Type: "password", Secret: true},
 		},
@@ -148,14 +148,28 @@ func (s ioState) common() ioCommon {
 
 var ioIDRe = regexp.MustCompile(`^[^\s/?#*,"'\\]+$`)
 
+func validIOID(id string) bool { return ioIDRe.MatchString(id) && !strings.Contains(id, "..") }
+
 func splitIDs(list string) []string {
 	var ids []string
 	for _, id := range strings.FieldsFunc(list, func(r rune) bool { return r == ',' || r == ' ' || r == ';' || r == '\n' }) {
-		if ioIDRe.MatchString(id) && !strings.Contains(id, "..") {
+		if validIOID(id) {
 			ids = append(ids, id)
 		}
 	}
 	return ids
+}
+
+// tileStates reads the "states" field: valid IDs with the user's own names.
+func tileStates(list string) (ids []string, names map[string]string) {
+	names = map[string]string{}
+	for _, e := range namedIDs(list) {
+		if validIOID(e.ID) {
+			ids = append(ids, e.ID)
+			names[e.ID] = e.Name
+		}
+	}
+	return ids, names
 }
 
 // states loads values and object info for the given ids. Unknown ids are
@@ -235,9 +249,10 @@ func ioValue(in *Instance, s ioState) string {
 	return strings.TrimSpace(fmt.Sprint(s.Val) + " " + c.Unit)
 }
 
-func (b iobroker) item(in *Instance, id string, s ioState) Item {
+// item shows a data point; label is the user's own name for it, if any.
+func (b iobroker) item(in *Instance, id string, s ioState, label string) Item {
 	c := s.common()
-	it := Item{Title: firstNonEmpty(c.name(in.Lang), id), Subtitle: id, Badge: ioValue(in, s)}
+	it := Item{Title: firstNonEmpty(label, c.name(in.Lang), id), Subtitle: id, Badge: ioValue(in, s)}
 	if c.switchable() {
 		it.Actions = []Action{{ID: "toggle", Label: in.T("Umschalten"), Params: map[string]string{"id": id}}}
 	}
@@ -246,7 +261,7 @@ func (b iobroker) item(in *Instance, id string, s ioState) Item {
 
 func (b iobroker) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	w := &Widget{}
-	if ids := splitIDs(in.V("states")); len(ids) > 0 {
+	if ids, names := tileStates(in.V("states")); len(ids) > 0 {
 		states, err := b.states(ctx, in, ids)
 		if err != nil {
 			return nil, err
@@ -258,10 +273,10 @@ func (b iobroker) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				continue
 			}
 			if s.common().switchable() {
-				w.Items = append(w.Items, b.item(in, id, s))
+				w.Items = append(w.Items, b.item(in, id, s, names[id]))
 				continue
 			}
-			w.Stats = append(w.Stats, Stat{Label: firstNonEmpty(s.common().name(in.Lang), id), Value: ioValue(in, s)})
+			w.Stats = append(w.Stats, Stat{Label: firstNonEmpty(names[id], s.common().name(in.Lang), id), Value: ioValue(in, s)})
 		}
 		return w, nil
 	}
@@ -355,12 +370,13 @@ func (b iobroker) Search(ctx context.Context, in *Instance, query string) ([]Ite
 		return []Item{}, err
 	}
 	states, _ := b.states(ctx, in, ids)
+	_, names := tileStates(in.V("states")) // own names from the tile also apply in the search
 	out := []Item{}
 	for _, id := range ids {
 		s := states[id]
 		c := found[id]
 		s.Common = &c
-		out = append(out, b.item(in, id, s))
+		out = append(out, b.item(in, id, s, names[id]))
 	}
 	return out, nil
 }

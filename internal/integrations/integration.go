@@ -211,6 +211,30 @@ func FetchImage(ctx context.Context, src ImageSource, in *Instance, path string)
 	return resp, nil
 }
 
+// namedID is an entry of a pick list field, with the display name the user
+// gave it (empty: use the service's own name).
+type namedID struct{ ID, Name string }
+
+// namedIDs reads pick list fields like "sensor.temp = Wohnzimmer, light.kueche":
+// entries separated by commas, semicolons or line breaks, each optionally
+// followed by "= display name". Entries without a name may also be separated
+// by spaces, as lists were before names existed.
+func namedIDs(list string) []namedID {
+	var out []namedID
+	for _, part := range strings.FieldsFunc(list, func(r rune) bool { return r == ',' || r == ';' || r == '\n' }) {
+		if id, name, ok := strings.Cut(part, "="); ok {
+			if id = strings.TrimSpace(id); id != "" {
+				out = append(out, namedID{ID: id, Name: strings.TrimSpace(name)})
+			}
+			continue
+		}
+		for _, id := range strings.Fields(part) {
+			out = append(out, namedID{ID: id})
+		}
+	}
+	return out
+}
+
 // hasPrefix reports whether path starts with one of the prefixes.
 func hasPrefix(path string, prefixes ...string) bool {
 	for _, p := range prefixes {
@@ -476,7 +500,6 @@ func init() {
 	for _, d := range []Definition{
 		{ID: "link", Name: "Nur Link", Icon: "", Category: "Allgemein", Description: "Einfache Verknüpfung ohne Integration"},
 		{ID: "zoraxy", Name: "Zoraxy", Icon: "zoraxy", Category: "Netzwerk", Images: []string{"zoraxy"}, Port: 8000},
-		{ID: "fritzbox", Name: "FRITZ!Box", Icon: "fritzbox", Category: "Netzwerk", Description: "Router-Oberfläche (Integration folgt)"},
 		{ID: "jdownloader", Name: "JDownloader", Icon: "jdownloader", Category: "Downloads", Images: []string{"jdownloader"}, Port: 5800},
 		{ID: "portainer", Name: "Portainer", Icon: "portainer", Category: "System", Images: []string{"portainer"}, Port: 9000},
 		{ID: "dockge", Name: "Dockge", Icon: "dockge", Category: "System", Images: []string{"dockge"}, Port: 5001},

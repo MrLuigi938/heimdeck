@@ -323,6 +323,18 @@ export const en = {
     'No message to your bot found yet. Write it something in Telegram (e.g. "Hello") and click "Find chat ID" again.',
   'Chat-ID von „{name}“ eingetragen – jetzt speichern.': 'Chat ID of "{name}" filled in – now save.',
   '{n} Chats gefunden – bitte unten auswählen.': '{n} chats found – please pick one below.',
+  // webhook tile
+  'Kopieren': 'Copy',
+  'Kopiert': 'Copied',
+  'Neu erzeugen': 'New address',
+  'Die alte Adresse funktioniert danach nicht mehr': 'The old address stops working',
+  'Kopieren geht hier nicht – bitte die Adresse markieren und von Hand kopieren': 'Copying does not work here – please select the address and copy it by hand',
+  'POST mit JSON {"title": "…", "message": "…"}, als Formular oder Text – oder GET mit ?title=…&message=…. Gilt nach dem Speichern.':
+    'POST with JSON {"title": "…", "message": "…"}, as a form or text – or GET with ?title=…&message=…. Works after saving.',
+  // own names for picked entries
+  'Anzeigenamen auf der Kachel – leer lassen für den Namen aus {name}': 'Names shown on the tile – leave empty for the name from {name}',
+  'Anzeigename (optional)': 'Display name (optional)',
+  'Anzeigename für {id}': 'Display name for {id}',
   // logout button
   'Abmelden?': 'Log out?',
   'Zum Abmelden nochmal klicken': 'Click again to log out',

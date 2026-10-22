@@ -26,8 +26,13 @@ func (proxmox) Def() Definition {
 	return Definition{
 		ID: "proxmox", Name: "Proxmox VE", Icon: "proxmox", Category: "System",
 		Description: "Nodes, CPU und RAM, laufende VMs und Container, Gäste starten, herunterfahren und neu starten, Dienste in VMs und LXCs automatisch finden",
+		Setup: []string{
+			"Als lokale Adresse die Proxmox-Oberfläche eintragen, z. B. https://192.168.1.10:8006, und unter „Weitere Optionen“ „Zertifikat nicht prüfen“ anhaken (Proxmox nutzt ein selbstsigniertes Zertifikat).",
+			"Token anlegen: Rechenzentrum → Berechtigungen → API-Token → Hinzufügen. Benutzer z. B. root@pam, eine Token-ID wie heimdeck, und „Privilegtrennung“ abwählen – sonst hat der Token keine Rechte und die Kachel bleibt leer.",
+			"Den Token als benutzer@pam!token-id=geheimnis eintragen, z. B. root@pam!heimdeck=1234abcd-…. Mit Privilegtrennung: dem Token selbst unter Rechenzentrum → Berechtigungen → Hinzufügen → API-Token-Berechtigung auf „/“ die Rolle PVEAuditor geben (für Start/Stopp zusätzlich PVEVMUser).",
+		},
 		Fields: []Field{{Key: "token", Label: "API-Token", Type: "password", Required: true, Secret: true,
-			Help: "Rechenzentrum → Berechtigungen → API-Token → Hinzufügen, eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser. Bei selbstsigniertem Zertifikat unter „Weitere Optionen“ „Zertifikat nicht prüfen“ aktivieren."}},
+			Help: "Eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser."}},
 		HasWidget: true, HasSearch: true, Port: 8006,
 	}
 }
@@ -59,6 +64,11 @@ type pveResource struct {
 	MaxMem   float64 `json:"maxmem"`
 	Tags     string  `json:"tags"`
 	Template int     `json:"template"`
+	Disk     float64 `json:"disk"`
+	MaxDisk  float64 `json:"maxdisk"`
+	Uptime   float64 `json:"uptime"`
+	Storage  string  `json:"storage"`
+	Shared   int     `json:"shared"`
 }
 
 func (p proxmox) resources(ctx context.Context, in *Instance) ([]pveResource, error) {
@@ -85,10 +95,11 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if err != nil {
 		return nil, err
 	}
-	var nodes []pveResource
-	var stopped []pveResource
+	var nodes, stopped, runningGuests []pveResource
 	nodesOnline, guests, running := 0, 0, 0
-	var cpu, cpus, mem, maxMem float64
+	var cpu, cpus, mem, maxMem, disk, maxDisk float64
+	sharedSeen := map[string]bool{}
+	w := &Widget{}
 	for _, r := range res {
 		switch {
 		case r.Type == "node":
@@ -104,12 +115,33 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			guests++
 			if r.Status == "running" {
 				running++
+				runningGuests = append(runningGuests, r)
 			} else {
 				stopped = append(stopped, r)
 			}
+		case r.Type == "storage" && r.Status == "available" && r.MaxDisk > 0:
+			// A shared storage (NFS, Ceph …) shows up once per node; count it once.
+			if r.Shared == 1 {
+				if sharedSeen[r.Storage] {
+					continue
+				}
+				sharedSeen[r.Storage] = true
+			}
+			disk += r.Disk
+			maxDisk += r.MaxDisk
+			if r.Disk/r.MaxDisk > 0.9 {
+				w.Alerts = append(w.Alerts, in.T("Speicher „%s“ ist zu %.0f %% voll", firstNonEmpty(r.Storage, r.ID), r.Disk/r.MaxDisk*100))
+			}
 		}
 	}
-	w := &Widget{}
+	// Proxmox answers with an empty list when the token has no rights at all –
+	// usually because "privilege separation" was left on when creating it.
+	if len(nodes) == 0 && guests == 0 {
+		return nil, in.Errorf("Der API-Token sieht keine Nodes und keine Gäste – beim Anlegen war vermutlich „Privilegtrennung“ an. Den Token ohne Privilegtrennung neu anlegen oder dem Token selbst die Rolle PVEAuditor auf „/“ geben.")
+	}
+	if len(nodes) == 0 {
+		w.Alerts = append(w.Alerts, in.T("Der API-Token sieht die Nodes nicht – für CPU und RAM die Rolle PVEAuditor auf „/“ vergeben."))
+	}
 	if len(nodes) > 1 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Nodes online"), Value: fmt.Sprintf("%d/%d", nodesOnline, len(nodes)), Tone: toneIf(nodesOnline < len(nodes), "bad")})
 	}
@@ -119,7 +151,13 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if maxMem > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("RAM"), Value: fmt.Sprintf("%.0f %%", mem/maxMem*100), Tone: toneIf(mem/maxMem > 0.9, "warn")})
 	}
+	if maxDisk > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Speicher"), Value: fmt.Sprintf("%.0f %%", disk/maxDisk*100), Tone: toneIf(disk/maxDisk > 0.9, "warn")})
+	}
 	w.Stats = append(w.Stats, Stat{Label: in.T("Gäste aktiv"), Value: fmt.Sprintf("%d/%d", running, guests)})
+	if len(nodes) == 1 && nodes[0].Uptime > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, nodes[0].Uptime)})
+	}
 
 	if len(nodes) > 1 {
 		w.ItemsTitle = in.T("Nodes")
@@ -132,13 +170,15 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			}
 			w.Items = append(w.Items, it)
 		}
-	} else if len(stopped) > 0 {
-		w.ItemsTitle = in.T("Gestoppt")
+	} else {
+		// One node: the guests that work hardest, then the stopped ones.
+		w.ItemsTitle = in.T("Gäste")
+		sort.Slice(runningGuests, func(i, j int) bool {
+			a, b := runningGuests[i], runningGuests[j]
+			return a.CPU*a.MaxCPU+a.Mem/1e10 > b.CPU*b.MaxCPU+b.Mem/1e10
+		})
 		sort.Slice(stopped, func(i, j int) bool { return stopped[i].VMID < stopped[j].VMID })
-		for i, r := range stopped {
-			if i == 5 {
-				break
-			}
+		for _, r := range append(runningGuests[:min(5, len(runningGuests))], stopped[:min(3, len(stopped))]...) {
 			w.Items = append(w.Items, p.guestItem(in, r))
 		}
 	}
@@ -148,10 +188,12 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 func (p proxmox) guestItem(in *Instance, r pveResource) Item {
 	kind := map[string]string{"qemu": "VM", "lxc": "LXC"}[r.Type]
 	sub := []string{fmt.Sprintf("%s %d", kind, r.VMID), r.Node}
+	it := Item{Title: r.Name, URL: in.Link("/")}
 	if r.Status == "running" && r.MaxMem > 0 {
-		sub = append(sub, fmt.Sprintf("CPU %.0f %%", r.CPU*100), "RAM "+in.Bytes(r.Mem))
+		sub = append(sub, fmt.Sprintf("CPU %.0f %%", r.CPU*100), "RAM "+in.Bytes(r.Mem)+" / "+in.Bytes(r.MaxMem))
+		it.Progress = pct(r.Mem / r.MaxMem * 100)
 	}
-	it := Item{Title: r.Name, Subtitle: strings.Join(sub, " · "), URL: in.Link("/")}
+	it.Subtitle = strings.Join(sub, " · ")
 	params := map[string]string{"node": r.Node, "type": r.Type, "vmid": strconv.Itoa(r.VMID)}
 	if r.Status == "running" {
 		it.Badge = in.T("Läuft")
@@ -227,6 +269,9 @@ func ProxmoxGuests(ctx context.Context, in *Instance) ([]Guest, error) {
 	res, err := p.resources(ctx, in)
 	if err != nil {
 		return nil, err
+	}
+	if len(res) == 0 {
+		return nil, in.Errorf("Der API-Token sieht keine Nodes und keine Gäste – beim Anlegen war vermutlich „Privilegtrennung“ an. Den Token ohne Privilegtrennung neu anlegen oder dem Token selbst die Rolle PVEAuditor auf „/“ geben.")
 	}
 	var guests []Guest
 	for _, r := range res {

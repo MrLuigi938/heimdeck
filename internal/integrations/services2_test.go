@@ -199,6 +199,13 @@ func TestIoBroker(t *testing.T) {
 	if err != nil || stats(w)["Temperatur"] != "21,46 °C" || len(w.Items) != 1 || w.Items[0].Title != "Stehlampe" || w.Items[0].Badge != "An" {
 		t.Fatalf("%v %+v", err, w)
 	}
+	// own display names
+	in.Values["states"] = "hm-rpc.0.ABC.1.STATE = Flurlicht, javascript.0.temp = Außen"
+	w, err = iobroker{}.Fetch(context.Background(), in)
+	if err != nil || stats(w)["Außen"] != "21,46 °C" || w.Items[0].Title != "Flurlicht" {
+		t.Fatalf("named: %v %+v", err, w)
+	}
+	in.Values["states"] = "hm-rpc.0.ABC.1.STATE, javascript.0.temp"
 	if err := (iobroker{}).Action(context.Background(), in, "toggle", map[string]string{"id": "hm-rpc.0.ABC.1.STATE"}); err != nil {
 		t.Fatal(err)
 	}
