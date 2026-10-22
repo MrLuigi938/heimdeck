@@ -323,6 +323,17 @@ export const en = {
     'No message to your bot found yet. Write it something in Telegram (e.g. "Hello") and click "Find chat ID" again.',
   'Chat-ID von „{name}“ eingetragen – jetzt speichern.': 'Chat ID of "{name}" filled in – now save.',
   '{n} Chats gefunden – bitte unten auswählen.': '{n} chats found – please pick one below.',
+  // choosing live data
+  'Live-Daten auswählen': 'Choose live data',
+  '{n} ausgeblendet': '{n} hidden',
+  'Bereiche': 'Sections',
+  'Ohne Haken zeigt die Kachel alle Bereiche.': 'Without a tick the tile shows all sections.',
+  'Werte': 'Values',
+  'Neu laden': 'Reload',
+  'Der Dienst liefert gerade keine Werte.': 'The service delivers no values right now.',
+  'Abschnitt': 'Section',
+  'gerade nicht geliefert': 'not delivered right now',
+  'Adresse und Zugangsdaten eintragen, dann zeigt Heimdeck hier, was der Dienst liefert.': 'Enter the address and credentials, then Heimdeck shows here what the service delivers.',
   // webhook tile
   'Kopieren': 'Copy',
   'Kopiert': 'Copied',

@@ -3,13 +3,15 @@ package i18n
 // en maps German source texts to English.
 var en = map[string]string{
 	// ---- general ----
-	"gestern":      "yesterday",
-	"vor %d Min.":  "%d min ago",
-	"gerade eben":  "just now",
-	"vor %d Std.":  "%d h ago",
-	"vor %d Tagen": "%d days ago",
-	"noch %s":      "%s left",
-	"„%s“ fehlt":   "“%s” is missing",
+	"gestern":                "yesterday",
+	"vor %d Min.":            "%d min ago",
+	"gerade eben":            "just now",
+	"Liste":                  "List",
+	"Hinweise und Warnungen": "Notes and warnings",
+	"vor %d Std.":            "%d h ago",
+	"vor %d Tagen":           "%d days ago",
+	"noch %s":                "%s left",
+	"„%s“ fehlt":             "“%s” is missing",
 
 	// ---- categories & groups ----
 	"Allgemein": "General",

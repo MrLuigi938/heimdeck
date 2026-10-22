@@ -34,6 +34,9 @@ type Field struct {
 	Options []string `json:"options,omitempty"`
 	// Pick offers a searchable list (from a Chooser) to fill a comma-separated field.
 	Pick bool `json:"pick,omitempty"`
+	// Display marks options that choose what the tile shows; the editor puts
+	// them into its foldable "Live data" section.
+	Display bool `json:"display,omitempty"`
 }
 
 // Choice is one entry of a field's pick list.

@@ -13,10 +13,11 @@
   // svelte-ignore state_referenced_locally
   let form = $state({
     id: 0, groupId: groups[0]?.id, name: '', url: '', externalUrl: '', apiUrl: '', icon: '', description: '',
-    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, secretsSet: [],
+    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, secretsSet: [], hide: [],
     ...structuredClone($state.snapshot(tile)),
   });
   form.config ??= {};
+  form.hide ??= [];
   let secrets = $state({});
   let step = $state(form.integration || form.id ? 'form' : 'pick');
   let filter = $state('');
@@ -57,6 +58,29 @@
     }
     testing = false;
   }
+
+  // "Live data on the tile": the values and sections the service delivers,
+  // asked for once when the section is opened. Unticked ones go to form.hide.
+  let parts = $state(null);
+  let partsError = $state('');
+  let partsLoading = $state(false);
+  async function loadParts() {
+    partsLoading = true;
+    partsError = '';
+    try {
+      parts = (await post('/tiles/parts', payload())).parts;
+    } catch (e) {
+      parts = null;
+      partsError = e.message;
+    }
+    partsLoading = false;
+  }
+  function togglePart(key, show) {
+    form.hide = show ? form.hide.filter((k) => k !== key) : [...form.hide, key];
+  }
+  // Hidden parts the service does not deliver right now (e.g. an empty list) stay listed.
+  let hiddenElsewhere = $derived(parts ? form.hide.filter((k) => !parts.some((p) => p.key === k)) : []);
+  let displayFields = $derived((def?.fields || []).filter((f) => f.display));
 
   // Pick list for fields like Home Assistant entities: search and tick instead of typing IDs.
   let picking = $state('');
@@ -234,7 +258,7 @@
         </label>
       </div>
 
-      {#each def?.fields || [] as f}
+      {#each (def?.fields || []).filter((f) => !f.display) as f}
         {#if f.type === 'checkbox'}
           <label class="check">
             <input type="checkbox" checked={form.config[f.key] === 'true'} onchange={(e) => (form.config[f.key] = e.currentTarget.checked ? 'true' : '')} />
@@ -321,6 +345,49 @@
 
       {#if def?.hasWidget}
         <label class="check"><input type="checkbox" bind:checked={form.showWidget} /> {t('Live-Daten auf der Kachel anzeigen')}</label>
+        {#if form.showWidget}
+          <details class="setup parts" ontoggle={(e) => e.currentTarget.open && !parts && !partsLoading && loadParts()}>
+            <summary>
+              {t('Live-Daten auswählen')}
+              {#if form.hide.length}<span class="muted">· {t('{n} ausgeblendet', { n: form.hide.length })}</span>{/if}
+            </summary>
+            {#if displayFields.length}
+              <div class="part-group">{t('Bereiche')}</div>
+              {#each displayFields as f}
+                <label class="check">
+                  <input type="checkbox" checked={form.config[f.key] === 'true'} onchange={(e) => (form.config[f.key] = e.currentTarget.checked ? 'true' : '')} />
+                  {f.label}
+                </label>
+              {/each}
+              <span class="help">{t('Ohne Haken zeigt die Kachel alle Bereiche.')}</span>
+            {/if}
+            <div class="part-group">
+              {t('Werte')}
+              <button type="button" class="ghost small" onclick={loadParts} disabled={partsLoading}>{partsLoading ? t('Lade …') : t('Neu laden')}</button>
+            </div>
+            {#if partsError}
+              <div class="help bad">{partsError}</div>
+            {:else if parts && !parts.length}
+              <div class="help">{t('Der Dienst liefert gerade keine Werte.')}</div>
+            {:else if parts}
+              {#each parts as p (p.key)}
+                <label class="check part">
+                  <input type="checkbox" checked={!form.hide.includes(p.key)} onchange={(e) => togglePart(p.key, e.currentTarget.checked)} />
+                  <span class:section={p.section}>{p.label}</span>
+                  {#if p.value}<span class="pval">{p.value}</span>{/if}
+                </label>
+              {/each}
+              {#each hiddenElsewhere as k (k)}
+                <label class="check part">
+                  <input type="checkbox" checked={false} onchange={() => togglePart(k, true)} />
+                  <span class="muted">{k.startsWith('#') ? t('Abschnitt') : k} – {t('gerade nicht geliefert')}</span>
+                </label>
+              {/each}
+            {:else if !partsLoading}
+              <div class="help">{t('Adresse und Zugangsdaten eintragen, dann zeigt Heimdeck hier, was der Dienst liefert.')}</div>
+            {/if}
+          </details>
+        {/if}
       {/if}
       <label class="check"><input type="checkbox" bind:checked={form.monitor} /> {t('Online-Status prüfen und anzeigen')}</label>
 
@@ -393,6 +460,12 @@
   .row input { flex: 1; min-width: 0; }
   .chooser { display: grid; gap: 8px; margin-top: -6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; }
   .choices { max-height: 280px; overflow: auto; display: grid; gap: 2px; }
+  .parts { display: grid; gap: 8px; }
+  .parts[open] summary { margin-bottom: 4px; }
+  .part-group { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }
+  .part { display: flex; align-items: center; gap: 8px; }
+  .part .section { font-style: italic; }
+  .pval { margin-left: auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
   .entries { display: grid; gap: 6px; margin-top: -6px; }
   .entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
   .eid { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

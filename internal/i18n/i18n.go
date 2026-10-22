@@ -7,6 +7,7 @@ package i18n
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,6 +33,34 @@ func T(lang, s string, args ...any) string {
 	}
 	if len(args) > 0 {
 		return fmt.Sprintf(s, args...)
+	}
+	return s
+}
+
+var (
+	sourceOnce sync.Once
+	source     map[string]string // English text -> German source
+)
+
+// Source returns the German original of a text shown in lang, so settings
+// that name a label (e.g. hidden tile values) work in every language.
+// Texts without a translation are their own source.
+func Source(lang, s string) string {
+	if lang != EN {
+		return s
+	}
+	sourceOnce.Do(func() {
+		source = make(map[string]string, len(en))
+		// Several German texts can share one translation: take the smallest,
+		// so the result does not depend on map order.
+		for de, e := range en {
+			if old, taken := source[e]; !taken || de < old {
+				source[e] = de
+			}
+		}
+	})
+	if de, ok := source[s]; ok {
+		return de
 	}
 	return s
 }

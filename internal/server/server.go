@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/tiles/{id}", s.handleSaveTile)
 	api.HandleFunc("DELETE /api/tiles/{id}", s.handleDeleteTile)
 	api.HandleFunc("POST /api/tiles/test", s.handleTestTile)
+	api.HandleFunc("POST /api/tiles/parts", s.handleTileParts)
 	api.HandleFunc("POST /api/tiles/choices", s.handleChoices)
 	api.HandleFunc("GET /api/tiles/{id}/widget", s.handleWidget)
 	api.HandleFunc("POST /api/tiles/{id}/action", s.handleAction)
