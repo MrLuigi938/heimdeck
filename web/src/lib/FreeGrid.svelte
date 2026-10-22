@@ -194,7 +194,7 @@
     {#if it}
       <div class="cell" role="listitem" class:moving={(dragging === tile.id && preview) || resizing?.it.id === tile.id} style:grid-area={area(it)}>
         <!-- One column wide is too narrow for name and live data: the tile becomes an icon. -->
-        <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={it.w === 1 ? 'icons' : ''}
+        <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={it.w === 1 ? 'icons' : ''} free
           onEdit={() => onEdit(tile)} dragProps={tileDragProps(tile)} />
         {#if editMode}
           <button class="resize" title={t('Größe ändern')} aria-label={t('Größe ändern')}
@@ -219,10 +219,21 @@
     grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), 29px);
   }
   .cells span { border: 1px dashed var(--border-strong); border-radius: 8px; opacity: .45; }
-  .cell { position: relative; min-width: 0; min-height: 0; }
-  /* The grid sets the size; content that does not fit scrolls inside the tile. */
-  .cell > :global(.tile) { height: 100%; overflow: auto; }
-  .cell > :global(.tile.compact) { aspect-ratio: auto; }
+  /* Each cell is a size container, so icons and names can follow its size. */
+  .cell { position: relative; min-width: 0; min-height: 0; container-type: size; --icon-max: 42cqmin; }
+  /* The grid sets the size; content that does not fit scrolls inside the tile.
+     The scrollbar only shows while the pointer is on the tile. */
+  .cell > :global(.tile) {
+    height: 100%; overflow: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: transparent transparent;
+  }
+  .cell > :global(.tile:hover) { scrollbar-color: var(--border-strong) transparent; }
+  /* Icon tiles scale with the cell instead of scrolling. */
+  .cell > :global(.tile.compact) { aspect-ratio: auto; overflow: hidden; }
+  .cell :global(.tile.compact .square) { padding: 6px; gap: 4px; }
+  @container (max-height: 84px) {
+    .cell :global(.tile.compact .cname) { display: none; }
+  }
   .cell.moving > :global(.tile) { opacity: .45; }
   .landing { border: 2px dashed var(--accent); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .resize {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/logging"
 )
 
 // Favicons are the fallback for tiles without a known icon: the icon a
@@ -174,7 +175,11 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 				defer cancel()
-				f, _ := fetchFavicon(ctx, base, t.Insecure)
+				var f favicon
+				func() {
+					defer logging.Recover("Favicon", "adresse", base)
+					f, _ = fetchFavicon(ctx, base, t.Insecure)
+				}()
 				f.at = time.Now()
 				s.mu.Lock()
 				s.favicons[key] = f

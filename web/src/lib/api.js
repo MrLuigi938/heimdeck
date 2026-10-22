@@ -2,6 +2,10 @@ import { i18n, t } from './i18n.svelte.js';
 
 // Small wrapper around fetch for the JSON API. The X-Lang header makes the
 // backend answer (widget texts, error messages) in the selected language.
+// Debug mode (setting): every API call is written to the browser console.
+let debug = false;
+export const setDebug = (on) => (debug = on);
+
 export async function api(method, path, body) {
   const opts = { method, headers: { 'X-Lang': i18n.lang }, credentials: 'same-origin' };
   if (body !== undefined) {
@@ -10,7 +14,18 @@ export async function api(method, path, body) {
   } else if (method !== 'GET') {
     opts.headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch('/api' + path, opts);
+  const start = performance.now();
+  let res;
+  try {
+    res = await fetch('/api' + path, opts);
+  } catch (err) {
+    if (debug) console.error(`[Heimdeck] ${method} ${path} – keine Verbindung zum Server (${err.message})`);
+    throw err;
+  }
+  if (debug) {
+    const line = `[Heimdeck] ${method} ${path} → ${res.status} (${Math.round(performance.now() - start)} ms)`;
+    res.ok ? console.debug(line) : console.warn(line);
+  }
   if (res.status === 401 && path !== '/login') {
     window.dispatchEvent(new Event('heimdeck:logout'));
   }

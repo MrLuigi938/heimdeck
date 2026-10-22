@@ -123,7 +123,7 @@ Change the defaults with environment variables, e.g. `CTID=150 IP=192.168.1.50/2
 | Variable | Default | Meaning |
 |---|---|---|
 | `CTID` | next free ID | Container ID |
-| `CT_HOSTNAME` | `heimdeck` | Host name |
+| `CT_HOSTNAME` | `heimdeck` | Container name in Proxmox (host name); asked for when the script runs in a terminal |
 | `CORES` / `MEMORY` / `DISK` | `1` / `512` / `2` | CPU cores, RAM in MB, disk in GB |
 | `STORAGE` | first container storage | Storage for the container disk |
 | `TPL_STORAGE` | first template storage | Storage for the Debian template |
@@ -171,6 +171,7 @@ Heimdeck is configured in the web interface. A few things are set via environmen
 | `HEIMDECK_SECURE_COOKIE` | `false` | Set to `true` when Heimdeck is only reachable via HTTPS |
 | `DOCKER_HOST` | `/var/run/docker.sock` | Docker connection, e.g. `tcp://socket-proxy:2375` |
 | `HEIMDECK_PROXMOX_URL` | – | Proxmox address suggested during setup |
+| `HEIMDECK_DEBUG` | `false` | `true` = debug mode from the start, regardless of the setting (see [Troubleshooting](usage.md#troubleshooting)) |
 | `TZ` | `UTC` | Time zone for times and dates |
 
 ## Behind a reverse proxy (HTTPS)

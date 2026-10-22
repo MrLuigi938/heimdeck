@@ -304,5 +304,15 @@ export const en = {
   'Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.':
     'In edit mode (✎) drag tiles to where you want them and resize them with the bottom-right corner (double-click fits the height to the content). One column wide, a tile becomes an icon. On phones the tiles are listed in this order.',
   'Größe ändern': 'Resize',
+  // debug mode
+  'Fehlersuche': 'Troubleshooting',
+  'Debug-Modus': 'Debug mode',
+  'Debug-Modus eingeschaltet': 'Debug mode on',
+  'Debug-Modus ausgeschaltet': 'Debug mode off',
+  'Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.':
+    'Writes to the log what Heimdeck is doing: every request with its duration, live data fetches and status checks. In the browser the requests also appear in the console (F12). Only turn it on for troubleshooting.',
+  'Eingeschaltet über HEIMDECK_DEBUG=true – lässt sich hier nicht ausschalten.': 'Turned on with HEIMDECK_DEBUG=true – it cannot be turned off here.',
+  'Protokoll ansehen': 'View the log',
+  'Installationsskript und Proxmox': 'Install script and Proxmox',
   'Freies Raster: auf einem größeren Bildschirm anordnen.': 'Free grid: arrange it on a larger screen.',
 };

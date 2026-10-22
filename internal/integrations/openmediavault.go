@@ -119,17 +119,45 @@ func (o openmediavault) Test(ctx context.Context, in *Instance) error {
 	return o.rpc(ctx, in, "System", "getInformation", nil, &info)
 }
 
-// omvNum reads numbers that openmediavault sends as strings (bytes > 4 GiB).
+// omvNum reads numbers that openmediavault sends as strings: plain (bytes
+// > 4 GiB) or, depending on the version, already formatted like "3.70 GiB"
+// or "12 %". A value it cannot read becomes 0 instead of failing the tile.
 type omvNum float64
 
+var omvUnits = map[string]float64{
+	"": 1, "b": 1, "%": 1,
+	"k": 1 << 10, "kb": 1e3, "kib": 1 << 10,
+	"m": 1 << 20, "mb": 1e6, "mib": 1 << 20,
+	"g": 1 << 30, "gb": 1e9, "gib": 1 << 30,
+	"t": 1 << 40, "tb": 1e12, "tib": 1 << 40,
+	"p": 1 << 50, "pb": 1e15, "pib": 1 << 50,
+}
+
 func (n *omvNum) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), `"`)
+	*n = omvNum(parseOmvNum(strings.Trim(string(b), `"`)))
+	return nil
+}
+
+func parseOmvNum(s string) float64 {
+	s = strings.TrimSpace(s)
 	if s == "" || s == "null" {
-		return nil
+		return 0
 	}
-	f, err := strconv.ParseFloat(s, 64)
-	*n = omvNum(f)
-	return err
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	i := strings.IndexFunc(s, func(r rune) bool { return (r < '0' || r > '9') && r != '.' && r != '-' && r != ',' })
+	if i <= 0 {
+		return 0
+	}
+	f, err := strconv.ParseFloat(strings.ReplaceAll(s[:i], ",", "."), 64)
+	if err != nil {
+		return 0
+	}
+	if unit, ok := omvUnits[strings.ToLower(strings.TrimSpace(s[i:]))]; ok {
+		return f * unit
+	}
+	return f
 }
 
 type omvInfo struct {
@@ -141,6 +169,14 @@ type omvInfo struct {
 	RebootRequired      bool   `json:"rebootRequired"`
 	ConfigDirty         bool   `json:"configDirty"`
 	AvailablePkgUpdates int    `json:"availablePkgUpdates"`
+}
+
+// omvPercent shows a share, or a dash when the version sent something else (e.g. bytes).
+func omvPercent(p float64) string {
+	if p < 0 || p > 100 {
+		return "–"
+	}
+	return fmt.Sprintf("%.0f %%", p)
 }
 
 func uptimeText(in *Instance, seconds float64) string {
@@ -155,9 +191,13 @@ func (o openmediavault) Fetch(ctx context.Context, in *Instance) (*Widget, error
 	if err := o.rpc(ctx, in, "System", "getInformation", nil, &info); err != nil {
 		return nil, err
 	}
+	mem := float64(info.MemUtilization)
+	if mem <= 1 { // older versions send 0..1, newer ones percent
+		mem *= 100
+	}
 	w := &Widget{Stats: []Stat{
 		{Label: in.T("CPU"), Value: fmt.Sprintf("%.0f %%", float64(info.CPUUtilization)), Tone: toneIf(info.CPUUtilization > 90, "warn")},
-		{Label: in.T("RAM"), Value: fmt.Sprintf("%.0f %%", float64(info.MemUtilization)*100), Tone: toneIf(info.MemUtilization > 0.9, "warn")},
+		{Label: in.T("RAM"), Value: omvPercent(mem), Tone: toneIf(mem > 90 && mem <= 100, "warn")},
 		{Label: in.T("Laufzeit"), Value: uptimeText(in, float64(info.Uptime))},
 		{Label: in.T("Updates"), Value: in.Num(info.AvailablePkgUpdates), Tone: toneIf(info.AvailablePkgUpdates > 0, "warn")},
 	}}

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +21,7 @@ import (
 	"github.com/heimdeck/heimdeck/internal/docker"
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
 
@@ -90,9 +93,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		} else if !errors.Is(err, auth.ErrInvalid) {
 			code = 500
 		}
+		slog.Warn("Anmeldung fehlgeschlagen", "benutzer", strings.TrimSpace(c.Username), "von", r.RemoteAddr, "grund", err)
 		writeErr(w, code, err)
 		return
 	}
+	slog.Debug("Angemeldet", "benutzer", strings.TrimSpace(c.Username), "von", r.RemoteAddr)
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -222,6 +227,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"proxmoxHint":  proxmoxHint(),
 		"notify":       map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != ""},
 		"username":     name,
+		"debug":        logging.Debug(),
+		"debugForced":  logging.Forced(), // HEIMDECK_DEBUG=true, the setting cannot turn it off
 	})
 }
 
@@ -233,6 +240,7 @@ var allowedSettings = map[string]bool{
 	"columns": true, "searchEngine": true, "searchUrl": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
+	"debug": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -265,6 +273,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	if v, ok := m["debug"]; ok {
+		logging.SetDebug(v == "true")
+	}
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -281,9 +292,11 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	g, err := s.store.CreateGroup(strings.TrimSpace(body.Name), body.BoardID)
 	if err != nil {
+		slog.Error("Gruppe anlegen", "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Gruppe angelegt", "gruppe", g.ID, "name", g.Name, "dashboard", g.BoardID)
 	writeJSON(w, g)
 }
 
@@ -397,9 +410,11 @@ func (s *Server) handleSaveTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SaveTile(&t); err != nil {
+		slog.Error("Kachel speichern", "kachel", t.ID, "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Kachel gespeichert", "kachel", t.ID, "name", t.Name, "dienst", t.Integration, "gruppe", t.GroupID)
 	s.forget(t.ID)
 	s.requestCheck(t.ID)
 	writeJSON(w, toDTO(t))
@@ -416,9 +431,11 @@ func (s *Server) handleDeleteTile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteTile(id); err != nil {
+		slog.Error("Kachel löschen", "kachel", id, "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Kachel gelöscht", "kachel", id)
 	s.forget(id)
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -430,9 +447,11 @@ func (s *Server) handleLayout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.SaveLayout(l); err != nil {
+		slog.Error("Anordnung speichern", "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Anordnung gespeichert", "gruppen", len(l))
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -575,12 +594,14 @@ func (s *Server) fetchWidget(t store.Tile, lang, key string, gen int, done chan 
 	defer close(done)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	var w *integrations.Widget
-	var err error
-	if integ, ok := integrations.Get(t.Integration); ok {
-		w, err = integ.Fetch(ctx, s.instance(t, lang))
-	} else {
-		err = errors.New("unbekannter Dienst-Typ")
+	start := time.Now()
+	w, err := s.safeFetch(ctx, t, lang)
+	if logging.Debug() {
+		attrs := []any{"kachel", t.ID, "name", t.Name, "dienst", t.Integration, "dauer", time.Since(start).Round(time.Millisecond)}
+		if err != nil {
+			attrs = append(attrs, "fehler", logging.Redact(err.Error()))
+		}
+		slog.Debug("Live-Daten geholt", attrs...)
 	}
 	s.mu.Lock()
 	// A tile that was edited or used in the meantime (forget) gets a fresh fetch instead.
@@ -589,6 +610,23 @@ func (s *Server) fetchWidget(t store.Tile, lang, key string, gen int, done chan 
 	}
 	delete(s.fetching, key)
 	s.mu.Unlock()
+}
+
+// safeFetch asks the service for the tile's live data. It runs outside of a
+// request, so a panic in an integration would otherwise end the whole program.
+func (s *Server) safeFetch(ctx context.Context, t store.Tile, lang string) (w *integrations.Widget, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			slog.Error("Absturz in einer Integration", "kachel", t.ID, "name", t.Name, "dienst", t.Integration, "fehler", logging.Redact(fmt.Sprint(p)))
+			os.Stderr.Write(debug.Stack())
+			w, err = nil, errors.New("interner Fehler in der Integration – Details stehen im Protokoll")
+		}
+	}()
+	integ, ok := integrations.Get(t.Integration)
+	if !ok {
+		return nil, errors.New("unbekannter Dienst-Typ")
+	}
+	return integ.Fetch(ctx, s.instance(t, lang))
 }
 
 func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
@@ -744,6 +782,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(t store.Tile) {
 			defer wg.Done()
+			defer logging.Recover("Suche", "kachel", t.ID, "dienst", t.Integration)
 			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
@@ -1011,6 +1050,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	slog.Debug("Sicherung importiert", "gruppen", len(data.Groups), "kacheln", count)
 	writeJSON(w, map[string]any{"ok": true, "tiles": count})
 }
 

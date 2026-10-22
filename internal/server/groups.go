@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -172,9 +173,11 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.UpdateGroup(g); err != nil {
+		slog.Error("Gruppe speichern", "gruppe", id, "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Gruppe gespeichert", "gruppe", id, "name", g.Name, "darstellung", g.Layout, "anordnung", g.Arrange, "sichtbarkeit", g.Visibility)
 	// Whoever just set the password keeps the group open.
 	if g.Visibility == store.Protected {
 		s.unlock(r, id)
@@ -245,10 +248,13 @@ func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 403, errLocked)
 		return
 	}
+	start := time.Now()
 	if err := s.store.DeleteGroup(id); err != nil {
+		slog.Error("Gruppe löschen", "gruppe", id, "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	slog.Debug("Gruppe gelöscht", "gruppe", id, "dauer", time.Since(start).Round(time.Millisecond))
 	writeJSON(w, map[string]bool{"ok": true})
 }
 

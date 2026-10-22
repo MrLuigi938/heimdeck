@@ -8,7 +8,7 @@
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
 
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, onClose, onSaved, onSwitchBoard } = $props();
 
   // Editable copy of the dashboards list.
   // svelte-ignore state_referenced_locally
@@ -75,11 +75,23 @@
     }
   }
 
+  // The debug mode switches right away and is saved on its own, like the language.
+  async function toggleDebug(e) {
+    try {
+      await put('/settings', { debug: String(e.target.checked) });
+      toast(e.target.checked ? t('Debug-Modus eingeschaltet') : t('Debug-Modus ausgeschaltet'));
+      onSaved({ keepOpen: true });
+    } catch (err) {
+      e.target.checked = !e.target.checked;
+      toast(err.message, 'bad');
+    }
+  }
+
   async function save() {
     try {
       await put('/settings', $state.snapshot(s));
       toast(t('Einstellungen gespeichert'));
-      onSaved();
+      onSaved({ keepOpen: true }); // more settings may follow; ✕ closes the dialog
     } catch (e) {
       toast(e.message, 'bad');
     }
@@ -362,6 +374,14 @@
       <button onclick={exportBackup}>{t('Exportieren')}</button>
       <label class="button">{t('Importieren')}<input type="file" accept="application/json" onchange={importBackup} hidden /></label>
     </div>
+  </section>
+
+  <section>
+    <h3>{t('Fehlersuche')}</h3>
+    <label class="check"><input type="checkbox" checked={debug} onchange={toggleDebug} disabled={debugForced} /> {t('Debug-Modus')}</label>
+    <p class="help indent">{t('Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.')}</p>
+    {#if debugForced}<p class="help indent">{t('Eingeschaltet über HEIMDECK_DEBUG=true – lässt sich hier nicht ausschalten.')}</p>{/if}
+    <p class="help indent">{t('Protokoll ansehen')}: <code>docker logs heimdeck</code> · {t('Installationsskript und Proxmox')}: <code>journalctl -u heimdeck</code></p>
   </section>
 </Modal>
 

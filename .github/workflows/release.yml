@@ -30,7 +30,7 @@ jobs:
           for arch in amd64 arm64; do
             name="heimdeck_${version}_linux_${arch}"
             mkdir -p "build/$name"
-            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "build/$name/heimdeck" .
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w -X main.version=$version" -o "build/$name/heimdeck" .
             cp README.md "build/$name/"
             tar -czf "dist/$name.tar.gz" -C "build/$name" .
           done
@@ -40,3 +40,5 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+          # Tags like v1.2.0-beta.1 become a pre-release, which is never shown as the latest release.
+          prerelease: ${{ contains(github.ref_name, '-') }}

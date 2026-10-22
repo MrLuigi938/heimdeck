@@ -90,6 +90,22 @@ sudo -u heimdeck HEIMDECK_DATA=/var/lib/heimdeck heimdeck reset-password <new-pa
 
 The new password needs at least 8 characters.
 
+## Troubleshooting
+
+Heimdeck always logs errors, warnings and requests that take longer than 5 seconds. If it hangs – the database or its internal state does not respond for 5 seconds – it writes where every part of the program is waiting.
+
+For more detail turn on **Settings → Troubleshooting → Debug mode**: the log then shows every request with its duration, every live data fetch (with the error, if any) and every status check. In the browser all requests also appear in the console (F12). Turn it off again afterwards. If Heimdeck cannot be opened at all, set `HEIMDECK_DEBUG=true` instead (Docker: `environment:`, install script: `/etc/default/heimdeck`) and restart it.
+
+```sh
+# Docker
+docker logs heimdeck --since 30m
+
+# Install script / Proxmox LXC
+sudo journalctl -u heimdeck --since "30 min ago"
+```
+
+When reporting a problem, please attach this log – it contains no passwords or API keys.
+
 ## Tips
 
 - **Language**: choose English or German during setup or later in the settings. Live data and error messages are translated too.

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -19,6 +19,7 @@ import (
 	"github.com/heimdeck/heimdeck/internal/docker"
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
 
@@ -99,10 +100,11 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/discover", s.handleDiscover)
 	api.HandleFunc("GET /api/export", s.handleExport)
 	api.HandleFunc("POST /api/import", s.handleImport)
+	api.HandleFunc("GET /api/debug/goroutines", s.handleGoroutines)
 	mux.Handle("/api/", s.auth.Require(api))
 
 	mux.Handle("/", s.spa())
-	return securityHeaders(withLang(requireJSON(mux)))
+	return logRequests(securityHeaders(withLang(requireJSON(mux))))
 }
 
 // spa serves the built frontend and falls back to index.html for client routes.
@@ -261,7 +263,7 @@ func widgetKey(id int64, lang string) string { return fmt.Sprintf("%d:%s", id, l
 
 func logErr(what string, err error) {
 	if err != nil {
-		log.Printf("%s: %v", what, err)
+		slog.Error(what, "fehler", logging.Redact(err.Error()))
 	}
 }
 

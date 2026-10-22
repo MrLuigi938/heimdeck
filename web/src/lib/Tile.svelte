@@ -26,7 +26,8 @@
   import { tileHref, rewrite } from './network.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
 
-  let { tile, def, status, editMode, newTab, local, uniform = false, compact = '', onEdit, dragProps } = $props();
+  // free: the tile sits in a free grid, whose size the user sets, so long content is not folded.
+  let { tile, def, status, editMode, newTab, local, uniform = false, compact = '', free = false, onEdit, dragProps } = $props();
 
   let widget = $state(null);
   let error = $state('');
@@ -146,7 +147,7 @@
       {:else if !loaded}
         <div class="skeleton"></div>
       {:else}
-        <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} />
+        <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} compact={!free} />
       {/if}
     </div>
   {/if}
@@ -178,8 +179,10 @@
   @keyframes shimmer { to { background-position: -200% 0; } }
 
   /* Compact: a square with the icon; the name below or, with icons-hover, on hover. */
-  .tile.compact { position: relative; aspect-ratio: 1; }
-  .square { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; min-width: 0; }
+  /* The width comes from the column; without it the square would take its width
+     from a taller row and overlap the next tile (seen on small iPhones). */
+  .tile.compact { position: relative; aspect-ratio: 1; width: 100%; }
+  .square { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; min-width: 0; min-height: 0; }
   .cname { font-size: 12px; font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
   .tile.compact:not(.editing) .square[href]:hover .cname { color: var(--accent); }
   .icons-hover .cname {

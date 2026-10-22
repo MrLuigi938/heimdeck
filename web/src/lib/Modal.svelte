@@ -1,13 +1,31 @@
 <script>
   import { t } from './i18n.svelte.js';
 
-  // Closes only via ✕ (or the dialog's own Cancel button): clicking next to it
-  // or pressing Esc (e.g. to dismiss the browser's autocomplete) used to throw
-  // away everything typed so far, also when a text selection ended outside.
+  // Closes via ✕, the dialog's own Cancel button or Esc – not by clicking next
+  // to it, which threw away everything typed when a text selection ended outside.
+  // Esc in a text field first only leaves the field (and closes the browser's
+  // autocomplete); a second Esc closes the dialog.
   let { title, onClose, children, footer, wide = false } = $props();
+  let backdrop;
+
+  function onKey(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    // Only the topmost dialog (e.g. a confirmation above the tile editor).
+    const all = document.querySelectorAll('.backdrop');
+    if (all[all.length - 1] !== backdrop) return;
+    const el = document.activeElement;
+    if (el && backdrop.contains(el) && el.matches('input, textarea, select, [contenteditable]')) {
+      el.blur();
+      return;
+    }
+    e.preventDefault();
+    onClose();
+  }
 </script>
 
-<div class="backdrop" role="presentation">
+<svelte:window onkeydown={onKey} />
+
+<div class="backdrop" role="presentation" bind:this={backdrop}>
   <div class="modal card" class:wide role="dialog" aria-modal="true" aria-label={title}>
     <header>
       <h2>{title}</h2>

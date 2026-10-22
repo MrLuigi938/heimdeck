@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -70,6 +71,42 @@ func TestOpenMediaVault(t *testing.T) {
 	}
 }
 
+func TestLoginPageInsteadOfAPI(t *testing.T) {
+	login := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<!doctype html><title>Login</title>"))
+	}))
+	defer login.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, login.URL+"/auth", http.StatusFound)
+	}))
+	defer proxy.Close()
+	j := &jellyseerr{titles: map[string]string{}}
+	for _, c := range []struct{ url, want string }{{login.URL, "Anmeldeseite"}, {proxy.URL, "weitergeleitet"}} {
+		in := &Instance{BaseURL: c.url, Values: map[string]string{"apiKey": "k"}, Client: NewClient(false), Lang: "de"}
+		_, err := j.Fetch(context.Background(), in)
+		if err == nil || !strings.Contains(err.Error(), c.want) || !errors.Is(err, ErrNotJSON) {
+			t.Errorf("%s: %v", c.url, err)
+		}
+	}
+}
+
+func TestOmvNum(t *testing.T) {
+	for in, want := range map[string]float64{
+		`"3.70 GiB"`: 3.70 * (1 << 30), `"512 MiB"`: 512 << 20, `"12 %"`: 12, `"8000000000000"`: 8e12,
+		`41.5`: 41.5, `"2,5 TB"`: 2.5e12, `""`: 0, `null`: 0, `"unbekannt"`: 0,
+	} {
+		var n omvNum
+		if err := json.Unmarshal([]byte(in), &n); err != nil || float64(n) != want {
+			t.Errorf("%s: got %v, %v; want %v", in, float64(n), err, want)
+		}
+	}
+	var info omvInfo
+	if err := json.Unmarshal([]byte(`{"cpuUtilization":"7 %","memUtilization":"3.70 GiB","uptime":12}`), &info); err != nil {
+		t.Fatalf("formatted values break the tile: %v", err)
+	}
+}
+
 func TestPhotoPrism(t *testing.T) {
 	hash := strings.Repeat("ab", 20)
 	f := newFake(t, map[string]any{
@@ -133,8 +170,8 @@ func TestUnifiProtect(t *testing.T) {
 	}
 	p := w.Items[1].Image[strings.Index(w.Items[1].Image, "p=")+2:]
 	path, _ := urlUnescape(p)
-	if _, h, err := (unifiProtect{}).ImageRequest(context.Background(), in, path); err != nil || h["X-API-KEY"] != "k" {
-		t.Fatalf("snapshot %q %v", path, err)
+	if p, h, err := (unifiProtect{}).ImageRequest(context.Background(), in, path); err != nil || h["X-API-KEY"] != "k" || strings.Contains(p, "?") {
+		t.Fatalf("snapshot %q → %q %v", path, p, err)
 	}
 	if _, _, err := (unifiProtect{}).ImageRequest(context.Background(), in, "/proxy/protect/integration/v1/cameras"); err == nil {
 		t.Fatal("non-snapshot path accepted")

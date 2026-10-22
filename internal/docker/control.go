@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/heimdeck/heimdeck/internal/logging"
 )
 
 var containerID = regexp.MustCompile(`^[0-9a-f]{12,64}$`)
@@ -125,6 +127,7 @@ func (u *Updates) check(c *Client, cts []Container) {
 		wg.Add(1)
 		go func(ct Container) {
 			defer wg.Done()
+			defer logging.Recover("Docker-Update-Prüfung", "container", ct.Name)
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			local, err := c.imageDigests(ctx, ct.ImageID)

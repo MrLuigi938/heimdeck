@@ -6,6 +6,7 @@
 package integrations
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -392,10 +393,32 @@ func (in *Instance) do(ctx context.Context, r request, out any) error {
 		io.Copy(io.Discard, resp.Body)
 		return nil
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	br := bufio.NewReader(resp.Body)
+	if isHTML(resp, br) {
+		return notJSON{in.htmlAnswer(req, resp)}
+	}
+	if err := json.NewDecoder(br).Decode(out); err != nil {
 		return notJSON{in.Errorf("unerwartete Antwort (kein gültiges JSON) – stimmt der Dienst-Typ? (%v)", err)}
 	}
 	return nil
+}
+
+// isHTML reports whether the answer is a web page instead of the API's JSON.
+func isHTML(resp *http.Response, br *bufio.Reader) bool {
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+		return true
+	}
+	head, _ := br.Peek(64)
+	return strings.HasPrefix(strings.TrimSpace(string(head)), "<")
+}
+
+// htmlAnswer explains a web page where the API was expected: usually a login
+// page of a proxy (Authentik, Authelia, Cloudflare Access) in front of the service.
+func (in *Instance) htmlAnswer(req *http.Request, resp *http.Response) error {
+	if final := resp.Request.URL; final.Host != req.URL.Host {
+		return in.Errorf("Statt der Schnittstelle kommt eine Webseite – die Anfrage wurde zu %s weitergeleitet, vermutlich eine Anmeldeseite. Bitte die interne Adresse des Dienstes eintragen (Weitere Optionen → Interne Adresse).", final.Host)
+	}
+	return in.Errorf("Statt der Schnittstelle kommt eine Webseite – liegt eine Anmeldeseite (z. B. Authentik, Cloudflare) davor oder stimmt der Dienst-Typ nicht? Dann die interne Adresse des Dienstes eintragen (Weitere Optionen → Interne Adresse).")
 }
 
 // ErrNotJSON matches answers that are not the expected JSON, usually because

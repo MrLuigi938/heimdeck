@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -193,6 +194,19 @@ func (s *Store) ensureBoard() error {
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+// Ping runs a trivial query; it waits for the single connection, so it also
+// shows when another query holds the database for too long.
+func (s *Store) Ping(ctx context.Context) error {
+	var one int
+	return s.db.QueryRowContext(ctx, `SELECT 1`).Scan(&one)
+}
+
+// Counts returns the number of boards, groups and tiles, for the startup log.
+func (s *Store) Counts() (boards, groups, tiles int) {
+	s.db.QueryRow(`SELECT (SELECT COUNT(*) FROM boards), (SELECT COUNT(*) FROM groups), (SELECT COUNT(*) FROM tiles)`).Scan(&boards, &groups, &tiles)
+	return
+}
 
 // ---- users & sessions ----
 

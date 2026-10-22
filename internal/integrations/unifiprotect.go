@@ -70,8 +70,9 @@ func (unifiProtect) item(in *Instance, c protectCamera) Item {
 	switch c.State {
 	case "CONNECTED":
 		if protectIDRe.MatchString(c.ID) {
-			// A new URL every minute, so the browser does not keep an old picture.
-			it.Image = in.Proxy(fmt.Sprintf("%s/v1/cameras/%s/snapshot?t=%d", protectAPI, c.ID, time.Now().Unix()/60))
+			// A new URL every five minutes, so the browser does not keep an old
+			// picture without asking the camera all the time.
+			it.Image = in.Proxy(fmt.Sprintf("%s/v1/cameras/%s/snapshot?t=%d", protectAPI, c.ID, time.Now().Unix()/300))
 		}
 	case "CONNECTING":
 		it.Badge = in.T("Verbindet")
@@ -130,5 +131,8 @@ func (unifiProtect) ImageRequest(ctx context.Context, in *Instance, path string)
 	if !protectSnapRe.MatchString(path) {
 		return "", nil, in.Errorf("nicht gefunden")
 	}
-	return path, map[string]string{"X-API-KEY": in.V("apiKey")}, nil
+	// ?t= only makes the browser load a fresh picture; the API itself gets the
+	// plain endpoint, which may reject parameters it does not know.
+	path, _, _ = strings.Cut(path, "?")
+	return path, map[string]string{"X-API-KEY": in.V("apiKey"), "Accept": "image/jpeg, image/*"}, nil
 }

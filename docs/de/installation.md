@@ -123,7 +123,7 @@ Standardwerte lassen sich per Umgebungsvariable ändern, z. B. `CTID=150 IP=192.
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `CTID` | nächste freie ID | Container-ID |
-| `CT_HOSTNAME` | `heimdeck` | Hostname |
+| `CT_HOSTNAME` | `heimdeck` | Name des Containers in Proxmox (Hostname); wird im Terminal abgefragt |
 | `CORES` / `MEMORY` / `DISK` | `1` / `512` / `2` | CPU-Kerne, RAM in MB, Speicher in GB |
 | `STORAGE` | erster Container-Speicher | Speicher für die Container-Disk |
 | `TPL_STORAGE` | erster Vorlagen-Speicher | Speicher für die Debian-Vorlage |
@@ -171,6 +171,7 @@ Heimdeck wird in der Weboberfläche eingerichtet. Ein paar Dinge werden per Umge
 | `HEIMDECK_SECURE_COOKIE` | `false` | Auf `true` setzen, wenn Heimdeck nur über HTTPS erreichbar ist |
 | `DOCKER_HOST` | `/var/run/docker.sock` | Docker-Verbindung, z. B. `tcp://socket-proxy:2375` |
 | `HEIMDECK_PROXMOX_URL` | – | Proxmox-Adresse, die beim Einrichten vorgeschlagen wird |
+| `HEIMDECK_DEBUG` | `false` | `true` = Debug-Modus von Anfang an, unabhängig von der Einstellung (siehe [Fehlersuche](benutzung.md#fehlersuche)) |
 | `TZ` | `UTC` | Zeitzone für Uhrzeiten und Daten |
 
 ## Hinter einem Reverse Proxy (HTTPS)

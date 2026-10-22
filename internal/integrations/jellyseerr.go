@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/heimdeck/heimdeck/internal/logging"
 )
 
 // jellyseerr also covers Overseerr and Seerr, which share the same API.
@@ -77,6 +79,7 @@ func (j *jellyseerr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		wg.Add(1)
 		go func(i int, r seerrRequest) {
 			defer wg.Done()
+			defer logging.Recover("Jellyseerr-Titel")
 			title := j.title(ctx, in, r.Media.MediaType, r.Media.TmdbID)
 			sub := r.RequestedBy.DisplayName
 			if r.Media.MediaType == "tv" && len(r.Seasons) > 0 {

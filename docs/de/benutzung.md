@@ -90,6 +90,22 @@ sudo -u heimdeck HEIMDECK_DATA=/var/lib/heimdeck heimdeck reset-password <neues-
 
 Das neue Passwort braucht mindestens 8 Zeichen.
 
+## Fehlersuche
+
+Heimdeck protokolliert immer Fehler, Warnungen und Anfragen, die länger als 5 Sekunden dauern. Hängt es – antworten die Datenbank oder der interne Zustand 5 Sekunden lang nicht –, schreibt es ins Protokoll, wo jeder Programmteil gerade wartet.
+
+Für mehr Details **Einstellungen → Fehlersuche → Debug-Modus** einschalten: Das Protokoll zeigt dann jede Anfrage mit ihrer Dauer, jedes Abholen der Live-Daten (samt Fehler) und jede Statusprüfung. Im Browser erscheinen alle Anfragen zusätzlich in der Konsole (F12). Danach wieder ausschalten. Lässt sich Heimdeck gar nicht mehr öffnen, stattdessen `HEIMDECK_DEBUG=true` setzen (Docker: `environment:`, Installationsskript: `/etc/default/heimdeck`) und neu starten.
+
+```sh
+# Docker
+docker logs heimdeck --since 30m
+
+# Installationsskript / Proxmox-LXC
+sudo journalctl -u heimdeck --since "30 min ago"
+```
+
+Bei einer Fehlermeldung bitte dieses Protokoll anhängen – es enthält keine Passwörter oder API-Keys.
+
 ## Tipps
 
 - **Sprache**: Deutsch oder Englisch bei der Einrichtung oder später in den Einstellungen wählen. Auch Live-Daten und Fehlermeldungen werden übersetzt.

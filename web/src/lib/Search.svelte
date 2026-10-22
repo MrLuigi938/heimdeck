@@ -68,17 +68,37 @@
       ? (/\{q\}|%s/.test(custom) ? custom.replace(/\{q\}|%s/g, term) : custom + term)
       : (engines[searchEngine] || engines.duckduckgo) + term;
     window.open(href, newTab ? '_blank' : '_self');
+    reset();
+  }
+
+  // Empties the search, so the next one can start right away – after an
+  // action, a web search or opening a service.
+  function reset({ focus = false } = {}) {
+    clearTimeout(timer);
+    seq++;
+    q = '';
+    results = [];
+    loading = false;
+    open = false;
+    if (focus) input.focus();
+    else input.blur();
   }
 
   function onKey(e) {
     if (e.key === 'Escape') {
-      q = '';
-      open = false;
-      input.blur();
+      reset();
     } else if (e.key === 'Enter' && q.trim()) {
-      if (tileHits.length) window.open(tileHref(tileHits[0], local), newTab ? '_blank' : '_self');
-      else webSearch();
+      if (tileHits.length) {
+        window.open(tileHref(tileHits[0], local), newTab ? '_blank' : '_self');
+        reset();
+      } else webSearch();
     }
+  }
+
+  // Coming back with the browser's Back button restores the page as it was,
+  // including the typed text: start empty instead.
+  function onPageShow(e) {
+    if (e.persisted) reset();
   }
 
   function globalKey(e) {
@@ -94,14 +114,7 @@
       try {
         await post(`/tiles/${tileId}/action`, { action: a.id, params: a.params || {} });
         toast(t('{action}: erledigt', { action: a.label }));
-        // Done: empty the search so the next one can start right away.
-        clearTimeout(timer);
-        seq++;
-        q = '';
-        results = [];
-        loading = false;
-        open = false;
-        input.focus();
+        reset({ focus: true });
       } catch (e) {
         toast(e.message, 'bad');
       }
@@ -109,7 +122,7 @@
   }
 </script>
 
-<svelte:window onkeydown={globalKey} />
+<svelte:window onkeydown={globalKey} onpageshow={onPageShow} />
 
 <div class="search" onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
   <svg class="glass" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
@@ -121,13 +134,14 @@
     onkeydown={onKey}
     placeholder={hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') + '  ( / )' : t('Dienste suchen oder im Web suchen …') + '  ( / )'}
     aria-label={t('Suche')}
+    autocomplete="off"
   />
   {#if open && q.trim()}
     <div class="panel card" tabindex="-1">
       {#if tileHits.length}
         <div class="section">{t('Kacheln')}</div>
         {#each tileHits as hit}
-          <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer">
+          <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer" onclick={() => setTimeout(reset)}>
             <Icon icon={hit.icon} name={hit.name} favicon={faviconUrl(hit)} size={24} /> <span>{hit.name}</span>
           </a>
         {/each}

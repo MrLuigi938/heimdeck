@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/heimdeck/heimdeck/internal/logging"
 )
 
 // Proxmox VE: REST API below /api2/json with an API token
@@ -246,6 +248,7 @@ func ProxmoxGuests(ctx context.Context, in *Instance) ([]Guest, error) {
 		wg.Add(1)
 		go func(g *Guest) {
 			defer wg.Done()
+			defer logging.Recover("Proxmox-Gast")
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			g.IP = p.guestIP(ctx, in, g)

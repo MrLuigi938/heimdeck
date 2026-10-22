@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/i18n"
+	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
 
@@ -160,6 +161,7 @@ func recoveredMsg(lang string, t store.Tile, kind string, d time.Duration) notif
 
 // send delivers the messages to all configured channels.
 func (s *Server) send(settings map[string]string, msgs []notification) {
+	defer logging.Recover("Benachrichtigung")
 	sec := s.notifySecrets()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

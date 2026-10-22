@@ -2,13 +2,14 @@ package server
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
 
@@ -72,10 +73,23 @@ func (s *Server) requestCheck(id int64) {
 func (s *Server) runChecks(ctx context.Context, only *int64) {
 	tiles, err := s.store.Tiles()
 	if err != nil {
-		log.Printf("Statusprüfung: %v", err)
+		slog.Error("Statusprüfung", "fehler", err)
 		return
 	}
 	now := time.Now()
+	defer func() {
+		if logging.Debug() && ctx.Err() == nil {
+			offline := []string{}
+			s.mu.Lock()
+			for _, t := range tiles {
+				if st, ok := s.latest[t.ID]; ok && (only == nil || t.ID == *only) && !st.Online {
+					offline = append(offline, t.Name)
+				}
+			}
+			s.mu.Unlock()
+			slog.Debug("Statusprüfung fertig", "kacheln", len(tiles), "offline", strings.Join(offline, ", "), "dauer", time.Since(now).Round(time.Millisecond))
+		}
+	}()
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	var logged []store.Check

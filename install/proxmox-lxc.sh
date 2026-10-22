@@ -22,7 +22,14 @@ command -v pct >/dev/null 2>&1 || die "this script runs on the Proxmox host (pct
 [ "$(id -u)" = 0 ] || die "please run as root"
 
 CTID="${CTID:-$(pvesh get /cluster/nextid)}"
+# The container's name in Proxmox (its host name). Asked for in a terminal, unless set.
+if [ -z "${CT_HOSTNAME:-}" ] && [ -t 0 ]; then
+  printf 'Container name [heimdeck]: '
+  read -r CT_HOSTNAME || CT_HOSTNAME=""
+fi
 CT_HOSTNAME="${CT_HOSTNAME:-heimdeck}"
+printf '%s' "$CT_HOSTNAME" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$' \
+  || die "invalid container name \"$CT_HOSTNAME\" – letters, digits and hyphens only (e.g. heimdeck)"
 CORES="${CORES:-1}"
 MEMORY="${MEMORY:-512}"
 DISK="${DISK:-2}"
@@ -85,7 +92,7 @@ pct exec "$CTID" -- env HEIMDECK_PORT="$PORT" HEIMDECK_DOCKER=0 HEIMDECK_PROXMOX
 
 ct_ip=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
 pct set "$CTID" --description "Heimdeck – Dashboard: http://$ct_ip:$PORT" >/dev/null
-say "Done! Heimdeck is running in container $CTID: http://$ct_ip:$PORT"
+say "Done! Heimdeck is running in container $CTID ($CT_HOSTNAME): http://$ct_ip:$PORT"
 echo
 echo "Console login for the container (Proxmox → $CTID → Console):"
 echo "  user: root"

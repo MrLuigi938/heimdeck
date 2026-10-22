@@ -1,5 +1,5 @@
 <script>
-  import { get, post, put } from './api.js';
+  import { get, post, put, setDebug } from './api.js';
   import { toast } from './toast.svelte.js';
   import Tile from './Tile.svelte';
   import FreeGrid, { byPosition } from './FreeGrid.svelte';
@@ -108,6 +108,7 @@
   $effect(() => {
     network.localHosts = settings.localHosts || '';
   });
+  $effect(() => setDebug(!!data?.debug));
   let local = $derived(isLocal());
   let autoLocal = $derived(detectLocal(network.localHosts));
 
@@ -504,7 +505,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} notify={data.notify} docker={data.docker} username={data.username} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} notify={data.notify} docker={data.docker} username={data.username} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
 {/if}
 

@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/heimdeck/heimdeck/internal/logging"
 )
 
 // Nextcloud: OCS API with an app password (Basic auth). The server overview
@@ -169,6 +171,7 @@ func (n nextcloud) Search(ctx context.Context, in *Instance, query string) ([]It
 		wg.Add(1)
 		go func(i int, id string) {
 			defer wg.Done()
+			defer logging.Recover("Nextcloud-Suche")
 			results[i] = n.searchProvider(ctx, in, id, names[id], query)
 		}(i, id)
 	}

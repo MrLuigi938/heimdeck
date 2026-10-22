@@ -1,3 +1,29 @@
+<script module>
+  // Icon addresses that failed recently (e.g. a name the icon collection does
+  // not have). Remembered for a week, so a tile with a favicon fallback shows
+  // it right away instead of trying the collection again on every visit.
+  const MISS_KEY = 'heimdeck-icon-miss';
+  const MISS_TTL = 7 * 24 * 3600 * 1000;
+  let misses = {};
+  try {
+    misses = JSON.parse(localStorage.getItem(MISS_KEY) || '{}');
+    const now = Date.now();
+    for (const [url, at] of Object.entries(misses)) if (now - at > MISS_TTL) delete misses[url];
+  } catch {
+    misses = {};
+  }
+  function rememberMiss(url) {
+    // Only addresses of the icon collection; Heimdeck's own favicon route may work again any time.
+    if (!url.startsWith('https://')) return;
+    misses[url] = Date.now();
+    try {
+      localStorage.setItem(MISS_KEY, JSON.stringify(misses));
+    } catch {
+      /* private mode */
+    }
+  }
+</script>
+
 <script>
   // Shows an icon from the dashboard-icons collection (by name), a URL, an
   // emoji, then the service's own favicon (`favicon`, served by Heimdeck),
@@ -21,7 +47,9 @@
   let sources = $derived.by(() => {
     const i = (icon || '').trim();
     if (isEmoji(i)) return [];
-    return favicon ? [...iconSources(i), favicon] : iconSources(i);
+    const list = favicon ? [...iconSources(i), favicon] : iconSources(i);
+    const known = list.filter((s) => !misses[s]);
+    return known.length ? known : list; // all failed before: try again rather than show nothing
   });
   let emoji = $derived(icon && isEmoji(icon.trim()) ? icon.trim() : '');
 
@@ -42,7 +70,7 @@
   let color = $derived(palette[[...(name || '?')].reduce((a, c) => a + c.charCodeAt(0), 0) % palette.length]);
 </script>
 
-<div class="icon" style="width:{size}px;height:{size}px">
+<div class="icon" style="--size:{size}px">
   {#if emoji}
     <span style="font-size:{size * 0.7}px">{emoji}</span>
   {:else}
@@ -52,7 +80,7 @@
     {#if src}
       {#key src}
         <img {src} alt="" class:hidden={!loaded} use:checkComplete
-          onload={() => (loadedSrc = src)} onerror={() => (failed[src] = true)} />
+          onload={() => (loadedSrc = src)} onerror={() => { failed[src] = true; rememberMiss(src); }} />
       {/key}
     {/if}
   {/if}
@@ -61,7 +89,11 @@
 <style>
   /* Fixed tracks: with "auto" rows a tall image (e.g. a portrait logo) set the
      row height itself and was cropped instead of scaled down. */
-  .icon { display: grid; grid-template: 100% / 100%; place-items: center; flex: none; overflow: hidden; }
+  /* --icon-max lets a surrounding container shrink the icon (small free-grid cells). */
+  .icon {
+    --s: min(var(--size), var(--icon-max, var(--size)));
+    width: var(--s); height: var(--s); display: grid; grid-template: 100% / 100%; place-items: center; flex: none; overflow: hidden;
+  }
   .icon span { line-height: 1; }
   .icon > * { grid-area: 1 / 1; }
   img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
