@@ -44,6 +44,29 @@
     return items;
   }
 
+  // The phone version: the same arrangement on fewer columns. Positions and
+  // widths are scaled down and rounded; a tile of three or more columns keeps
+  // at least two, so live data does not shrink to an icon. Where the rounded
+  // spot is taken, a tile flows on like text: further right in its row, then
+  // into the next rows from the left. Gaps the user left stay.
+  function shrink(items, cols) {
+    const f = cols / COLS;
+    const placed = [];
+    for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
+      const w = clamp(Math.max(Math.round(it.w * f), it.w >= 3 ? 2 : 1), 1, cols);
+      const start = clamp(Math.round(it.x * f), 0, cols - w);
+      let spot;
+      for (let y = it.y; !spot; y++) {
+        for (let x = y === it.y ? start : 0; x + w <= cols && !spot; x++) {
+          const c = { ...it, x, y, w };
+          if (!placed.some((p) => overlaps(p, c))) spot = c;
+        }
+      }
+      placed.push(spot);
+    }
+    return placed;
+  }
+
   const positions = (list) => Object.fromEntries(list.map(({ id, x, y, w, h }) => [id, { x, y, w, h }]));
 
   // Reading order (top to bottom, left to right), used on phones and for the saved order.
@@ -57,7 +80,10 @@
   import Tile from './Tile.svelte';
   import { t } from './i18n.svelte.js';
 
-  let { tiles, defs, status, editMode, newTab, local, dragging = null, findTile, grab, tileDragProps, onEdit, onCommit } = $props();
+  // cols below COLS shows a scaled-down copy (phones): tiles can still be opened
+  // and edited, but not moved or resized there.
+  let { tiles, defs, status, editMode, newTab, local, cols = COLS, dragging = null, findTile, grab, tileDragProps, onEdit, onCommit } = $props();
+  let arranging = $derived(editMode && cols === COLS);
 
   // Starting size, close to what the tile takes in rows.
   function size(tile) {
@@ -69,10 +95,10 @@
   let items = $derived(arrange(tiles, size));
   let preview = $state(null); // positions while a tile is dragged or resized
   let resizing = $state(null);
-  let shown = $derived(preview || items);
+  let shown = $derived(preview || (cols === COLS ? items : shrink(items, cols)));
   let byId = $derived(Object.fromEntries(shown.map((i) => [i.id, i])));
-  // In edit mode a few empty rows below make room to drop tiles further down.
-  let rows = $derived(Math.max(1, ...shown.map((i) => i.y + i.h)) + (editMode ? 3 : 0));
+  // While arranging, a few empty rows below make room to drop tiles further down.
+  let rows = $derived(Math.max(1, ...shown.map((i) => i.y + i.h)) + (arranging ? 3 : 0));
   // A tile dragged in from another group: shown as an outline where it lands.
   let incoming = $derived(dragging != null && preview && !tiles.some((tl) => tl.id === dragging) ? byId[dragging] : null);
   let gridEl;
@@ -91,7 +117,7 @@
   }
 
   function dragover(e) {
-    if (!editMode || dragging == null) return;
+    if (!arranging || dragging == null) return;
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
@@ -118,7 +144,7 @@
   }
 
   function drop(e) {
-    if (!editMode || dragging == null) return;
+    if (!arranging || dragging == null) return;
     e.preventDefault();
     e.stopPropagation();
     if (preview) onCommit(positions(preview), dragging);
@@ -182,9 +208,9 @@
   const area = (it) => `${it.y + 1} / ${it.x + 1} / span ${it.h} / span ${it.w}`;
 </script>
 
-<div class="free" class:editing={editMode} bind:this={gridEl} style:--rows={rows}
+<div class="free" class:editing={arranging} bind:this={gridEl} style:--rows={rows} style:--cols={cols}
   role="list" ondragover={dragover} ondragleave={dragleave} ondrop={drop}>
-  {#if editMode}
+  {#if arranging}
     <div class="cells" aria-hidden="true">
       {#each { length: rows * COLS }, i (i)}<span></span>{/each}
     </div>
@@ -195,8 +221,8 @@
       <div class="cell" role="listitem" class:moving={(dragging === tile.id && preview) || resizing?.it.id === tile.id} style:grid-area={area(it)}>
         <!-- One column wide is too narrow for name and live data: the tile becomes an icon. -->
         <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={it.w === 1 ? 'icons' : ''} free
-          onEdit={() => onEdit(tile)} dragProps={tileDragProps(tile)} />
-        {#if editMode}
+          onEdit={() => onEdit(tile)} dragProps={arranging ? tileDragProps(tile) : {}} />
+        {#if arranging}
           <button class="resize" title={t('Größe ändern')} aria-label={t('Größe ändern')}
             onpointerdown={(e) => startResize(e, it)} onpointermove={moveResize} onpointerup={endResize} onpointercancel={cancelResize}
             ondblclick={(e) => fitHeight(e, it)} onkeydown={(e) => keyResize(e, it)}></button>
@@ -212,7 +238,7 @@
 <style>
   .free {
     position: relative; display: grid; gap: 12px;
-    grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), 29px);
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), 29px);
   }
   .cells {
     position: absolute; inset: 0; display: grid; gap: 12px; pointer-events: none;

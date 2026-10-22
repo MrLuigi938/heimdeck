@@ -301,8 +301,8 @@ export const en = {
   // group display and free grid
   'Darstellung': 'Display',
   'Freies Raster – Kacheln frei platzieren und in der Größe ändern': 'Free grid – place and resize tiles freely',
-  'Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.':
-    'In edit mode (✎) drag tiles to where you want them and resize them with the bottom-right corner (double-click fits the height to the content). One column wide, a tile becomes an icon. On phones the tiles are listed in this order.',
+  'Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy wird das Raster auf 4 Spalten verkleinert.':
+    'In edit mode (✎) drag tiles to where you want them and resize them with the bottom-right corner (double-click fits the height to the content). One column wide, a tile becomes an icon. On phones the grid is scaled down to 4 columns.',
   'Größe ändern': 'Resize',
   // Telegram
   'Telegram-Bot-Token': 'Telegram bot token',

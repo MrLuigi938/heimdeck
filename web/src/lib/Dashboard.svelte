@@ -95,7 +95,7 @@
   const isUniform = (g) => layoutOf(g) === 'uniform';
   const compactOf = (g) => (layoutOf(g).startsWith('icons') ? layoutOf(g) : '');
   const isFree = (g) => g.arrange === 'free';
-  // On phones a freely arranged group is shown like the others, in reading order.
+  // On phones a freely arranged group is shown scaled down to 4 columns.
   let narrow = $state(matchMedia('(max-width: 640px)').matches);
   $effect(() => {
     const media = matchMedia('(max-width: 640px)');
@@ -103,7 +103,6 @@
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   });
-  const tilesOf = (g) => (isFree(g) ? byPosition(g.tiles) : g.tiles);
   let hasExternal = $derived(allTiles.some((t) => t.externalUrl));
   $effect(() => {
     network.localHosts = settings.localHosts || '';
@@ -298,12 +297,6 @@
       ondragend: () => { dragging = null; dropTarget = null; },
     };
   }
-  // Tiles dragged out of a free grid into a normal group start at their top left.
-  function dragPropsOf(tile, group) {
-    if (!isFree(group)) return dragPropsFor(tile, group);
-    return narrow ? {} : freeDragProps(tile);
-  }
-
   // A free grid reports the new positions; a tile dropped in from another group moves along.
   function commitGrid(group, grid, incomingId) {
     if (incomingId != null && !group.tiles.some((t) => t.id === incomingId)) {
@@ -477,8 +470,11 @@
               </div>
             {/if}
           </div>
-          {#if isFree(group) && !narrow && group.tiles.length}
-            <FreeGrid tiles={group.tiles} {defs} {status} {editMode} {newTab} {local}
+          {#if isFree(group) && group.tiles.length}
+            {#if editMode && narrow}
+              <p class="empty-group on-bg">{t('Freies Raster: auf einem größeren Bildschirm anordnen.')}</p>
+            {/if}
+            <FreeGrid tiles={group.tiles} {defs} {status} {editMode} {newTab} {local} cols={narrow ? 4 : 12}
               {dragging} {findTile} grab={() => grab} tileDragProps={freeDragProps} onEdit={(tile) => (editing = tile)}
               onCommit={(grid, incomingId) => commitGrid(group, grid, incomingId)} />
             {#if editMode}
@@ -491,13 +487,10 @@
               {#if !group.tiles.length && !editMode}
                 <p class="empty-group on-bg">{t('Noch keine Kacheln – über ✎ oben rechts hinzufügen.')}</p>
               {/if}
-              {#if editMode && isFree(group) && narrow && group.tiles.length}
-                <p class="empty-group on-bg">{t('Freies Raster: auf einem größeren Bildschirm anordnen.')}</p>
-              {/if}
-              {#each tilesOf(group) as tile (tile.id)}
+              {#each group.tiles as tile (tile.id)}
                 <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
                   <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)} compact={compactOf(group)}
-                    onEdit={() => (editing = tile)} dragProps={dragPropsOf(tile, group)} />
+                    onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
                 </div>
               {/each}
               {#if editMode}

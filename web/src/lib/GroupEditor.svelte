@@ -88,7 +88,7 @@
         <option value="icons-hover">{t('Kompakt – nur Icon, Name beim Darüberfahren')}</option>
         <option value="free">{t('Freies Raster – Kacheln frei platzieren und in der Größe ändern')}</option>
       </select>
-      {#if look === 'free'}<span class="help">{t('Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy stehen die Kacheln in dieser Reihenfolge untereinander.')}</span>{/if}
+      {#if look === 'free'}<span class="help">{t('Im Bearbeitungsmodus (✎) Kacheln an die gewünschte Stelle ziehen und über die Ecke unten rechts größer oder kleiner ziehen (Doppelklick passt die Höhe an den Inhalt an). Eine Spalte breit wird eine Kachel zum Icon. Auf dem Handy wird das Raster auf 4 Spalten verkleinert.')}</span>{/if}
     </label>
     {#if boards.length > 1}
       <label class="field">
