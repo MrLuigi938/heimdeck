@@ -110,6 +110,13 @@
     }
     saveKeys();
   }
+  // One shortcut back to its default; another action using that key gives it up.
+  function resetKey(a) {
+    const other = ACTIONS.find((o) => o.id !== a.id && keys[o.id] === a.key);
+    if (other) keys[other.id] = '';
+    keys[a.id] = a.key;
+    saveKeys();
+  }
   function resetKeys() {
     keys = keymap({});
     saveKeys();
@@ -492,6 +499,11 @@
           <button class="small key" class:primary={recording === a.id} onclick={() => (recording = recording === a.id ? '' : a.id)}>
             {recording === a.id ? t('Taste drücken …') : keyLabel(keys[a.id])}
           </button>
+          {#if keys[a.id] !== a.key}
+            <button class="small ghost" onclick={() => resetKey(a)} title={t('Zurücksetzen auf {key}', { key: keyLabel(a.key) })} aria-label={t('Zurücksetzen auf {key}', { key: keyLabel(a.key) })}>↺</button>
+          {:else}
+            <span></span>
+          {/if}
         {/each}
       </div>
       <div class="row"><span class="spacer"></span><button class="small" onclick={resetKeys}>{t('Standard wiederherstellen')}</button></div>
@@ -519,7 +531,7 @@
   .swatch.active { border-color: var(--text); }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .indent { margin: -6px 0 0 26px; }
-  .keys { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; font-size: 14px; }
+  .keys { display: grid; grid-template-columns: 1fr auto 32px; gap: 6px 8px; align-items: center; font-size: 14px; }
   .key { min-width: 64px; justify-content: center; font-family: ui-monospace, monospace; font-weight: 600; }
   /* Same look as the setup guides in the tile editor. */
   .howto { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }

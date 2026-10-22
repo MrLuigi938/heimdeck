@@ -340,6 +340,7 @@ export const en = {
     'Click a key and press the new one. Delete removes a shortcut, Esc cancels. The digits 1–9 always open the dashboard with that number.',
   'Taste drücken …': 'Press a key …',
   'Standard wiederherstellen': 'Restore defaults',
+  'Zurücksetzen auf {key}': 'Reset to {key}',
   'Diese Taste geht nicht – bitte eine Buchstaben-, Zeichen- oder Satzzeichen-Taste wählen (Ziffern 1–9 wechseln das Dashboard).':
     'This key cannot be used – please choose a letter, symbol or punctuation key (digits 1–9 switch the dashboard).',
   '„{key}“ war für „{action}“ belegt – dort ist es jetzt leer.': '"{key}" was used for "{action}" – that one is empty now.',
