@@ -57,3 +57,11 @@ func TestNewestRelease(t *testing.T) {
 		}
 	}
 }
+
+func TestNoUpdateCheckWithoutRelease(t *testing.T) {
+	for _, v := range []string{"", "dev", "latest", "edge-c68d286"} {
+		if parseVersion(v).ok {
+			t.Errorf("%q counts as a release", v)
+		}
+	}
+}

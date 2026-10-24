@@ -39,7 +39,8 @@ func (s *Server) newerRelease() *releaseInfo {
 
 // CheckUpdates runs until ctx ends.
 func (s *Server) CheckUpdates(ctx context.Context) {
-	if s.version == "" || s.version == "dev" {
+	// Only released versions are compared; dev and edge builds have none.
+	if !parseVersion(s.version).ok {
 		return
 	}
 	for {

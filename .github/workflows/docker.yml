@@ -28,21 +28,32 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ghcr.io/${{ github.repository }}
+          # "latest" only comes from stable release tags (flavor latest=auto);
+          # pushes to main go to "edge", so :latest always is the newest release.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=edge,branch=main
             type=ref,event=pr
           labels: |
             org.opencontainers.image.title=Heimdeck
             org.opencontainers.image.description=A simple dashboard for your home server with live data, one search and actions on the tiles
+      # The version shown in the footer: the release for tags, otherwise
+      # "edge-<commit>" (no update check for such builds).
+      - id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=edge-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
-          build-args: VERSION=${{ steps.meta.outputs.version }}
+          build-args: VERSION=${{ steps.version.outputs.value }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
