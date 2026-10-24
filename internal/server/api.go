@@ -244,7 +244,7 @@ var allowedSettings = map[string]bool{
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 	"debug": true, "telegramChat": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
-	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "searchView": true,
+	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "searchView": true, "searchJump": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {

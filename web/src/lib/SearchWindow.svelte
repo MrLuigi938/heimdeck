@@ -11,6 +11,8 @@
   let {
     q = $bindable(), parsed, tileHits, groups, loading, noHits, tileById, defs, local, newTab, recent, hasSearchServices,
     onInput, makeAction, webSearch, openUrl, onClose,
+    // anchored: opens right below the search field in the header, which stays the input.
+    anchored = false, input = null,
   } = $props();
 
   let field;
@@ -21,7 +23,20 @@
   let sheet = $state(false); // phones: the preview slides up as a sheet
   let busy = $state('');
 
-  $effect(() => field?.focus());
+  const fieldEl = () => (anchored ? input : field);
+  $effect(() => fieldEl()?.focus());
+
+  // Anchored, the window sits right under the header's search field.
+  let top = $state(0);
+  $effect(() => {
+    if (anchored && input) top = Math.round(input.getBoundingClientRect().bottom + 8);
+  });
+  let win;
+  // Anchored there is no dark backdrop: a click anywhere else closes the window
+  // (but not a click in a confirmation dialog opened from it).
+  function onWindowDown(e) {
+    if (anchored && win && !win.contains(e.target) && !input?.parentElement?.contains(e.target) && !e.target.closest?.('.backdrop:not(.anchored)')) onClose();
+  }
 
   // Every hit in one list: tiles first, then the services in the server's order.
   let entries = $derived([
@@ -71,6 +86,11 @@
     queueMicrotask(() => listEl?.querySelector('.entry.sel')?.scrollIntoView({ block: 'nearest' }));
   }
 
+  // The header's field forwards its keys here when the window is anchored.
+  export function handleKey(e) {
+    onKey(e);
+  }
+
   function onKey(e) {
     if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
@@ -115,7 +135,7 @@
   function useRecent(term) {
     q = term;
     onInput();
-    field?.focus();
+    fieldEl()?.focus();
   }
 
   const host = (u) => {
@@ -127,11 +147,13 @@
   };
 </script>
 
-<svelte:window onkeydown={onWindowKey} />
+<svelte:window onkeydown={onWindowKey} onmousedown={onWindowDown} />
 
 <!-- class "backdrop": the dashboard's shortcuts pause while it is open. -->
-<div class="backdrop" role="presentation" bind:this={backdrop} onmousedown={(e) => e.target === backdrop && onClose()}>
-  <div class="win card" role="dialog" aria-modal="true" aria-label={t('Suche')}>
+<div class="backdrop" class:anchored role="presentation" bind:this={backdrop} style:padding-top={anchored ? top + 'px' : null}
+  onmousedown={(e) => !anchored && e.target === backdrop && onClose()}>
+  <div class="win card" bind:this={win} role="dialog" aria-modal={!anchored} aria-label={t('Suche')}>
+    {#if !anchored}
     <div class="top">
       <svg class="glass" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
       <input bind:this={field} bind:value={q} oninput={onInput} onkeydown={onKey} autocomplete="off" aria-label={t('Suche')}
@@ -139,11 +161,12 @@
       {#if q}<button class="clear" onclick={() => { q = ''; onInput(); field.focus(); }} aria-label={t('Suche leeren')}>✕</button>{/if}
       <button class="ghost close" onclick={onClose} aria-label={t('Schließen')}><kbd>Esc</kbd><span class="close-text">{t('Schließen')}</span></button>
     </div>
+    {/if}
 
     {#if q.trim()}
       <div class="chips" role="tablist">
         {#each chips as c (c.id)}
-          <button class="chip" class:on={cat === c.id} role="tab" aria-selected={cat === c.id} onclick={() => { cat = c.id; field.focus(); }}>
+          <button class="chip" class:on={cat === c.id} role="tab" aria-selected={cat === c.id} onclick={() => { cat = c.id; fieldEl()?.focus(); }}>
             {c.label} <span class="n">{c.n}</span>
           </button>
         {/each}
@@ -236,6 +259,9 @@
     position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .55);
     display: grid; justify-items: center; align-items: start; padding: 7vh 16px 16px; animation: fade .12s;
   }
+  /* Anchored: no dark layer; clicks go through to the page (and close the window). */
+  .backdrop.anchored { background: none; pointer-events: none; animation: none; }
+  .backdrop.anchored .win { pointer-events: auto; box-shadow: 0 18px 50px rgba(0, 0, 0, .45); max-height: min(640px, calc(100dvh - 120px)); }
   .win {
     width: min(980px, 100%); max-height: min(680px, 86vh); max-height: min(680px, 86dvh);
     display: flex; flex-direction: column; background: var(--surface-solid); overflow: hidden;

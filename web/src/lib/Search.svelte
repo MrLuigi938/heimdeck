@@ -12,16 +12,44 @@
   // (setting "searchView"): a large window with filters and a preview (default),
   // one column per service below the field, or the compact list below the field.
   // shortcut is only shown in the placeholder; the dashboard handles the key and calls focus().
-  let { tiles, defs = {}, view = 'window', newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
+  let { tiles, defs = {}, view = 'window', jumpTop = false, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
 
+  // The search window opens right under the field when the field is in view
+  // (anchored, you type in the field itself), otherwise in the middle of the
+  // screen – or, with jumpTop, the page scrolls up first. Phones always get
+  // the full-screen window.
+  const phone = () => matchMedia('(max-width: 640px)').matches;
+  function fieldInView() {
+    const r = input.getBoundingClientRect();
+    return r.bottom > 0 && r.top < innerHeight;
+  }
+  function openAnchored() {
+    anchored = true;
+    windowOpen = true;
+    input.focus({ preventScroll: true });
+  }
   export function focus() {
-    if (view === 'window') windowOpen = true;
-    else input.focus();
+    if (view !== 'window') return input.focus();
+    if (phone()) {
+      anchored = false;
+      windowOpen = true;
+    } else if (fieldInView()) {
+      openAnchored();
+    } else if (jumpTop) {
+      scrollTo({ top: 0, behavior: 'smooth' });
+      openAnchored();
+    } else {
+      anchored = false;
+      windowOpen = true;
+    }
   }
 
   let q = $state('');
   let open = $state(false);
   let windowOpen = $state(false);
+  let anchored = $state(false);
+  let win;
   let results = $state([]);
   let loading = $state(false);
   let input;
@@ -159,12 +187,21 @@
     };
   }
 
-  // In the window view the field in the header only opens the window.
-  function openWindow(e) {
-    if (view !== 'window') return;
-    e.preventDefault();
-    e.currentTarget.blur();
-    windowOpen = true;
+  // Clicking the field in the window view: anchored under it; on phones the full-screen window.
+  function onFieldFocus() {
+    if (view !== 'window') {
+      open = q.length > 0;
+    } else if (!windowOpen) {
+      if (phone()) {
+        input.blur();
+        anchored = false;
+        windowOpen = true;
+      } else openAnchored();
+    }
+  }
+  function onFieldKey(e) {
+    if (windowOpen && anchored) win?.handleKey(e);
+    else onKey(e);
   }
 </script>
 
@@ -176,15 +213,13 @@
     bind:this={input}
     bind:value={q}
     oninput={onInput}
-    onfocus={(e) => (view === 'window' ? openWindow(e) : (open = q.length > 0))}
-    onmousedown={openWindow}
-    onkeydown={onKey}
+    onfocus={onFieldFocus}
+    onkeydown={onFieldKey}
     placeholder={(hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') : t('Dienste suchen oder im Web suchen …')) + (shortcut ? `  ( ${shortcut} )` : '')}
     aria-label={t('Suche')}
     autocomplete="off"
-    readonly={view === 'window'}
   />
-  {#if q && view !== 'window'}
+  {#if q && (view !== 'window' || anchored)}
     <button class="clear" onclick={() => reset({ focus: true })} aria-label={t('Suche leeren')} title={t('Suche leeren')}>
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
     </button>
@@ -273,7 +308,7 @@
 </div>
 
 {#if windowOpen}
-  <SearchWindow bind:q {parsed} {tileHits} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
+  <SearchWindow bind:this={win} bind:q {anchored} {input} {parsed} {tileHits} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
     {onInput} {makeAction} {webSearch} {openUrl} onClose={() => reset()} />
 {/if}
 
@@ -281,7 +316,6 @@
   .search { position: relative; width: 100%; max-width: 620px; }
   .glass { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
   input { padding: 12px 44px 12px 40px; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); }
-  input[readonly] { cursor: text; }
   /* Empties the field; only there while something is typed. */
   .clear {
     position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0;

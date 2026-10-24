@@ -456,6 +456,10 @@
             <option value="list">{t('Liste – kompakt unter dem Suchfeld')}</option>
           </select>
         </label>
+        {#if (s.searchView || 'window') === 'window'}
+          <label class="check"><input type="checkbox" checked={s.searchJump === 'true'} onchange={setFlag('searchJump')} /> {t('Beim Tastenkürzel nach oben zum Suchfeld springen')}</label>
+          <p class="help indent">{t('Aus: Weiter unten auf der Seite öffnet das Kürzel das Suchfenster dort, wo du gerade bist. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.')}</p>
+        {/if}
         <label class="field">
           <span>{t('Websuche')}</span>
           <select bind:value={s.searchEngine} onchange={() => saveSetting({ searchEngine: s.searchEngine })}>

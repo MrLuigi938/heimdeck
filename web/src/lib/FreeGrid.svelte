@@ -200,6 +200,30 @@
   }
 
   const area = (it) => `${it.y + 1} / ${it.x + 1} / span ${it.h} / span ${it.w}`;
+
+  // Marks a tile whose content is taller than the tile ("scrolls"). Only then
+  // does the mouse wheel stay inside it; otherwise the page scrolls as usual.
+  // Checked again whenever the tile or its content changes size.
+  function overflowWatch(cell) {
+    const tile = () => cell.querySelector(':scope > .tile');
+    const check = () => {
+      const el = tile();
+      if (el) el.classList.toggle('scrolls', el.scrollHeight > el.clientHeight + 1);
+    };
+    const ro = new ResizeObserver(check);
+    const watch = () => {
+      ro.disconnect();
+      const el = tile();
+      if (!el) return;
+      ro.observe(el);
+      for (const child of el.children) ro.observe(child);
+      check();
+    };
+    const mo = new MutationObserver(watch);
+    mo.observe(cell, { childList: true, subtree: true });
+    watch();
+    return { destroy: () => { ro.disconnect(); mo.disconnect(); } };
+  }
 </script>
 
 {#if flow}
@@ -224,7 +248,7 @@
   {#each tiles as tile (tile.id)}
     {@const it = byId[tile.id]}
     {#if it}
-      <div class="cell" role="listitem" class:moving={(dragging === tile.id && preview) || resizing?.it.id === tile.id} style:grid-area={area(it)}>
+      <div class="cell" role="listitem" use:overflowWatch class:moving={(dragging === tile.id && preview) || resizing?.it.id === tile.id} style:grid-area={area(it)}>
         <!-- One column wide is too narrow for name and live data: the tile becomes an icon. -->
         <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={it.w === 1 ? 'icons' : ''} free
           onEdit={() => onEdit(tile)} dragProps={arranging ? tileDragProps(tile) : {}} />
@@ -257,9 +281,10 @@
   /* The grid sets the size; content that does not fit scrolls inside the tile.
      The scrollbar only shows while the pointer is on the tile. */
   .cell > :global(.tile) {
-    height: 100%; overflow: auto; overscroll-behavior: contain;
+    height: 100%; overflow: auto;
     scrollbar-width: thin; scrollbar-color: transparent transparent;
   }
+  .cell > :global(.tile.scrolls) { overscroll-behavior: contain; }
   .cell > :global(.tile:hover) { scrollbar-color: var(--border-strong) transparent; }
   /* Icon tiles scale with the cell instead of scrolling. */
   .cell > :global(.tile.compact) { aspect-ratio: auto; overflow: hidden; }

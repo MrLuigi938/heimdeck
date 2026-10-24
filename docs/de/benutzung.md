@@ -56,7 +56,7 @@ Taste `/` drücken (oder ins Suchfeld klicken). Eine Suche umfasst deine Kacheln
 
 *Einstellungen → Suche → Darstellung der Ergebnisse* bietet drei Ansichten:
 
-- **Suchfenster** (Standard): öffnet sich groß in der Mitte. Filter oben zeigen nur, was es gibt (Kacheln, Medien, Dokumente, Smart Home …, mit Trefferzahl); ↑ ↓ wählt aus, Enter öffnet, Tab wechselt den Filter, Esc schließt. Rechts zeigt eine Vorschau den gewählten Treffer mit seinen Knöpfen (z. B. Anfragen, Umschalten) und einem Link in den Dienst. Ist das Feld leer, stehen deine letzten Suchen bereit. Auf dem Handy füllt das Fenster den Bildschirm, ein Tipp öffnet die Vorschau von unten.
+- **Suchfenster** (Standard): klappt direkt unter dem Suchfeld auf, wenn du hineinklickst, oder in der Mitte, wenn du weiter unten auf der Seite das Tastenkürzel drückst (*Beim Tastenkürzel nach oben zum Suchfeld springen* scrollt stattdessen nach oben). Filter oben zeigen nur, was es gibt (Kacheln, Medien, Dokumente, Smart Home …, mit Trefferzahl); ↑ ↓ wählt aus, Enter öffnet, Tab wechselt den Filter, Esc schließt. Rechts zeigt eine Vorschau den gewählten Treffer mit seinen Knöpfen (z. B. Anfragen, Umschalten) und einem Link in den Dienst. Ist das Feld leer, stehen deine letzten Suchen bereit. Auf dem Handy füllt das Fenster den Bildschirm, ein Tipp öffnet die Vorschau von unten.
 - **Spalten**: unter dem Suchfeld, eine Spalte pro Dienst, der etwas gefunden hat.
 - **Liste**: die kompakte Liste unter dem Suchfeld.
 

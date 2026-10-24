@@ -416,7 +416,7 @@
           </div>
         {/if}
       </div>
-      <Search bind:this={searchBox} tiles={allTiles} {defs} view={settings.searchView || 'window'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+      <Search bind:this={searchBox} tiles={allTiles} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
         shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}

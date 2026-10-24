@@ -56,7 +56,7 @@ Press `/` anywhere (or click the search box). One search covers your tiles and e
 
 *Settings → Search → How results are shown* offers three views:
 
-- **Search window** (default): opens large in the middle. Filters at the top show only what is there (Tiles, Media, Documents, Smart Home …, with the number of hits); ↑ ↓ select, Enter opens, Tab switches the filter, Esc closes. On the right a preview shows the selected hit with its buttons (e.g. Request, Toggle) and a link into the service. While the field is empty, your recent searches are offered. On phones the window fills the screen and a tap opens the preview from below.
+- **Search window** (default): opens right below the search field when you click it, or in the middle when you press the shortcut further down the page (*Jump up to the search field with the shortcut* scrolls up instead). Filters at the top show only what is there (Tiles, Media, Documents, Smart Home …, with the number of hits); ↑ ↓ select, Enter opens, Tab switches the filter, Esc closes. On the right a preview shows the selected hit with its buttons (e.g. Request, Toggle) and a link into the service. While the field is empty, your recent searches are offered. On phones the window fills the screen and a tap opens the preview from below.
 - **Columns**: below the search field, one column per service that found something.
 - **List**: the compact list below the search field.
 

@@ -435,6 +435,9 @@ export const en = {
   'Suchfenster – mit Filtern, Vorschau und Tastatursteuerung': 'Search window – with filters, preview and keyboard control',
   'Spalten – eine pro Dienst, unter dem Suchfeld': 'Columns – one per service, below the search field',
   'Liste – kompakt unter dem Suchfeld': 'List – compact, below the search field',
+  'Beim Tastenkürzel nach oben zum Suchfeld springen': 'Jump up to the search field with the shortcut',
+  'Aus: Weiter unten auf der Seite öffnet das Kürzel das Suchfenster dort, wo du gerade bist. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.':
+    'Off: further down the page the shortcut opens the search window where you are. Clicking the search field at the top always opens the results right below it.',
 
   // settings layout
   'Einstellung suchen …': 'Search settings …',
