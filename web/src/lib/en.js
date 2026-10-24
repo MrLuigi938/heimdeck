@@ -419,6 +419,23 @@ export const en = {
   'Allgemeines Theme': 'General theme',
   'Suche leeren': 'Clear search',
 
+  // search window and views
+  'Alle': 'All',
+  'Keine Treffer.': 'No hits.',
+  'In {service} öffnen': 'Open in {service}',
+  'auswählen': 'select',
+  'öffnen': 'open',
+  'nächster Filter': 'next filter',
+  'nur in einem Dienst suchen': 'search only one service',
+  'Zuletzt gesucht': 'Recent searches',
+  'Findet deine Kacheln sofort und fragt alle Dienste, die suchen können. Mit !name am Anfang nur in einem Dienst suchen, z. B. „!jelly severance“.':
+    'Finds your tiles at once and asks every service that can search. Start with !name to search only one service, e.g. “!jelly severance”.',
+  'Findet deine Kacheln; Enter sucht im Web.': 'Finds your tiles; Enter searches the web.',
+  'Darstellung der Ergebnisse': 'How results are shown',
+  'Suchfenster – mit Filtern, Vorschau und Tastatursteuerung': 'Search window – with filters, preview and keyboard control',
+  'Spalten – eine pro Dienst, unter dem Suchfeld': 'Columns – one per service, below the search field',
+  'Liste – kompakt unter dem Suchfeld': 'List – compact, below the search field',
+
   // settings layout
   'Einstellung suchen …': 'Search settings …',
   'Änderungen werden sofort gespeichert': 'Changes are saved right away',

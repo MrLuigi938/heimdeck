@@ -54,6 +54,14 @@ Each tile can have a second, public address. If you open the dashboard via a loc
 
 Press `/` anywhere (or click the search box). One search covers your tiles and every connected service that supports search – media libraries, requests, documents, photos and people, games, audiobooks, comics, files, smart-home devices, network clients, DNS queries and more, with covers and thumbnails. Paste a video URL to send it straight to Tubesy.
 
+*Settings → Search → How results are shown* offers three views:
+
+- **Search window** (default): opens large in the middle. Filters at the top show only what is there (Tiles, Media, Documents, Smart Home …, with the number of hits); ↑ ↓ select, Enter opens, Tab switches the filter, Esc closes. On the right a preview shows the selected hit with its buttons (e.g. Request, Toggle) and a link into the service. While the field is empty, your recent searches are offered. On phones the window fills the screen and a tap opens the preview from below.
+- **Columns**: below the search field, one column per service that found something.
+- **List**: the compact list below the search field.
+
+Starting with `!name` searches only the services whose tile name begins with it, e.g. `!jelly severance` or `!paper invoice`.
+
 Pressing Enter without a matching tile searches the web. Choose the search engine in the settings – besides DuckDuckGo, Brave, Startpage, Google, Bing, Ecosia, Qwant and Kagi you can enter your own address (e.g. SearXNG), with `{q}` for the search term.
 
 Which services can be searched is listed in [Supported services](services.md).

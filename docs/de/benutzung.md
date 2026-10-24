@@ -54,6 +54,14 @@ Als „zuhause“ gilt, wenn das Dashboard über eine private IP (`192.168.…`,
 
 Taste `/` drücken (oder ins Suchfeld klicken). Eine Suche umfasst deine Kacheln und jeden verbundenen Dienst mit Suchfunktion – Medienbibliotheken, Anfragen, Dokumente, Fotos und Personen, Spiele, Hörbücher, Comics, Dateien, Smart-Home-Geräte, Netzwerk-Clients, DNS-Abfragen und mehr, mit Covern und Vorschaubildern. Eine eingefügte Video-URL lässt sich direkt an Tubesy schicken.
 
+*Einstellungen → Suche → Darstellung der Ergebnisse* bietet drei Ansichten:
+
+- **Suchfenster** (Standard): öffnet sich groß in der Mitte. Filter oben zeigen nur, was es gibt (Kacheln, Medien, Dokumente, Smart Home …, mit Trefferzahl); ↑ ↓ wählt aus, Enter öffnet, Tab wechselt den Filter, Esc schließt. Rechts zeigt eine Vorschau den gewählten Treffer mit seinen Knöpfen (z. B. Anfragen, Umschalten) und einem Link in den Dienst. Ist das Feld leer, stehen deine letzten Suchen bereit. Auf dem Handy füllt das Fenster den Bildschirm, ein Tipp öffnet die Vorschau von unten.
+- **Spalten**: unter dem Suchfeld, eine Spalte pro Dienst, der etwas gefunden hat.
+- **Liste**: die kompakte Liste unter dem Suchfeld.
+
+Mit `!name` am Anfang wird nur in den Diensten gesucht, deren Kachelname so beginnt, z. B. `!jelly severance` oder `!paper rechnung`.
+
 Enter ohne passende Kachel startet die Websuche. Die Suchmaschine wählst du in den Einstellungen – neben DuckDuckGo, Brave, Startpage, Google, Bing, Ecosia, Qwant und Kagi auch eine eigene Adresse (z. B. SearXNG), mit `{q}` für den Suchbegriff.
 
 Welche Dienste durchsucht werden können, steht unter [Unterstützte Dienste](dienste.md).

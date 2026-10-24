@@ -449,6 +449,14 @@
       <section hidden={current !== 'search'} bind:this={sectionEls.search}>
         <h3>{t('Suche')}</h3>
         <label class="field">
+          <span>{t('Darstellung der Ergebnisse')}</span>
+          <select value={s.searchView || 'window'} onchange={(e) => saveSetting({ searchView: e.target.value })}>
+            <option value="window">{t('Suchfenster – mit Filtern, Vorschau und Tastatursteuerung')}</option>
+            <option value="columns">{t('Spalten – eine pro Dienst, unter dem Suchfeld')}</option>
+            <option value="list">{t('Liste – kompakt unter dem Suchfeld')}</option>
+          </select>
+        </label>
+        <label class="field">
           <span>{t('Websuche')}</span>
           <select bind:value={s.searchEngine} onchange={() => saveSetting({ searchEngine: s.searchEngine })}>
             <option value="duckduckgo">DuckDuckGo</option>

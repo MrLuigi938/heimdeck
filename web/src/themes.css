@@ -399,13 +399,18 @@
 
 /* Menus and lists made of buttons stay menus: the dashboard switcher, the
    search results and the settings sidebar. */
-:root[data-skin] .board-menu button, :root[data-skin] .search button.hit {
+:root[data-skin] .board-menu button, :root[data-skin] .search button.hit, :root[data-skin] .win button.entry {
   background: none; border: 0; box-shadow: none; text-shadow: none; filter: none; color: var(--text);
   text-transform: none; letter-spacing: normal; font-weight: 400;
 }
 :root[data-skin] .search button.hit.web { color: var(--muted); border-top: 1px solid var(--border); }
 :root[data-skin] .board-menu button:hover, :root[data-skin] .board-menu button.on,
 :root[data-skin] .search button.hit:hover, :root[data-skin] .search button.hit:focus { background: var(--surface-2); }
+:root[data-skin] .win button.entry.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+:root[data-skin] .win button.entry.web { color: var(--muted); border-top: 1px solid var(--border); }
+/* Filter chips in the search window stay pills. */
+:root[data-skin] .win button.chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; box-shadow: none; text-shadow: none; filter: none; color: var(--text); padding: 4px 12px; text-transform: none; letter-spacing: normal; }
+:root[data-skin] .win button.chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
 :root[data-skin] .settings button.nav, :root[data-skin] .settings button.back {
   background: none; border: 0; box-shadow: none; text-shadow: none; filter: none; color: var(--text);
   text-transform: none; letter-spacing: normal;
