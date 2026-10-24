@@ -417,4 +417,5 @@ export const en = {
   'Kompakt': 'Compact',
   'Farbe des Themes': 'The theme’s colour',
   'Allgemeines Theme': 'General theme',
+  'Suche leeren': 'Clear search',
 };

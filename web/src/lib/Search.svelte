@@ -133,6 +133,11 @@
     aria-label={t('Suche')}
     autocomplete="off"
   />
+  {#if q}
+    <button class="clear" onclick={() => reset({ focus: true })} aria-label={t('Suche leeren')} title={t('Suche leeren')}>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+    </button>
+  {/if}
   {#if open && q.trim()}
     <div class="panel card" tabindex="-1">
       {#if tileHits.length}
@@ -177,7 +182,13 @@
 <style>
   .search { position: relative; width: 100%; max-width: 620px; }
   .glass { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
-  input { padding: 12px 14px 12px 40px; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); }
+  input { padding: 12px 44px 12px 40px; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); }
+  /* Empties the field; only there while something is typed. */
+  .clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0;
+    display: grid; place-items: center; border-radius: 50%; border: 0; background: var(--surface-2); color: var(--muted);
+  }
+  .clear:hover { color: var(--text); background: var(--border-strong); }
   .panel {
     position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40; background: var(--surface-solid);
     padding: 8px; max-height: min(70vh, 640px); overflow-y: auto; display: grid; gap: 2px;

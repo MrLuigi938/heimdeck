@@ -374,6 +374,24 @@
 :root[data-skin='halloween'] .bar > div { background: linear-gradient(90deg, #ff7a1a, #ffb347); }
 :root[data-skin='halloween'] button.primary { color: #140a1f; }
 
+/* ---------- Buttons a skin must leave alone ---------- */
+
+/* Skins restyle buttons; these few are text links or small round controls
+   and keep their own look in every theme ("show more", clearing the search,
+   colour swatches, theme cards). */
+:root[data-skin] button.fold {
+  background: none; border: 0; box-shadow: none; padding: 0; color: var(--muted);
+  text-transform: none; letter-spacing: normal; text-shadow: none; filter: none;
+}
+:root[data-skin] button.fold:hover { color: var(--accent); }
+:root[data-skin] button.clear {
+  background: var(--surface-2); border: 0; box-shadow: none; padding: 0; border-radius: 50%;
+  color: var(--muted); text-shadow: none; filter: none;
+}
+:root[data-skin] button.clear:hover { color: var(--text); }
+:root[data-skin] button.swatch { border: 2px solid transparent; box-shadow: none; padding: 0; border-radius: 50%; }
+:root[data-skin] button.swatch.active { border-color: var(--text); }
+
 /* ---------- Style options (independent of the theme, so last: they win) ---------- */
 
 :root[data-corners='square'] { --radius: 4px; --r-md: 3px; --r-sm: 3px; --r-xs: 2px; }
