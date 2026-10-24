@@ -484,8 +484,10 @@
         <form class="locked card" onsubmit={(e) => unlock(e, group)}>
           <span class="lock-name">🔒 {group.name}</span>
           <span class="spacer"></span>
-          <input type="password" placeholder={t('Passwort')} bind:value={unlockPw[group.id]} autocomplete="off" aria-label={t('Passwort für {name}', { name: group.name })} />
+          <input type="password" placeholder={t('Passwort')} bind:value={unlockPw[group.id]} autocomplete="off" aria-label={t('Passwort für {name}', { name: group.name })}
+            title={t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')} />
           <button class="small">{t('Entsperren')}</button>
+          {#if editMode}<span class="help lock-hint">{t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')}</span>{/if}
         </form>
       {:else if group.visibility !== 'hidden' || showHidden || editMode}
         <section class="group" aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
@@ -590,7 +592,7 @@
   .board-menu button:hover, .board-menu button.on { background: var(--surface-2); }
   .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
-  .tools .on { background: var(--accent); color: #fff; }
+  .tools .on { background: var(--accent); color: var(--on-accent, #fff); }
   .logout.armed { width: auto; padding: 0 10px; background: var(--bad); color: #fff; }
   .logout-ask { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
   .logout-check { display: none; font-weight: 700; }
@@ -605,6 +607,7 @@
   .locked { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
   .lock-name { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
   .locked input { width: 180px; padding: 6px 10px; }
+  .lock-hint { flex-basis: 100%; }
   .net { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
   .manual { color: var(--accent); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }

@@ -435,6 +435,12 @@ export const en = {
   'Suchfenster – mit Filtern, Vorschau und Tastatursteuerung': 'Search window – with filters, preview and keyboard control',
   'Spalten – eine pro Dienst, unter dem Suchfeld': 'Columns – one per service, below the search field',
   'Liste – kompakt unter dem Suchfeld': 'List – compact, below the search field',
+  'Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.':
+    'Forgot the group password? Your login password unlocks the group too – then it can be deleted or protected anew.',
+  'Auch die öffentliche Adresse prüfen': 'Check the public address too',
+  'Bei allen Kacheln auch die öffentliche Adresse prüfen': 'Check the public address of every tile too',
+  'Sonst wird nur die lokale Adresse geprüft – die öffentliche nur bei Kacheln, bei denen du es im Kachel-Editor einschaltest.':
+    'Otherwise only the local address is checked – the public one only for tiles where you turn it on in the tile editor.',
   'Beim Tastenkürzel nach oben zum Suchfeld springen': 'Jump up to the search field with the shortcut',
   'Aus: Weiter unten auf der Seite öffnet das Kürzel das Suchfenster dort, wo du gerade bist. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.':
     'Off: further down the page the shortcut opens the search window where you are. Clicking the search field at the top always opens the results right below it.',

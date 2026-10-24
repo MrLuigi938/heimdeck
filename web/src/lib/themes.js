@@ -46,6 +46,21 @@ export function applyTheme(settings, boardTheme = '') {
   set('font', settings?.font || '');
   set('density', settings?.density || '');
   // An accent of its own beats the theme's; empty = the theme's colour.
-  root.style.setProperty('--accent', settings?.accent || theme.accent || '#5b8cff');
+  const accent = settings?.accent || theme.accent || '#5b8cff';
+  root.style.setProperty('--accent', accent);
+  root.style.setProperty('--on-accent', onColor(accent));
   return theme;
+}
+
+// Text colour for a surface in the given colour: white or near-black,
+// whichever has the higher contrast (WCAG). Light accents such as neon
+// yellow get dark text, dark ones white.
+export function onColor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '#fff';
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [0, 2, 4].map((i) => lin(parseInt(m[1].slice(i, i + 2), 16) / 255));
+  const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const dark = 0.0056; // luminance of #111
+  return (1.05 / (l + 0.05)) >= ((l + 0.05) / (dark + 0.05)) ? '#fff' : '#111';
 }

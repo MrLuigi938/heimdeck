@@ -13,7 +13,7 @@
   // svelte-ignore state_referenced_locally
   let form = $state({
     id: 0, groupId: groups[0]?.id, name: '', url: '', externalUrl: '', apiUrl: '', icon: '', description: '',
-    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, secretsSet: [], hide: [],
+    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, monitorExternal: false, secretsSet: [], hide: [],
     ...structuredClone($state.snapshot(tile)),
   });
   form.config ??= {};
@@ -390,6 +390,9 @@
         {/if}
       {/if}
       <label class="check"><input type="checkbox" bind:checked={form.monitor} /> {t('Online-Status prüfen und anzeigen')}</label>
+      {#if form.monitor && form.externalUrl?.trim()}
+        <label class="check indent"><input type="checkbox" bind:checked={form.monitorExternal} /> {t('Auch die öffentliche Adresse prüfen')}</label>
+      {/if}
 
       <button type="button" class="ghost small more" onclick={() => (advanced = !advanced)}>{advanced ? '▾' : '▸'} {t('Weitere Optionen')}</button>
       {#if advanced}
@@ -484,4 +487,5 @@
   .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
   .preview { margin-top: 10px; color: var(--text); }
   @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  .check.indent { margin: -6px 0 0 26px; font-size: 13.5px; }
 </style>

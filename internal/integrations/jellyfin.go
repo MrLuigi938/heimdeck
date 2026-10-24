@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -205,7 +206,7 @@ func (j jellyfin) Search(ctx context.Context, in *Instance, query string) ([]Ite
 		out = append(out, Item{
 			Title: it.Name, Subtitle: sub, Badge: in.T("Vorhanden"),
 			URL:   j.link(ctx, in, it.ID),
-			Image: in.Link(map[bool]string{true: "/emby", false: ""}[j.emby] + "/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
+			Image: in.Proxy(map[bool]string{true: "/emby", false: ""}[j.emby] + "/Items/" + it.ID + "/Images/Primary?maxHeight=120"),
 		})
 	}
 	return out, nil
@@ -237,4 +238,16 @@ func (j jellyfin) link(ctx context.Context, in *Instance, id string) string {
 		}
 	}
 	return in.Link("/web/index.html#!/item?id=" + id + "&serverId=" + server.(string))
+}
+
+// jellyfinImageRe matches the posters the search hands out.
+var jellyfinImageRe = regexp.MustCompile(`^(/emby)?/Items/[A-Za-z0-9_-]+/Images/Primary(\?maxHeight=\d+)?$`)
+
+// ImageRequest loads posters through Heimdeck, so they also show when the
+// dashboard runs on https and the server on plain http.
+func (j jellyfin) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
+	if !jellyfinImageRe.MatchString(path) {
+		return "", nil, in.Errorf("nicht gefunden")
+	}
+	return path, map[string]string{"X-Emby-Token": in.V("apiKey")}, nil
 }

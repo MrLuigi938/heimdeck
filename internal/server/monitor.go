@@ -94,6 +94,7 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 	var wg sync.WaitGroup
 	var logged []store.Check
 	latest := map[int64]TileStatus{}
+	settings, _ := s.store.Settings()
 	for _, t := range tiles {
 		if only != nil && t.ID != *only {
 			continue
@@ -112,7 +113,7 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 			in := pingTwice(ctx, internal, t.Insecure)
 			st.Online, st.MS = in.Online, in.MS
 			checks := []store.Check{{TileID: t.ID, Kind: "int", Online: in.Online, MS: in.MS}}
-			if ext := strings.TrimSpace(t.ExternalURL); ext != "" && ext != internal {
+			if ext := strings.TrimSpace(t.ExternalURL); ext != "" && ext != internal && checksExternal(t, settings) {
 				e := pingTwice(ctx, ext, t.Insecure)
 				st.Ext = &e
 				checks = append(checks, store.Check{TileID: t.ID, Kind: "ext", Online: e.Online, MS: e.MS})
@@ -182,4 +183,11 @@ func ping(ctx context.Context, target string, insecure bool) Check {
 		return Check{}
 	}
 	return Check{Online: true, MS: time.Since(start).Milliseconds()}
+}
+
+// checksExternal reports whether the tile's public address is checked too:
+// set on the tile, or for all tiles with the setting monitorExternal. By
+// default only the local address is checked.
+func checksExternal(t store.Tile, settings map[string]string) bool {
+	return t.MonitorExt || settings["monitorExternal"] == "true"
 }

@@ -217,13 +217,21 @@ func (s *Server) handleUnlockGroup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]bool{"ok": true})
 		return
 	}
-	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil {
+	// The group's own password, or – if it is forgotten – the password of the
+	// Heimdeck account; unlocked, the group can be deleted or get a new password.
+	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil && !s.accountPassword(r, body.Password) {
 		time.Sleep(500 * time.Millisecond) // slow down guessing
 		writeErr(w, 403, errors.New("Falsches Passwort"))
 		return
 	}
 	s.unlock(r, id)
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// accountPassword reports whether password is the logged-in user's own password.
+func (s *Server) accountPassword(r *http.Request, password string) bool {
+	name, err := s.store.Username(s.auth.UserID(r))
+	return err == nil && password != "" && s.auth.Login(httptestDiscard{}, r, name, password) == nil
 }
 
 func (s *Server) handleLockGroup(w http.ResponseWriter, r *http.Request) {
@@ -324,6 +332,7 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 
 	rows := map[string]*uptimeRow{}
 	out := []*uptimeRow{}
+	settings, _ := s.store.Settings()
 	for _, t := range tiles {
 		if !t.Monitor {
 			continue
@@ -340,7 +349,7 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 		if internal != "" {
 			add("int", internal)
 		}
-		if t.ExternalURL != "" && t.ExternalURL != internal {
+		if t.ExternalURL != "" && t.ExternalURL != internal && checksExternal(t, settings) {
 			add("ext", t.ExternalURL)
 		}
 	}

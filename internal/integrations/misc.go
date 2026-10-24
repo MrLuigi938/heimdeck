@@ -96,15 +96,20 @@ func (romm) Def() Definition {
 	}
 }
 
-// get authenticates with a Client API Token (RomM 4.x) or, as fallback, username and password.
-func (romm) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
-	var auth string
+// rommAuth is the Authorization header: a Client API Token (RomM 4.x) or, as fallback, username and password.
+func rommAuth(in *Instance) string {
 	switch {
 	case in.V("apiKey") != "":
-		auth = "Bearer " + in.V("apiKey")
+		return "Bearer " + in.V("apiKey")
 	case in.V("username") != "":
-		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(in.V("username")+":"+in.Values["password"]))
-	default:
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(in.V("username")+":"+in.Values["password"]))
+	}
+	return ""
+}
+
+func (romm) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
+	auth := rommAuth(in)
+	if auth == "" {
 		return in.Errorf("Bitte einen API-Token oder Benutzername und Passwort eintragen")
 	}
 	err := in.do(ctx, request{path: path, query: q, headers: map[string]string{"Authorization": auth}}, out)
@@ -188,17 +193,27 @@ func rommItem(in *Instance, rom rommRom) Item {
 		sub += fmt.Sprint(year)
 	}
 	it := Item{Title: name, Subtitle: sub, URL: in.Link(fmt.Sprintf("/rom/%d", rom.ID))}
-	// Prefer RomM's own copy of the cover; IGDB's address is the fallback.
+	// Prefer RomM's own copy of the cover; IGDB's address is the fallback. The copy is
+	// loaded through Heimdeck: newer RomM versions want a login for it, and a plain
+	// http RomM behind an https dashboard would be blocked by the browser.
 	if p := rom.PathCoverSmall + rom.PathCoverS; p != "" {
 		p = strings.TrimLeft(p, "/")
 		if !strings.HasPrefix(p, "assets/") {
 			p = "assets/romm/resources/" + p
 		}
-		it.Image = in.Link("/" + p)
+		it.Image = in.Proxy("/" + p)
 	} else if rom.URLCover != "" {
 		it.Image = rom.URLCover
 	}
 	return it
+}
+
+// ImageRequest serves the covers RomM keeps below /assets/romm/resources.
+func (romm) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
+	if !strings.HasPrefix(path, "/assets/romm/resources/") {
+		return "", nil, in.Errorf("nicht gefunden")
+	}
+	return path, map[string]string{"Authorization": rommAuth(in)}, nil
 }
 
 type rommRom struct {

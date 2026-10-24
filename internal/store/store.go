@@ -79,7 +79,8 @@ type Tile struct {
 	Config      map[string]string `json:"config"`
 	Insecure    bool              `json:"insecure"`
 	ShowWidget  bool              `json:"showWidget"`
-	Monitor     bool              `json:"monitor"` // check and show the online status
+	Monitor     bool              `json:"monitor"`         // check and show the online status
+	MonitorExt  bool              `json:"monitorExternal"` // also check the public address (the setting monitorExternal does it for all)
 	Position    int               `json:"position"`
 	Grid        *GridPos          `json:"grid"` // nil = not placed yet (or the group is not arranged freely)
 	// Hide lists live data parts the tile leaves out: values by their German
@@ -166,6 +167,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE tiles ADD COLUMN grid_h INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE tiles ADD COLUMN hide TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE boards ADD COLUMN theme TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE tiles ADD COLUMN monitor_ext INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
@@ -453,13 +455,13 @@ func (s *Store) DeleteGroup(id int64) error {
 
 // ---- tiles ----
 
-const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position, grid_x, grid_y, grid_w, grid_h, hide`
+const tileCols = `id, group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, monitor_ext, position, grid_x, grid_y, grid_w, grid_h, hide`
 
 func (s *Store) scanTile(sc interface{ Scan(...any) error }) (Tile, error) {
 	var t Tile
 	var cfg, sec, hide string
 	var p GridPos
-	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Monitor, &t.Position,
+	err := sc.Scan(&t.ID, &t.GroupID, &t.Name, &t.URL, &t.ExternalURL, &t.APIURL, &t.Icon, &t.Description, &t.Integration, &cfg, &sec, &t.Insecure, &t.ShowWidget, &t.Monitor, &t.MonitorExt, &t.Position,
 		&p.X, &p.Y, &p.W, &p.H, &hide)
 	if err != nil {
 		return t, err
@@ -523,9 +525,9 @@ func (s *Store) SaveTile(t *Tile) error {
 			t.Grid = nil
 		}
 		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM tiles WHERE group_id = ?`, t.GroupID).Scan(&t.Position)
-		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, position, grid_x, grid_y, grid_w, grid_h, hide)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.Position,
+		res, err := s.db.Exec(`INSERT INTO tiles (group_id, name, url, external_url, api_url, icon, description, integration, config, secrets, insecure, show_widget, monitor, monitor_ext, position, grid_x, grid_y, grid_w, grid_h, hide)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.MonitorExt, t.Position,
 			p.X, p.Y, p.W, p.H, string(hide))
 		if err != nil {
 			return err
@@ -535,8 +537,8 @@ func (s *Store) SaveTile(t *Tile) error {
 	}
 	// The grid position is only changed by SaveLayout; a tile moved to another group loses it.
 	// (SQLite evaluates every SET expression with the old row, so group_id here is the old one.)
-	_, err = s.db.Exec(`UPDATE tiles SET grid_w = CASE WHEN group_id = ? THEN grid_w ELSE 0 END, group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ?, monitor = ?, hide = ? WHERE id = ?`,
-		t.GroupID, t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, string(hide), t.ID)
+	_, err = s.db.Exec(`UPDATE tiles SET grid_w = CASE WHEN group_id = ? THEN grid_w ELSE 0 END, group_id = ?, name = ?, url = ?, external_url = ?, api_url = ?, icon = ?, description = ?, integration = ?, config = ?, secrets = ?, insecure = ?, show_widget = ?, monitor = ?, monitor_ext = ?, hide = ? WHERE id = ?`,
+		t.GroupID, t.GroupID, t.Name, t.URL, t.ExternalURL, t.APIURL, t.Icon, t.Description, t.Integration, string(cfg), sec, t.Insecure, t.ShowWidget, t.Monitor, t.MonitorExt, string(hide), t.ID)
 	return err
 }
 

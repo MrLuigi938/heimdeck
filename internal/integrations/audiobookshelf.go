@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -164,7 +165,7 @@ func (a audiobookshelf) Search(ctx context.Context, in *Instance, query string) 
 			}
 			// Covers need no login in Audiobookshelf.
 			out = append(out, Item{Title: m.Title, Subtitle: strings.Join(sub, " · "), URL: in.Link("/item/" + b.LibraryItem.ID),
-				Image: in.Link("/api/items/" + b.LibraryItem.ID + "/cover?width=120&format=jpeg")})
+				Image: in.Proxy("/api/items/" + b.LibraryItem.ID + "/cover?width=120&format=jpeg")})
 		}
 		for _, au := range res.Authors {
 			out = append(out, Item{Title: au.Name, Subtitle: in.T("Autor") + " · " + in.T("%d Bücher", au.NumBooks),
@@ -179,4 +180,14 @@ func (a audiobookshelf) Search(ctx context.Context, in *Instance, query string) 
 		}
 	}
 	return out, nil
+}
+
+var absCoverRe = regexp.MustCompile(`^/api/items/[A-Za-z0-9_-]+/cover\?width=\d+&format=jpeg$`)
+
+// ImageRequest loads covers through Heimdeck (with the API key, and from https dashboards too).
+func (audiobookshelf) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
+	if !absCoverRe.MatchString(path) {
+		return "", nil, in.Errorf("nicht gefunden")
+	}
+	return path, map[string]string{"Authorization": "Bearer " + in.V("apiKey")}, nil
 }

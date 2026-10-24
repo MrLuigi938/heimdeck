@@ -170,3 +170,29 @@ func TestStashAndMeTube(t *testing.T) {
 		t.Fatalf("metube %+v %v", w.Items, w.Alerts)
 	}
 }
+
+// Covers go through Heimdeck's image proxy; only the services' own image paths are allowed.
+func TestImagePaths(t *testing.T) {
+	in := &Instance{Values: map[string]string{"apiKey": "k"}, Lang: "de"}
+	for _, c := range []struct {
+		src  ImageSource
+		path string
+		ok   bool
+	}{
+		{romm{}, "/assets/romm/resources/roms/1/2/cover/small.png", true},
+		{romm{}, "/api/users/me", false},
+		{jellyfin{}, "/Items/abc123/Images/Primary?maxHeight=120", true},
+		{jellyfin{emby: true}, "/emby/Items/abc123/Images/Primary?maxHeight=120", true},
+		{jellyfin{}, "/System/Info", false},
+		{audiobookshelf{}, "/api/items/li_1/cover?width=120&format=jpeg", true},
+		{audiobookshelf{}, "/api/me", false},
+	} {
+		_, headers, err := c.src.ImageRequest(context.Background(), in, c.path)
+		if (err == nil) != c.ok {
+			t.Errorf("%T %s: err %v", c.src, c.path, err)
+		}
+		if c.ok && len(headers) == 0 {
+			t.Errorf("%T %s: no auth header", c.src, c.path)
+		}
+	}
+}

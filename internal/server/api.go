@@ -244,7 +244,7 @@ var allowedSettings = map[string]bool{
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 	"debug": true, "telegramChat": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
-	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "searchView": true, "searchJump": true,
+	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "searchView": true, "searchJump": true, "monitorExternal": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -938,6 +938,7 @@ type exportTile struct {
 	Insecure    bool              `json:"insecure,omitempty"`
 	ShowWidget  bool              `json:"showWidget"`
 	NoMonitor   bool              `json:"noMonitor,omitempty"`
+	MonitorExt  bool              `json:"monitorExternal,omitempty"`
 	Grid        *store.GridPos    `json:"grid,omitempty"`
 	Hide        []string          `json:"hide,omitempty"`
 }
@@ -986,7 +987,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, t := range tiles {
 			if t.GroupID == g.ID {
 				eg.Tiles = append(eg.Tiles, exportTile{Name: t.Name, URL: t.URL, ExternalURL: t.ExternalURL, APIURL: t.APIURL, Icon: t.Icon,
-					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor, Grid: t.Grid, Hide: t.Hide})
+					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor, MonitorExt: t.MonitorExt, Grid: t.Grid, Hide: t.Hide})
 			}
 		}
 		data.Groups = append(data.Groups, eg)
@@ -1057,6 +1058,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			t, err := s.buildTile(tileInput{Tile: store.Tile{
 				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
 				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget, Grid: et.Grid, Hide: et.Hide,
+				MonitorExt: et.MonitorExt,
 			}, Monitor: &monitor})
 			if err != nil {
 				continue

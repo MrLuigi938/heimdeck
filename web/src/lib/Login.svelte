@@ -70,7 +70,7 @@
   .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .langs { margin-left: auto; display: flex; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; }
   .langs button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
-  .langs button.on { background: var(--accent); color: #fff; }
+  .langs button.on { background: var(--accent); color: var(--on-accent, #fff); }
   p { margin: 0; font-size: 14px; line-height: 1.5; }
   img { border-radius: var(--r-md); }
 </style>

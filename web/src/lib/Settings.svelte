@@ -192,6 +192,14 @@
   }
   // A theme brings its own accent colour; picking one drops a colour chosen before.
   const pickTheme = (id) => saveSetting({ theme: id, accent: '' });
+  // A custom search engine is only saved together with its address: picking
+  // "Custom …" first shows the field, leaving the filled field saves both.
+  function pickEngine() {
+    if (s.searchEngine !== 'custom' || (s.searchUrl || '').trim()) saveSetting({ searchEngine: s.searchEngine, searchUrl: s.searchUrl || '' });
+  }
+  function saveCustomEngine() {
+    if ((s.searchUrl || '').trim()) saveSetting({ searchEngine: 'custom', searchUrl: s.searchUrl.trim() });
+  }
   // For text fields: saved when the field is left or Enter is pressed.
   const saveField = (key) => () => saveSetting({ [key]: (s[key] || '').trim() });
 
@@ -462,7 +470,7 @@
         {/if}
         <label class="field">
           <span>{t('Websuche')}</span>
-          <select bind:value={s.searchEngine} onchange={() => saveSetting({ searchEngine: s.searchEngine })}>
+          <select bind:value={s.searchEngine} onchange={pickEngine}>
             <option value="duckduckgo">DuckDuckGo</option>
             <option value="brave">Brave Search</option>
             <option value="startpage">Startpage</option>
@@ -477,7 +485,8 @@
         {#if s.searchEngine === 'custom'}
           <label class="field">
             <span>{t('Adresse der Suchmaschine')}</span>
-            <input bind:value={s.searchUrl} onchange={saveField('searchUrl')} placeholder="https://searx.example.com/search?q={'{q}'}" inputmode="url" />
+            <!-- svelte-ignore a11y_autofocus -->
+            <input bind:value={s.searchUrl} onchange={saveCustomEngine} placeholder="https://searx.example.com/search?q={'{q}'}" inputmode="url" autofocus={!s.searchUrl} />
             <span class="help">{t('{q} wird durch den Suchbegriff ersetzt, z. B. für deine eigene SearXNG-Instanz.')}</span>
           </label>
         {/if}
@@ -495,6 +504,8 @@
           <input bind:value={s.localHosts} onchange={saveField('localHosts')} placeholder={t('z. B. dashboard.home, 10.8.0.1')} />
           <span class="help">{t('Mit Komma trennen. Nützlich, wenn du das Dashboard zuhause über einen eigenen Hostnamen öffnest.')}</span>
         </label>
+        <label class="check"><input type="checkbox" checked={s.monitorExternal === 'true'} onchange={setFlag('monitorExternal')} /> {t('Bei allen Kacheln auch die öffentliche Adresse prüfen')}</label>
+        <p class="help indent">{t('Sonst wird nur die lokale Adresse geprüft – die öffentliche nur bei Kacheln, bei denen du es im Kachel-Editor einschaltest.')}</p>
         <h3>Docker</h3>
         {#if !docker}<p class="help">{t('Kein Docker-Socket eingebunden – siehe Anleitung in der docker-compose.yml')}</p>{/if}
         <label class="check"><input type="checkbox" checked={s.dockerUpdates === 'true'} onchange={setFlag('dockerUpdates')} disabled={!docker} /> {t('Nach Container-Updates suchen')}</label>
