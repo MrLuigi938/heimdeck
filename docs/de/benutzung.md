@@ -16,7 +16,7 @@
 ## Umstieg von Heimdall
 
 1. In Heimdall: Einstellungen → **Exportieren** – das lädt `HeimdallExport.json` herunter.
-2. In Heimdeck: auf der Startseite **Von Heimdall übernehmen** (oder Einstellungen → Sicherung → Importieren) und die Datei wählen.
+2. In Heimdeck: auf der Startseite **Von Heimdall übernehmen** (oder Einstellungen → Konto und Sicherung → Importieren) und die Datei wählen.
 
 Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Dienste, die Heimdeck kennt (Sonarr, Radarr, Jellyfin, Nextcloud, AdGuard, Proxmox …), werden als Live-Kachel übernommen – mit API-Key, Benutzer und Passwort aus Heimdall sowie der „Override URL“ als interne Adresse.
 
@@ -93,7 +93,7 @@ Namen aus [dashboardicons.com](https://dashboardicons.com) (z. B. `jellyfin`), e
 
 ## Sicherung
 
-- **Einstellungen → Exportieren** speichert Dashboards, Gruppen und Kacheln als Datei – **ohne** API-Keys und Passwörter. Wieder einspielen unter Einstellungen → Sicherung.
+- **Einstellungen → Konto und Sicherung → Exportieren** speichert Dashboards, Gruppen und Kacheln als Datei – **ohne** API-Keys und Passwörter. Wieder einspielen an derselben Stelle.
 - Für eine vollständige Sicherung samt Schlüsseln den Datenordner sichern (`./data` bei Docker, `/var/lib/heimdeck` beim Installationsskript). Er enthält die Datenbank und den Verschlüsselungsschlüssel – gut aufbewahren.
 
 ## Passwort vergessen?

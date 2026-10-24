@@ -5,7 +5,8 @@
   // to it, which threw away everything typed when a text selection ended outside.
   // Esc in a text field first only leaves the field (and closes the browser's
   // autocomplete); a second Esc closes the dialog.
-  let { title, onClose, children, footer, wide = false } = $props();
+  // size: "" (normal), "settings" (large and of fixed height; the content scrolls by itself).
+  let { title, onClose, children, footer, wide = false, size = '' } = $props();
   let backdrop;
 
   function onKey(e) {
@@ -26,7 +27,7 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="backdrop" role="presentation" bind:this={backdrop}>
-  <div class="modal card" class:wide role="dialog" aria-modal="true" aria-label={title}>
+  <div class="modal card {size}" class:wide role="dialog" aria-modal="true" aria-label={title}>
     <header>
       <h2>{title}</h2>
       <button class="ghost icon" onclick={onClose} aria-label={t('Schließen')}>✕</button>
@@ -47,6 +48,8 @@
     display: flex; flex-direction: column; background: var(--surface-solid); overflow: hidden;
   }
   .modal.wide { width: min(780px, 100%); }
+  .modal.settings { width: min(940px, 100%); height: min(720px, calc(100dvh - 32px)); }
+  .modal.settings .body { padding: 0; overflow: hidden; display: block; }
   header { display: flex; align-items: center; padding: 16px 16px 8px 20px; }
   h2 { margin: 0; font-size: 18px; flex: 1; }
   /* min-height: 0 lets the body shrink and scroll, so the footer (Save) stays visible */
@@ -55,6 +58,7 @@
   @media (max-width: 520px) {
     .backdrop { padding: 8px; }
     .modal { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+    .modal.settings { height: calc(100dvh - 16px); }
     .body { padding: 8px 16px 16px; }
     footer { padding: 12px 16px; }
   }

@@ -376,14 +376,10 @@
 
 /* ---------- Buttons a skin must leave alone ---------- */
 
-/* Skins restyle buttons; these few are text links or small round controls
-   and keep their own look in every theme ("show more", clearing the search,
-   colour swatches, theme cards). */
-:root[data-skin] button.fold {
-  background: none; border: 0; box-shadow: none; padding: 0; color: var(--muted);
-  text-transform: none; letter-spacing: normal; text-shadow: none; filter: none;
-}
-:root[data-skin] button.fold:hover { color: var(--accent); }
+/* Skins restyle buttons. "Show more" then becomes a real button in the
+   theme's style and needs the padding its plain text-link form leaves out;
+   clearing the search and the colour swatches keep their own round shape. */
+:root[data-skin] button.fold { padding: 3px 10px; }
 :root[data-skin] button.clear {
   background: var(--surface-2); border: 0; box-shadow: none; padding: 0; border-radius: 50%;
   color: var(--muted); text-shadow: none; filter: none;
@@ -392,6 +388,14 @@
 :root[data-skin] button.swatch { border: 2px solid transparent; box-shadow: none; padding: 0; border-radius: 50%; }
 :root[data-skin] button.swatch.active { border-color: var(--text); }
 
+/* The settings sidebar is a list, not a row of buttons. */
+:root[data-skin] .settings button.nav, :root[data-skin] .settings button.back {
+  background: none; border: 0; box-shadow: none; text-shadow: none; filter: none; color: var(--text);
+  text-transform: none; letter-spacing: normal;
+}
+:root[data-skin] .settings button.back { color: var(--accent); }
+:root[data-skin] .settings button.nav:hover { background: var(--surface-2); }
+:root[data-skin] .settings button.nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 /* ---------- Style options (independent of the theme, so last: they win) ---------- */
 
 :root[data-corners='square'] { --radius: 4px; --r-md: 3px; --r-sm: 3px; --r-xs: 2px; }

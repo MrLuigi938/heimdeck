@@ -16,7 +16,7 @@
 ## Moving from Heimdall
 
 1. In Heimdall: Settings → **Export** – this downloads `HeimdallExport.json`.
-2. In Heimdeck: click **Import from Heimdall** on the start page (or Settings → Backup → Import) and choose the file.
+2. In Heimdeck: click **Import from Heimdall** on the start page (or Settings → Account and backup → Import) and choose the file.
 
 Tags become groups; tiles without a tag go to the group “Heimdall”. Services Heimdeck knows (Sonarr, Radarr, Jellyfin, Nextcloud, AdGuard, Proxmox …) are imported as live tiles – including API key, user and password from Heimdall, with the “Override URL” as the internal address.
 
@@ -93,7 +93,7 @@ Use a name from [dashboardicons.com](https://dashboardicons.com) (e.g. `jellyfin
 
 ## Backup
 
-- **Settings → Export** saves your dashboards, groups and tiles as a file – **without** API keys and passwords. Import it again under Settings → Backup.
+- **Settings → Account and backup → Export** saves your dashboards, groups and tiles as a file – **without** API keys and passwords. Import it again in the same place.
 - For a full backup including keys, back up the data folder (`./data` with Docker, `/var/lib/heimdeck` with the install script). It contains the database and the encryption key – keep it safe.
 
 ## Forgot your password?

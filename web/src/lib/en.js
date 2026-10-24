@@ -418,4 +418,14 @@ export const en = {
   'Farbe des Themes': 'The theme’s colour',
   'Allgemeines Theme': 'General theme',
   'Suche leeren': 'Clear search',
+
+  // settings layout
+  'Einstellung suchen …': 'Search settings …',
+  'Änderungen werden sofort gespeichert': 'Changes are saved right away',
+  'Netzwerk und Docker': 'Network and Docker',
+  'Konto und Sicherung': 'Account and backup',
+  'Chat-ID von „{name}“ eingetragen.': 'Chat ID of “{name}” filled in.',
+  'Mit „Test senden“ ausprobieren.': 'Try it with “Send test”.',
+  'Die Suche oben findet deine Kacheln sofort und fragt im Hintergrund alle Dienste, die suchen können (z. B. Jellyfin, Paperless). Enter öffnet den ersten Treffer oder sucht im Web.':
+    'The search at the top finds your tiles at once and asks every service that can search (e.g. Jellyfin, Paperless) in the background. Enter opens the first hit or searches the web.',
 };
