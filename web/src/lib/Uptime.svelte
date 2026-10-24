@@ -161,8 +161,8 @@
   .head { display: flex; align-items: center; gap: 8px; min-height: 30px; }
   .title { background: none; border: 0; padding: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; gap: 8px; align-items: center; }
   .chev { width: 10px; }
-  .sum { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; padding: 1px 8px; border-radius: 8px; background: var(--surface-2); }
-  .seg { margin-left: auto; display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .sum { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; padding: 1px 8px; border-radius: var(--r-xs); background: var(--surface-2); }
+  .seg { margin-left: auto; display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
   .seg button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
   .seg button.on { background: var(--surface-2); color: var(--text); }
   .body { padding: 8px 16px 12px; display: grid; }

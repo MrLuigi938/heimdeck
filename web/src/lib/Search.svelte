@@ -183,7 +183,7 @@
     padding: 8px; max-height: min(70vh, 640px); overflow-y: auto; display: grid; gap: 2px;
   }
   .section { display: flex; gap: 6px; align-items: center; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 10px 8px 4px; }
-  .hit { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 10px; border: 0; background: none; text-align: left; width: 100%; }
+  .hit { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: var(--r-sm); border: 0; background: none; text-align: left; width: 100%; }
   .hit:hover, .hit:focus { background: var(--surface-2); }
   .web { color: var(--muted); margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; }
   .remote { padding: 0 8px; }

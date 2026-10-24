@@ -383,6 +383,7 @@ type boardInput struct {
 	Name       string `json:"name"`
 	Icon       string `json:"icon"`
 	Background string `json:"background"`
+	Theme      string `json:"theme"`
 }
 
 func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
@@ -391,7 +392,7 @@ func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
-	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon), Background: strings.TrimSpace(in.Background)}
+	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon), Background: strings.TrimSpace(in.Background), Theme: strings.TrimSpace(in.Theme)}
 	if err := s.store.SaveBoard(&b); err != nil {
 		writeErr(w, 500, err)
 		return
@@ -415,7 +416,7 @@ func (s *Server) handleUpdateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, err)
 		return
 	}
-	b.Name, b.Icon, b.Background = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon), strings.TrimSpace(in.Background)
+	b.Name, b.Icon, b.Background, b.Theme = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon), strings.TrimSpace(in.Background), strings.TrimSpace(in.Theme)
 	if err := s.store.SaveBoard(&b); err != nil {
 		writeErr(w, 500, err)
 		return

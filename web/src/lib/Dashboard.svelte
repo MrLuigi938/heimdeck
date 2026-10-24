@@ -17,6 +17,7 @@
   import { promptDialog } from './dialog.svelte.js';
   import Modal from './Modal.svelte';
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
+  import { applyTheme } from './themes.js';
 
   let data = $state(null);
   let status = $state({});
@@ -160,17 +161,12 @@
     return () => { clearInterval(s); clearInterval(c); };
   });
 
-  // Theme, accent colour and background follow the settings.
+  // Theme, accent colour and background follow the settings; a dashboard can have its own theme.
   $effect(() => {
-    const root = document.documentElement;
     const media = matchMedia('(prefers-color-scheme: light)');
-    const apply = () => {
-      const theme = settings.theme === 'light' || (settings.theme !== 'dark' && media.matches) ? 'light' : 'dark';
-      root.dataset.theme = theme;
-    };
+    const apply = () => applyTheme(settings, board?.theme);
     apply();
     media.addEventListener('change', apply);
-    root.style.setProperty('--accent', settings.accent || '#5b8cff');
     document.title = settings.title || 'Heimdeck';
     // A dashboard can have its own background; otherwise the global one is used.
     const background = board?.background || settings.background;
@@ -590,7 +586,7 @@
   .board-btn { padding: 4px 10px; font-size: 13px; border-radius: 999px; display: inline-flex; gap: 6px; align-items: center; }
   .caret { font-size: 10px; color: var(--muted); }
   .board-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 45; min-width: 180px; padding: 6px; display: grid; gap: 2px; background: var(--surface-solid); }
-  .board-menu button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; }
+  .board-menu button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: var(--r-xs); }
   .board-menu button:hover, .board-menu button.on { background: var(--surface-2); }
   .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }

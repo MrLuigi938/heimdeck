@@ -22,11 +22,22 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 
 ## Dashboards and groups
 
-- **Multiple dashboards**, e.g. “Home” and “Work”: switch next to the title at the top. Each dashboard can have its own background image. Every browser remembers the last one used; `?board=<id>` links to a specific one.
+- **Multiple dashboards**, e.g. “Home” and “Work”: switch next to the title at the top. Each dashboard can have its own background image and theme. Every browser remembers the last one used; `?board=<id>` links to a specific one.
 - **Groups** sort your tiles. The tile size (automatic, uniform or compact as an icon square) can be set for all groups or per group (edit group → Display). With the display **Free grid** (per group) you place the tiles yourself: in edit mode (✎) a 12-column grid appears under the group, tiles can be dragged anywhere and made wider, narrower, taller or shorter with the bottom-right corner (double-clicking the corner fits the height to the content, the arrow keys resize as well). A tile only one column wide is shown as an icon, so large live tiles and small icons can share a group. Gaps stay where you leave them; a tile dropped onto another pushes that one down. On phones the grid is scaled down to 4 columns: positions and widths are converted, tiles of 3 or more columns stay at least half the screen wide, narrow ones become icons. Moving and resizing only works on a larger screen.
 - **Hidden groups** are only shown after clicking 👁 (for the current session). **Protected groups** need their own password.
 - **Link-only tiles**: every tile can be a plain link and still shows whether the service is reachable. The status check can be turned off per tile.
 - **Choosing live data**: in the tile editor, open **Choose live data** below “Show live data on the tile”. Heimdeck asks the service once and lists every value it delivers plus the list, notes and buttons – untick what you don't need. Values a later version adds show up on their own; for the FRITZ!Box you also choose which sections are loaded at all.
+
+## Themes
+
+*Settings → Appearance → Theme* changes the look with one click, without touching the layout:
+
+- **Classic**: Heimdeck Dark and Light (or automatically like the system), Nord, Mocha, Retro Warm, Vampire and Sand – colour palettes for every taste.
+- **Playful**: Terminal (green on black), Neon City (cut corners, neon yellow and cyan), Luna 2001 (every tile a window with a blue title bar), Aero Glass (frosted glass frames), Grim Hunter (dark fantasy with brass frames), Guild Hall (gold frames, progress as experience bars) and Halloween (pumpkins and cobwebs). *Halloween automatically in October* switches to it for the month.
+- **Style options** work with every theme: corners (square or very round), tiles (glass or solid – solid is easier on weak tablets), font (system or monospace) and spacing (compact).
+- Every theme brings its **accent colour**; pick your own one below the themes, ✦ goes back to the theme's.
+- **Per dashboard**: under *Settings → Dashboards* a dashboard can get its own theme, e.g. Nord for “Work”.
+- A background image of your own (general or per dashboard) replaces the theme's backdrop.
 
 ## Home or away
 

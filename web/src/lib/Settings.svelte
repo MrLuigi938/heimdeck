@@ -8,6 +8,7 @@
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
+  import { THEMES } from './themes.js';
 
   let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, onClose, onSaved, onSwitchBoard } = $props();
 
@@ -18,7 +19,7 @@
 
   async function saveBoard(b) {
     try {
-      await put(`/boards/${b.id}`, { name: b.name, icon: b.icon, background: b.background });
+      await put(`/boards/${b.id}`, { name: b.name, icon: b.icon, background: b.background, theme: b.theme || '' });
       toast(t('Gespeichert'));
       onSaved({ keepOpen: true });
     } catch (e) {
@@ -133,6 +134,19 @@
       toast(err.message, 'bad');
     }
   }
+
+  // Theme and style options apply and are saved right away, so you see them at once.
+  // A theme brings its own accent colour; picking one drops a colour chosen before.
+  async function saveLook(change) {
+    Object.assign(s, change);
+    try {
+      await put('/settings', change);
+      onSaved({ keepOpen: true });
+    } catch (err) {
+      toast(err.message, 'bad');
+    }
+  }
+  const pickTheme = (id) => saveLook({ theme: id, accent: '' });
 
   async function save() {
     try {
@@ -265,23 +279,66 @@
           <option value="en">English</option>
         </select>
       </label>
+      <label class="field"><span>{t('Titel')}</span><input bind:value={s.title} /></label>
+    </div>
+    <div class="field">
+      <span>{t('Theme')}</span>
+      {#each [['classic', 'Klassisch'], ['fun', 'Verspielt']] as [group, label]}
+        <div class="theme-group">{t(label)}</div>
+        <div class="themes">
+          {#each THEMES.filter((th) => th.group === group) as th (th.id)}
+            {@const [bg, surface, accent, text] = th.preview}
+            <button class="theme" class:active={(s.theme || 'auto') === th.id} onclick={() => pickTheme(th.id)} aria-pressed={(s.theme || 'auto') === th.id}>
+              <span class="swatch-preview" style="background:{th.id === 'auto' ? `linear-gradient(135deg, ${bg} 50%, ${surface} 50%)` : bg}">
+                <span class="mini" style="background:{surface};color:{text}"><span class="mini-line" style="background:{text}"></span><span class="mini-dot" style="background:{accent}"></span></span>
+              </span>
+              <span class="theme-name">{t(th.name)}</span>
+            </button>
+          {/each}
+        </div>
+      {/each}
+      <label class="check"><input type="checkbox" checked={s.seasonal === 'true'} onchange={(e) => saveLook({ seasonal: String(e.target.checked) })} /> {t('Im Oktober automatisch Halloween')}</label>
+    </div>
+    <div class="grid4">
       <label class="field">
-        <span>{t('Farbschema')}</span>
-        <select bind:value={s.theme}>
-          <option value="auto">{t('Automatisch (wie System)')}</option>
-          <option value="dark">{t('Dunkel')}</option>
-          <option value="light">{t('Hell')}</option>
+        <span>{t('Ecken')}</span>
+        <select value={s.corners || ''} onchange={(e) => saveLook({ corners: e.target.value })}>
+          <option value="">{t('Wie das Theme')}</option>
+          <option value="square">{t('Eckig')}</option>
+          <option value="round">{t('Sehr rund')}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>{t('Kacheln')}</span>
+        <select value={s.tileStyle || ''} onchange={(e) => saveLook({ tileStyle: e.target.value })}>
+          <option value="">{t('Glas (durchscheinend)')}</option>
+          <option value="solid">{t('Massiv')}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>{t('Schrift')}</span>
+        <select value={s.font || ''} onchange={(e) => saveLook({ font: e.target.value })}>
+          <option value="">{t('Wie das Theme')}</option>
+          <option value="system">{t('System')}</option>
+          <option value="mono">{t('Monospace')}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>{t('Abstände')}</span>
+        <select value={s.density || ''} onchange={(e) => saveLook({ density: e.target.value })}>
+          <option value="">{t('Normal')}</option>
+          <option value="compact">{t('Kompakt')}</option>
         </select>
       </label>
     </div>
-    <label class="field"><span>{t('Titel')}</span><input bind:value={s.title} /></label>
     <div class="field">
       <span>{t('Akzentfarbe')}</span>
       <div class="row wrap">
+        <button class="swatch theme-accent" class:active={!s.accent} onclick={() => saveLook({ accent: '' })} title={t('Farbe des Themes')} aria-label={t('Farbe des Themes')}>✦</button>
         {#each accents as c}
           <button class="swatch" class:active={s.accent === c} style="background:{c}" onclick={() => (s.accent = c)} aria-label={c}></button>
         {/each}
-        <input type="color" bind:value={s.accent} aria-label={t('Eigene Farbe')} />
+        <input type="color" value={s.accent || '#5b8cff'} oninput={(e) => (s.accent = e.target.value)} aria-label={t('Eigene Farbe')} />
       </div>
     </div>
     <label class="field">
@@ -339,6 +396,10 @@
         <input class="emoji" bind:value={b.icon} maxlength="4" aria-label={t('Symbol')} />
         <input bind:value={b.name} aria-label={t('Name')} />
         <input class="board-bg" bind:value={b.background} placeholder={t('Eigenes Hintergrundbild (URL, optional)')} aria-label={t('Hintergrundbild')} />
+        <select class="board-theme" bind:value={b.theme} aria-label={t('Theme')}>
+          <option value="">{t('Allgemeines Theme')}</option>
+          {#each THEMES.filter((th) => th.id !== 'auto') as th}<option value={th.id}>{t(th.name)}</option>{/each}
+        </select>
         <div class="board-actions">
           <button class="small" onclick={() => saveBoard(b)}>{t('Speichern')}</button>
           <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
@@ -534,7 +595,7 @@
   .keys { display: grid; grid-template-columns: 1fr auto 32px; gap: 6px 8px; align-items: center; font-size: 14px; }
   .key { min-width: 64px; justify-content: center; font-family: ui-monospace, monospace; font-weight: 600; }
   /* Same look as the setup guides in the tile editor. */
-  .howto { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+  .howto { background: var(--surface-2); border-radius: var(--r-md); padding: 10px 14px; font-size: 13.5px; }
   .howto summary { cursor: pointer; font-weight: 600; }
   .howto ol { margin: 8px 0 2px; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); }
   .chat-choices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -544,7 +605,20 @@
   .board-actions { display: flex; gap: 6px; justify-content: flex-end; }
   /* Background URL gets its own line under icon and name. */
   .board-bg { grid-column: 1 / -1; grid-row: 2; font-size: 13px; }
+  .board-theme { grid-column: 1 / -1; grid-row: 3; font-size: 13px; }
   .board-row:not(form) { margin-bottom: 8px; }
+  /* Theme cards: a tiny tile in the theme's colours. */
+  .theme-group { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .theme { display: grid; gap: 6px; padding: 6px; text-align: left; border-radius: var(--r-md); background: var(--surface-2); }
+  .theme.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .swatch-preview { display: grid; place-items: center; height: 48px; border-radius: var(--r-xs); padding: 8px; }
+  .mini { width: 100%; height: 100%; border-radius: 4px; display: flex; align-items: center; gap: 6px; padding: 0 6px; }
+  .mini-line { flex: 1; height: 4px; border-radius: 2px; opacity: .8; }
+  .mini-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .theme-name { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .theme-accent { background: var(--surface-2); display: inline-grid; place-items: center; font-size: 13px; }
+  .grid4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   /* On phones the buttons get their own line below icon and name. */
   @media (max-width: 560px) {
     .board-row { grid-template-columns: 52px minmax(0, 1fr); margin-bottom: 6px; }

@@ -114,10 +114,10 @@
   .widget { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }
   /* The value shrinks with its length so it fits the box (100cqi = box width). */
-  .stat { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; min-width: 0; container-type: inline-size; }
+  .stat { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; container-type: inline-size; }
   .value { font-size: clamp(11px, calc(100cqi / (var(--n, 4) * 0.6)), 17px); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .label { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .alerts { margin: 0; padding: 8px 10px; list-style: none; font-size: 12.5px; line-height: 1.4; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: 10px; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+  .alerts { margin: 0; padding: 8px 10px; list-style: none; font-size: 12.5px; line-height: 1.4; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: var(--r-sm); display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
   .alerts.clamped li { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
   .items-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
@@ -133,7 +133,7 @@
   .bar > div { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s; }
   .item-actions { display: flex; gap: 4px; flex: none; margin-left: auto; }
   .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
-  .thumb { position: relative; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: var(--surface-2); display: block; }
+  .thumb { position: relative; aspect-ratio: 16 / 10; border-radius: var(--r-xs); overflow: hidden; background: var(--surface-2); display: block; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb-caption { position: absolute; inset: auto 0 0 0; padding: 14px 7px 4px; font-size: 11.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     background: linear-gradient(transparent, rgba(0, 0, 0, .65)); }

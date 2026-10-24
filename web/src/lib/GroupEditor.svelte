@@ -111,7 +111,7 @@
 <style>
   .form { display: grid; gap: 14px; }
   .field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; color: var(--text); font-size: 14px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; color: var(--text); font-size: 14px; }
   .opt.on { border-color: var(--accent); }
   .opt input { margin-top: 3px; }
 </style>

@@ -22,11 +22,22 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
 
 ## Dashboards und Gruppen
 
-- **Mehrere Dashboards**, z. B. „Privat“ und „Arbeit“: oben neben dem Titel umschalten. Jedes Dashboard kann ein eigenes Hintergrundbild haben. Jeder Browser merkt sich das zuletzt benutzte, per `?board=<id>` lässt sich eines direkt verlinken.
+- **Mehrere Dashboards**, z. B. „Privat“ und „Arbeit“: oben neben dem Titel umschalten. Jedes Dashboard kann ein eigenes Hintergrundbild und Theme haben. Jeder Browser merkt sich das zuletzt benutzte, per `?board=<id>` lässt sich eines direkt verlinken.
 - **Gruppen** ordnen deine Kacheln. Die Kachelgröße (automatisch, einheitlich oder kompakt als Icon-Quadrat) lässt sich für alle oder pro Gruppe einstellen (Gruppe bearbeiten → Darstellung). Mit der Darstellung **Freies Raster** (pro Gruppe) platzierst du die Kacheln selbst: Im Bearbeitungsmodus (✎) liegt ein Raster mit 12 Spalten unter der Gruppe, Kacheln lassen sich an jede Stelle ziehen und über die Ecke unten rechts breiter, schmaler, höher oder niedriger ziehen (Doppelklick auf die Ecke passt die Höhe an den Inhalt an, die Pfeiltasten ändern die Größe ebenfalls). Ist eine Kachel nur eine Spalte breit, wird sie als Icon angezeigt – so lassen sich große Live-Kacheln und kleine Icons in einer Gruppe mischen. Lücken bleiben, wo du sie lässt; landet eine Kachel auf einer anderen, rutscht diese nach unten. Auf dem Handy wird das Raster auf 4 Spalten verkleinert: Position und Breite werden umgerechnet, Kacheln ab 3 Spalten bleiben mindestens halb so breit wie der Bildschirm, schmale werden zu Icons. Verschieben und Größe ändern geht nur auf einem größeren Bildschirm.
 - **Ausgeblendete Gruppen** erscheinen erst nach Klick auf 👁 (für die aktuelle Sitzung). **Geschützte Gruppen** brauchen ein eigenes Passwort.
 - **Nur-Link-Kacheln**: Jede Kachel kann ein einfacher Link sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
 - **Live-Daten auswählen**: Im Kachel-Editor unter „Live-Daten auf der Kachel anzeigen“ **Live-Daten auswählen** aufklappen. Heimdeck fragt den Dienst einmal ab und listet jeden Wert, den er liefert, dazu Liste, Hinweise und Knöpfe – einfach abhaken, was du nicht brauchst. Werte, die eine spätere Version ergänzt, erscheinen von selbst; bei der FRITZ!Box wählst du dort außerdem, welche Bereiche überhaupt geladen werden.
+
+## Themes
+
+*Einstellungen → Aussehen → Theme* ändert das Aussehen mit einem Klick, ohne die Anordnung anzufassen:
+
+- **Klassisch**: Heimdeck Dunkel und Hell (oder automatisch wie das System), Nord, Mokka, Retro-Warm, Vampir und Sand – Farbpaletten für jeden Geschmack.
+- **Verspielt**: Terminal (grün auf schwarz), Neon City (abgeschrägte Ecken, Neongelb und Cyan), Luna 2001 (jede Kachel ein Fenster mit blauer Titelleiste), Aero-Glas (Milchglas-Rahmen), Hexer (düstere Fantasy mit Messingrahmen), Gildenhalle (Goldrahmen, Fortschritt als Erfahrungsbalken) und Halloween (Kürbisse und Spinnennetze). *Im Oktober automatisch Halloween* schaltet es für den Monat ein.
+- **Stil-Optionen** passen zu jedem Theme: Ecken (eckig oder sehr rund), Kacheln (Glas oder massiv – massiv schont schwache Tablets), Schrift (System oder Monospace) und Abstände (kompakt).
+- Jedes Theme bringt seine **Akzentfarbe** mit; darunter lässt sich eine eigene wählen, ✦ nimmt wieder die des Themes.
+- **Pro Dashboard**: Unter *Einstellungen → Dashboards* bekommt ein Dashboard ein eigenes Theme, z. B. Nord für „Arbeit“.
+- Ein eigenes Hintergrundbild (allgemein oder pro Dashboard) ersetzt den Hintergrund des Themes.
 
 ## Zuhause oder unterwegs
 

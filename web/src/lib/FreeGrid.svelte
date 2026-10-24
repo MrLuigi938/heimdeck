@@ -244,7 +244,7 @@
     position: absolute; inset: 0; display: grid; gap: 12px; pointer-events: none;
     grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), 29px);
   }
-  .cells span { border: 1px dashed var(--border-strong); border-radius: 8px; opacity: .45; }
+  .cells span { border: 1px dashed var(--border-strong); border-radius: var(--r-xs); opacity: .45; }
   /* Each cell is a size container, so icons and names can follow its size. */
   .cell { position: relative; min-width: 0; min-height: 0; container-type: size; --icon-max: 42cqmin; }
   /* The grid sets the size; content that does not fit scrolls inside the tile.

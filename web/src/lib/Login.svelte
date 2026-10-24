@@ -68,9 +68,9 @@
   .box { width: min(380px, 100%); padding: 32px; display: grid; gap: 16px; }
   h1 { margin: 0; font-size: 24px; }
   .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .langs { margin-left: auto; display: flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+  .langs { margin-left: auto; display: flex; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; }
   .langs button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
   .langs button.on { background: var(--accent); color: #fff; }
   p { margin: 0; font-size: 14px; line-height: 1.5; }
-  img { border-radius: 12px; }
+  img { border-radius: var(--r-md); }
 </style>

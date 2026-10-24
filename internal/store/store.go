@@ -62,6 +62,7 @@ type Board struct {
 	Name       string `json:"name"`
 	Icon       string `json:"icon"`
 	Background string `json:"background"` // empty = use the global background
+	Theme      string `json:"theme"`      // empty = use the global theme
 	Position   int    `json:"position"`
 }
 
@@ -164,6 +165,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE tiles ADD COLUMN grid_w INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE tiles ADD COLUMN grid_h INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE tiles ADD COLUMN hide TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE boards ADD COLUMN theme TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
@@ -372,7 +374,7 @@ func (s *Store) UpdateGroup(g Group) error {
 // ---- boards ----
 
 func (s *Store) Boards() ([]Board, error) {
-	rows, err := s.db.Query(`SELECT id, name, icon, background, position FROM boards ORDER BY position, id`)
+	rows, err := s.db.Query(`SELECT id, name, icon, background, theme, position FROM boards ORDER BY position, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +382,7 @@ func (s *Store) Boards() ([]Board, error) {
 	out := []Board{}
 	for rows.Next() {
 		var b Board
-		if err := rows.Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Position); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Theme, &b.Position); err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -390,7 +392,7 @@ func (s *Store) Boards() ([]Board, error) {
 
 func (s *Store) Board(id int64) (Board, error) {
 	var b Board
-	err := s.db.QueryRow(`SELECT id, name, icon, background, position FROM boards WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Position)
+	err := s.db.QueryRow(`SELECT id, name, icon, background, theme, position FROM boards WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Theme, &b.Position)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -400,14 +402,14 @@ func (s *Store) Board(id int64) (Board, error) {
 func (s *Store) SaveBoard(b *Board) error {
 	if b.ID == 0 {
 		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM boards`).Scan(&b.Position)
-		res, err := s.db.Exec(`INSERT INTO boards (name, icon, background, position) VALUES (?, ?, ?, ?)`, b.Name, b.Icon, b.Background, b.Position)
+		res, err := s.db.Exec(`INSERT INTO boards (name, icon, background, theme, position) VALUES (?, ?, ?, ?, ?)`, b.Name, b.Icon, b.Background, b.Theme, b.Position)
 		if err != nil {
 			return err
 		}
 		b.ID, _ = res.LastInsertId()
 		return nil
 	}
-	_, err := s.db.Exec(`UPDATE boards SET name = ?, icon = ?, background = ? WHERE id = ?`, b.Name, b.Icon, b.Background, b.ID)
+	_, err := s.db.Exec(`UPDATE boards SET name = ?, icon = ?, background = ?, theme = ? WHERE id = ?`, b.Name, b.Icon, b.Background, b.Theme, b.ID)
 	return err
 }
 

@@ -100,7 +100,7 @@
 
 <style>
   .list { display: grid; gap: 6px; }
-  .item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+  .item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); cursor: pointer; }
   .item:hover { border-color: var(--border-strong); }
   .dim { opacity: .55; }
   .grow { flex: 1; min-width: 0; }

@@ -173,8 +173,8 @@
   .dot.unknown { opacity: .4; }
   .edit { flex: none; }
   .body { padding: 0 14px 14px; min-width: 0; }
-  .error { font-size: 12.5px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: 10px; }
-  .skeleton { height: 54px; border-radius: 10px; background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  .error { font-size: 12.5px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: var(--r-sm); }
+  .skeleton { height: 54px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   .setup { margin: 0 14px 14px; font-size: 13px; text-align: left; border-style: dashed; }
   @keyframes shimmer { to { background-position: -200% 0; } }
 

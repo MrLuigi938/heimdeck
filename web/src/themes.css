@@ -1,0 +1,394 @@
+/* Themes. A palette only sets the colour variables of app.css; a skin also
+   changes shapes and decoration. Skin rules start with :root[data-skin=…],
+   which outranks the components' own scoped styles. Nothing here changes
+   the layout: sizes, grid and order stay the same in every theme. */
+
+/* ---------- Classic palettes ---------- */
+
+:root[data-palette='nord'] {
+  --bg: #2e3440;
+  --surface: rgba(59, 66, 82, 0.86);
+  --surface-2: rgba(67, 76, 94, 0.92);
+  --surface-solid: #3b4252;
+  --border: rgba(236, 239, 244, 0.08);
+  --border-strong: rgba(236, 239, 244, 0.18);
+  --text: #eceff4;
+  --muted: #a7b1c2;
+  --ok: #a3be8c;
+  --warn: #ebcb8b;
+  --bad: #bf616a;
+  --shadow: 0 8px 26px rgba(20, 24, 32, 0.35);
+}
+
+:root[data-palette='mocha'] {
+  --bg: #1e1e2e;
+  --surface: rgba(38, 38, 56, 0.86);
+  --surface-2: rgba(49, 50, 68, 0.92);
+  --surface-solid: #262637;
+  --border: rgba(205, 214, 244, 0.08);
+  --border-strong: rgba(205, 214, 244, 0.17);
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --ok: #a6e3a1;
+  --warn: #f9e2af;
+  --bad: #f38ba8;
+  --shadow: 0 8px 28px rgba(10, 10, 20, 0.4);
+}
+
+:root[data-palette='retro'] {
+  --bg: #282828;
+  --surface: rgba(50, 48, 47, 0.9);
+  --surface-2: rgba(60, 56, 54, 0.94);
+  --surface-solid: #32302f;
+  --border: rgba(235, 219, 178, 0.09);
+  --border-strong: rgba(235, 219, 178, 0.2);
+  --text: #ebdbb2;
+  --muted: #a89984;
+  --ok: #b8bb26;
+  --warn: #fabd2f;
+  --bad: #fb4934;
+  --shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-palette='vampire'] {
+  --bg: #282a36;
+  --surface: rgba(52, 55, 70, 0.88);
+  --surface-2: rgba(68, 71, 90, 0.92);
+  --surface-solid: #343746;
+  --border: rgba(248, 248, 242, 0.08);
+  --border-strong: rgba(248, 248, 242, 0.17);
+  --text: #f8f8f2;
+  --muted: #a4abcc;
+  --ok: #50fa7b;
+  --warn: #f1fa8c;
+  --bad: #ff5555;
+  --shadow: 0 8px 28px rgba(10, 10, 20, 0.4);
+}
+
+:root[data-palette='sand'] {
+  --bg: #eee8d5;
+  --surface: rgba(253, 246, 227, 0.92);
+  --surface-2: rgba(238, 232, 213, 0.95);
+  --surface-solid: #fdf6e3;
+  --border: rgba(7, 54, 66, 0.1);
+  --border-strong: rgba(7, 54, 66, 0.22);
+  --text: #073642;
+  --muted: #586e75;
+  --ok: #859900;
+  --warn: #b58900;
+  --bad: #dc322f;
+  --shadow: 0 8px 24px rgba(7, 54, 66, 0.08);
+}
+
+/* ---------- Terminal ---------- */
+
+:root[data-palette='terminal'] {
+  --bg: #050a05;
+  --surface: rgba(8, 16, 8, 0.94);
+  --surface-2: rgba(14, 30, 14, 0.96);
+  --surface-solid: #081008;
+  --border: rgba(80, 255, 120, 0.22);
+  --border-strong: rgba(80, 255, 120, 0.45);
+  --text: #9dff9d;
+  --muted: #5fae5f;
+  --ok: #9dff9d;
+  --warn: #ffd75f;
+  --bad: #ff5f5f;
+  --shadow: none;
+  --font: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
+  --radius: 2px; --r-md: 2px; --r-sm: 2px; --r-xs: 2px;
+}
+:root[data-skin='terminal'] body:not(.has-bg) {
+  background:
+    repeating-linear-gradient(0deg, rgba(60, 255, 110, 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 40%, #0a1a0c, #030603 75%);
+  background-attachment: fixed;
+}
+:root[data-skin='terminal'] .card { backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-skin='terminal'] .tile .name { text-transform: lowercase; }
+:root[data-skin='terminal'] .tile .name::before { content: '> '; color: var(--muted); }
+:root[data-skin='terminal'] .tile:hover { border-color: var(--accent); box-shadow: 0 0 12px rgba(60, 255, 110, 0.18); }
+:root[data-skin='terminal'] .stat { background: transparent; border: 1px dashed var(--border); }
+:root[data-skin='terminal'] .items-title::before { content: '# '; }
+:root[data-skin='terminal'] .bar > div { background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px); }
+:root[data-skin='terminal'] button { background: transparent; }
+:root[data-skin='terminal'] button.primary { background: var(--accent); color: #031503; }
+:root[data-skin='terminal'] .dot.up { box-shadow: 0 0 6px var(--ok); }
+
+/* ---------- Neon City ---------- */
+
+:root[data-palette='neon'] {
+  --bg: #0b0b14;
+  --surface: rgba(16, 16, 30, 0.9);
+  --surface-2: rgba(26, 26, 46, 0.95);
+  --surface-solid: #12121f;
+  --border: rgba(0, 240, 255, 0.28);
+  --border-strong: rgba(0, 240, 255, 0.65);
+  --text: #e6fbff;
+  --muted: #7fa6b3;
+  --ok: #00ffa3;
+  --warn: #fcee0a;
+  --bad: #ff2a6d;
+  --shadow: 0 0 22px rgba(0, 240, 255, 0.08);
+  --font: 'Bahnschrift', 'DIN Alternate', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+  --radius: 0px; --r-md: 0px; --r-sm: 0px; --r-xs: 0px;
+}
+:root[data-skin='neon'] body:not(.has-bg) {
+  background:
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 46px 46px,
+    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px) 0 0 / 46px 46px,
+    radial-gradient(ellipse at 85% 0%, rgba(255, 42, 109, 0.28), transparent 55%),
+    radial-gradient(ellipse at 10% 100%, rgba(0, 240, 255, 0.2), transparent 55%),
+    #0b0b14;
+  background-attachment: fixed;
+}
+/* Cut corners: top right and bottom left, the yellow notch marks the tile. */
+:root[data-skin='neon'] .card {
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+}
+:root[data-skin='neon'] .tile.card { border-left: 3px solid var(--warn); }
+:root[data-skin='neon'] .tile:hover { border-color: var(--border-strong); border-left-color: var(--warn); }
+:root[data-skin='neon'] .tile .name { text-transform: uppercase; letter-spacing: 0.08em; }
+:root[data-skin='neon'] .tile .name::before { content: '// '; color: var(--warn); }
+:root[data-skin='neon'] .stat { background: rgba(0, 240, 255, 0.04); border-left: 2px solid var(--border-strong); }
+:root[data-skin='neon'] .stat:nth-child(3n + 1) { border-left-color: var(--warn); }
+:root[data-skin='neon'] .stat:nth-child(3n + 2) { border-left-color: #00f0ff; }
+:root[data-skin='neon'] .stat:nth-child(3n) { border-left-color: var(--bad); }
+:root[data-skin='neon'] .items-title { letter-spacing: 0.12em; }
+:root[data-skin='neon'] .bar { height: 3px; background: rgba(0, 240, 255, 0.12); }
+:root[data-skin='neon'] .bar > div { background: #00f0ff; box-shadow: 0 0 8px #00f0ff; }
+:root[data-skin='neon'] button { text-transform: uppercase; letter-spacing: 0.06em; }
+:root[data-skin='neon'] button.primary { color: #0b0b14; }
+:root[data-skin='neon'] .dot.up { box-shadow: 0 0 8px var(--ok); }
+:root[data-skin='neon'] .dot.down { box-shadow: 0 0 8px var(--bad); }
+
+/* ---------- Luna 2001 (a desktop from the early 2000s) ---------- */
+
+:root[data-palette='xp'] {
+  --bg: #3a6ea5;
+  --surface: #ece9d8;
+  --surface-2: #ffffff;
+  --surface-solid: #ffffff;
+  --border: #9fb4cc;
+  --border-strong: #7f9db9;
+  --text: #000000;
+  --muted: #4d4d4d;
+  --ok: #2e9e2e;
+  --warn: #b7791f;
+  --bad: #d62e2e;
+  --shadow: 2px 3px 8px rgba(0, 0, 40, 0.35);
+  --font: Tahoma, 'Segoe UI', Verdana, sans-serif;
+  --radius: 8px; --r-md: 3px; --r-sm: 3px; --r-xs: 3px;
+}
+:root[data-skin='xp'] body:not(.has-bg) {
+  background:
+    radial-gradient(ellipse 120% 60% at 30% 100%, #4d9a2a 0 45%, transparent 46%),
+    radial-gradient(ellipse 90% 45% at 85% 100%, #3f8a22 0 50%, transparent 51%),
+    linear-gradient(#2c6fd1 0%, #6aa5e8 45%, #b7d6f3 70%, #5aa02c 70.5%, #3d7a1c 100%);
+  background-attachment: fixed;
+}
+:root[data-skin='xp'] .card { backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* Every tile is a small window: blue title bar, beige body. */
+:root[data-skin='xp'] .tile.card:not(.compact) { border: 1px solid #0831d9; border-radius: 8px 8px 0 0; overflow: hidden; }
+:root[data-skin='xp'] .tile:not(.compact) .head {
+  background: linear-gradient(#0a5fe8, #0858dd 8%, #0844c4 55%, #0a3fb3 92%, #0a37a0);
+  color: #fff; padding: 7px 10px;
+}
+:root[data-skin='xp'] .tile:not(.compact) .head .name { text-shadow: 1px 1px 0 #0a2a80; }
+:root[data-skin='xp'] .tile:not(.compact) .head .desc { color: #d6e2ff; }
+:root[data-skin='xp'] .tile:not(.editing) .head[href]:hover .name { color: #fff; text-decoration: underline; }
+:root[data-skin='xp'] .tile .head .edit { color: #fff; }
+:root[data-skin='xp'] .tile .body { padding-top: 10px; }
+:root[data-skin='xp'] .tile:hover { border-color: #0831d9; }
+:root[data-skin='xp'] .stat { border: 1px solid var(--border-strong); }
+:root[data-skin='xp'] .bar { height: 12px; background: #fff; border: 1px solid #7f9db9; border-radius: 3px; padding: 1px; }
+:root[data-skin='xp'] .bar > div { background: repeating-linear-gradient(90deg, #2fb32f 0 7px, transparent 7px 9px); border-radius: 0; }
+:root[data-skin='xp'] button {
+  background: linear-gradient(#ffffff, #ece9d8 85%, #d6d0bb);
+  border: 1px solid #003c74; border-radius: 3px; color: #000;
+}
+:root[data-skin='xp'] button:hover { border-color: #e5a01a; box-shadow: inset 0 0 0 1px #f8d07a; }
+:root[data-skin='xp'] button.primary { background: linear-gradient(#5fbf4a, #3a9a2a 60%, #2e8a20); border-color: #1e5e14; color: #fff; font-weight: 700; }
+:root[data-skin='xp'] button.ghost { background: transparent; border-color: transparent; }
+:root[data-skin='xp'] .on-bg { background: #ece9d8; border: 1px solid #7f9db9; border-radius: 6px; box-shadow: var(--shadow); }
+:root[data-skin='xp'] .brand.on-bg { padding: 8px 14px; justify-self: start; }
+:root[data-skin='xp'] .tools.on-bg { padding: 4px; justify-self: end; }
+:root[data-skin='xp'] h2.on-bg, :root[data-skin='xp'] span.on-bg { padding: 4px 10px; }
+
+/* ---------- Aero glass ---------- */
+
+:root[data-palette='aero'] {
+  --bg: #123f66;
+  --surface: rgba(150, 195, 235, 0.3);
+  --surface-2: rgba(255, 255, 255, 0.18);
+  --surface-solid: #1c4a73;
+  --border: rgba(255, 255, 255, 0.5);
+  --border-strong: rgba(255, 255, 255, 0.8);
+  --text: #ffffff;
+  --muted: #d4e6f6;
+  --ok: #5ee05e;
+  --warn: #ffd34d;
+  --bad: #ff6b5e;
+  --shadow: 0 6px 24px rgba(0, 20, 50, 0.45);
+  --font: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --radius: 8px; --r-md: 4px; --r-sm: 4px; --r-xs: 3px;
+}
+:root[data-skin='aero'] body:not(.has-bg) {
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(120, 220, 255, 0.45), transparent 45%),
+    radial-gradient(ellipse at 80% 70%, rgba(60, 180, 120, 0.35), transparent 50%),
+    linear-gradient(135deg, #0b2a4a, #1d6fa5 50%, #0f3b66);
+  background-attachment: fixed;
+}
+:root[data-skin='aero'] .card { backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); }
+:root[data-skin='aero'] .tile .head .name { text-shadow: 0 0 8px rgba(255, 255, 255, 0.6), 0 1px 1px rgba(0, 0, 0, 0.3); }
+/* The content sits on a light pane inside the glass frame, as in the window body. */
+:root[data-skin='aero'] .tile .body {
+  --text: #1e2b38; --muted: #546576; --surface-2: #e8eff6; --border: #d5e0ea;
+  --ok: #1d8a1d; --warn: #a66b00; --bad: #c0352a;
+  color: var(--text); background: rgba(247, 250, 253, 0.94);
+  margin: 0 8px 8px; padding: 10px; border: 1px solid #8aa6c1; border-radius: 4px;
+}
+:root[data-skin='aero'] button {
+  background: linear-gradient(#f6f6f6, #e3e3e3 49%, #d4d4d4 50%, #e9e9e9);
+  border: 1px solid #707070; border-radius: 3px; color: #1e2b38;
+}
+:root[data-skin='aero'] button:hover { background: linear-gradient(#eaf6fd, #d9f0fc 49%, #bee6fd 50%, #a7d9f5); border-color: #3c7fb1; }
+:root[data-skin='aero'] button.primary { background: linear-gradient(#7cc1f2, #4aa3e8 49%, #2b8ad8 50%, #4fa7ec); border-color: #1f5f99; color: #fff; }
+:root[data-skin='aero'] button.ghost { background: transparent; border-color: transparent; color: #fff; }
+:root[data-skin='aero'] .modal { --surface: rgba(28, 74, 115, 0.92); }
+:root[data-skin='aero'] input, :root[data-skin='aero'] select, :root[data-skin='aero'] textarea { background: rgba(255, 255, 255, 0.92); color: #1e2b38; border-color: #8aa6c1; }
+:root[data-skin='aero'] input::placeholder { color: #6b7c8c; }
+
+/* ---------- Hexer (dark fantasy) ---------- */
+
+:root[data-palette='hexer'] {
+  --bg: #14110d;
+  --surface: rgba(36, 32, 26, 0.93);
+  --surface-2: rgba(50, 43, 34, 0.95);
+  --surface-solid: #24201a;
+  --border: rgba(138, 117, 80, 0.45);
+  --border-strong: rgba(201, 164, 92, 0.75);
+  --text: #e8dcc0;
+  --muted: #a89a7c;
+  --ok: #8fae5a;
+  --warn: #d9a441;
+  --bad: #c0392b;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --font: 'Palatino Linotype', 'Book Antiqua', Palatino, 'URW Palladio L', Georgia, serif;
+  --radius: 4px; --r-md: 3px; --r-sm: 3px; --r-xs: 2px;
+}
+:root[data-skin='hexer'] body:not(.has-bg) {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(201, 164, 92, 0.12), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(110, 20, 15, 0.35), transparent 60%),
+    #14110d;
+  background-attachment: fixed;
+}
+/* A double frame like a page in an old book. */
+:root[data-skin='hexer'] .card { box-shadow: inset 0 0 0 3px var(--surface-solid), inset 0 0 0 4px rgba(138, 117, 80, 0.35), var(--shadow); }
+:root[data-skin='hexer'] body { font-variant-numeric: lining-nums; }
+:root[data-skin='hexer'] .tile .name { font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; }
+:root[data-skin='hexer'] .items-title { font-variant: small-caps; text-transform: none; letter-spacing: 0.08em; }
+:root[data-skin='hexer'] .items-title::before { content: '✦ '; color: var(--accent); }
+:root[data-skin='hexer'] .stat { background: transparent; border-bottom: 1px solid var(--border); border-radius: 0; }
+:root[data-skin='hexer'] .bar > div { background: linear-gradient(90deg, #7a1c14, var(--bad)); }
+:root[data-skin='hexer'] button { background: transparent; border-color: var(--border-strong); color: var(--accent); }
+:root[data-skin='hexer'] button.primary { background: var(--accent); color: #14110d; }
+:root[data-skin='hexer'] .dot.up { box-shadow: 0 0 6px var(--ok); }
+
+/* ---------- Gildenhalle (MMO) ---------- */
+
+:root[data-palette='mmo'] {
+  --bg: #0d1620;
+  --surface: rgba(20, 34, 46, 0.95);
+  --surface-2: rgba(6, 11, 16, 0.85);
+  --surface-solid: #14222e;
+  --border: rgba(200, 162, 74, 0.55);
+  --border-strong: #e8c66a;
+  --text: #f2e7c9;
+  --muted: #9fb0c0;
+  --ok: #1eff00;
+  --warn: #ffd36b;
+  --bad: #ff4040;
+  --shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+  --radius: 6px; --r-md: 4px; --r-sm: 4px; --r-xs: 3px;
+}
+:root[data-skin='mmo'] body:not(.has-bg) {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 211, 107, 0.16), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgba(120, 50, 200, 0.18), transparent 50%),
+    #0d1620;
+  background-attachment: fixed;
+}
+:root[data-skin='mmo'] .card { border: 2px solid var(--border); box-shadow: inset 0 0 0 1px #000, 0 0 0 1px #000, var(--shadow); }
+:root[data-skin='mmo'] .tile:hover { border-color: var(--border-strong); }
+:root[data-skin='mmo'] .tile .name { color: #ffd36b; text-shadow: 0 1px 2px #000; }
+:root[data-skin='mmo'] .stat { box-shadow: inset 0 0 0 1px rgba(200, 162, 74, 0.35); }
+/* Progress becomes an experience bar. */
+:root[data-skin='mmo'] .bar { height: 9px; background: #05090d; border: 1px solid rgba(200, 162, 74, 0.55); border-radius: 3px; }
+:root[data-skin='mmo'] .bar > div { background: linear-gradient(#b46cff, #7b2cbf); border-radius: 2px; }
+:root[data-skin='mmo'] .badge { background: rgba(163, 53, 238, 0.18); color: #c58cff; }
+:root[data-skin='mmo'] .alerts { color: #ffd36b; background: rgba(255, 211, 107, 0.07); border: 1px solid rgba(255, 211, 107, 0.3); }
+:root[data-skin='mmo'] .alerts li::first-letter { color: #ff4040; }
+:root[data-skin='mmo'] button { background: linear-gradient(#8a1c1c, #5c1010); border: 1px solid #c8a24a; color: #ffd36b; text-shadow: 0 1px 1px #000; }
+:root[data-skin='mmo'] button:hover { border-color: #ffe08a; filter: brightness(1.15); }
+:root[data-skin='mmo'] button.ghost { background: transparent; border-color: transparent; color: var(--text); }
+:root[data-skin='mmo'] input, :root[data-skin='mmo'] select, :root[data-skin='mmo'] textarea { background: #05090d; }
+
+/* ---------- Halloween ---------- */
+
+:root[data-palette='halloween'] {
+  --bg: #140a1f;
+  --surface: rgba(34, 17, 46, 0.9);
+  --surface-2: rgba(48, 25, 66, 0.94);
+  --surface-solid: #22112e;
+  --border: rgba(255, 122, 26, 0.22);
+  --border-strong: rgba(255, 122, 26, 0.55);
+  --text: #f3e6ff;
+  --muted: #b9a3cc;
+  --ok: #7cff6b;
+  --warn: #ff9a3c;
+  --bad: #ff3b5c;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+:root[data-skin='halloween'] body:not(.has-bg) {
+  background:
+    radial-gradient(circle at 96% 15%, #fff2c4 0 30px, rgba(255, 190, 90, 0.3) 32px, transparent 120px),
+    radial-gradient(ellipse at 50% 120%, rgba(255, 122, 26, 0.22), transparent 55%),
+    linear-gradient(#1c0d2c, #140a1f 60%, #0b0612);
+  background-attachment: fixed;
+}
+/* A cobweb in the lower right corner of every tile. */
+:root[data-skin='halloween'] .tile.card:not(.compact)::after {
+  content: ''; position: absolute; right: 0; bottom: 0; width: 46px; height: 46px; pointer-events: none; opacity: 0.35;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 46' fill='none' stroke='%23d9c6ea' stroke-width='.8'%3E%3Cpath d='M46 0 46 46 0 46M46 46 6 6M46 46 26 0M46 46 0 26'/%3E%3Cpath d='M46 14Q36 22 32 32 22 36 14 46M46 26Q40 32 38 38 32 40 26 46M46 36Q43 40 42 42 40 43 36 46'/%3E%3C/svg%3E") no-repeat;
+}
+/* Pumpkin for online, ghost for down. */
+:root[data-skin='halloween'] .dot.up, :root[data-skin='halloween'] .dot.down {
+  background: none; box-shadow: none; width: auto; height: auto; font-size: 13px; line-height: 1;
+}
+:root[data-skin='halloween'] .dot.up::before { content: '🎃'; }
+:root[data-skin='halloween'] .dot.down::before { content: '👻'; }
+:root[data-skin='halloween'] .item { border-top-style: dashed; }
+:root[data-skin='halloween'] .bar > div { background: linear-gradient(90deg, #ff7a1a, #ffb347); }
+:root[data-skin='halloween'] button.primary { color: #140a1f; }
+
+/* ---------- Style options (independent of the theme, so last: they win) ---------- */
+
+:root[data-corners='square'] { --radius: 4px; --r-md: 3px; --r-sm: 3px; --r-xs: 2px; }
+:root[data-corners='round'] { --radius: 22px; --r-md: 16px; --r-sm: 14px; --r-xs: 11px; }
+
+:root[data-tiles='solid'] .card {
+  background: var(--surface-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-font='system'] { --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+:root[data-font='mono'] { --font: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, 'Liberation Mono', monospace; }
+
+:root[data-density='compact'] body { font-size: 14px; }
+:root[data-density='compact'] .tile .head { padding: 10px 12px; gap: 10px; }
+:root[data-density='compact'] .tile .body { padding: 0 12px 12px; }
+:root[data-density='compact'] .stat { padding: 6px 8px; }
