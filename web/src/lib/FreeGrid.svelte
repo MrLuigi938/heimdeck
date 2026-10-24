@@ -312,4 +312,7 @@
   .fcell.full { grid-column: 1 / -1; }
   .fcell.half { grid-column: span 2; align-self: stretch; }
   .fcell.half > :global(.tile) { height: 100%; }
+  /* A quarter of a phone is too small for two lines under the icon: one line,
+     ending in "…" (the full name is in the tooltip). */
+  .fcell.icon :global(.cname) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: unset; line-clamp: unset; }
 </style>
