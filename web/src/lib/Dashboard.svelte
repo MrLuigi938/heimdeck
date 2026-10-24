@@ -633,8 +633,10 @@
   }
   @media (max-width: 640px) {
     .net-label { display: none; }
-    /* Icons in a compact block (3 + 2) that matches the height of the title block. */
-    .tools { display: grid; grid-template-columns: repeat(3, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }
+    /* Icons in a compact block of two rows that matches the height of the title
+       block: 2 + 2 for four icons, 3 + 2 or 3 + 3 when there are more. */
+    .tools { display: grid; grid-template-columns: repeat(2, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }
+    .tools:has(> :nth-child(5)) { grid-template-columns: repeat(3, 38px); }
     .tools :global(button) { width: 38px; height: 38px; padding: 0; justify-content: center; }
     /* No room for the question in the icon block: a check mark asks instead. */
     .logout.armed { width: 38px; padding: 0; }

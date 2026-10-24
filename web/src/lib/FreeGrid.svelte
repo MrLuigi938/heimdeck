@@ -44,29 +44,6 @@
     return items;
   }
 
-  // The phone version: the same arrangement on fewer columns. Positions and
-  // widths are scaled down and rounded; a tile of three or more columns keeps
-  // at least two, so live data does not shrink to an icon. Where the rounded
-  // spot is taken, a tile flows on like text: further right in its row, then
-  // into the next rows from the left. Gaps the user left stay.
-  function shrink(items, cols) {
-    const f = cols / COLS;
-    const placed = [];
-    for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x)) {
-      const w = clamp(Math.max(Math.round(it.w * f), it.w >= 3 ? 2 : 1), 1, cols);
-      const start = clamp(Math.round(it.x * f), 0, cols - w);
-      let spot;
-      for (let y = it.y; !spot; y++) {
-        for (let x = y === it.y ? start : 0; x + w <= cols && !spot; x++) {
-          const c = { ...it, x, y, w };
-          if (!placed.some((p) => overlaps(p, c))) spot = c;
-        }
-      }
-      placed.push(spot);
-    }
-    return placed;
-  }
-
   const positions = (list) => Object.fromEntries(list.map(({ id, x, y, w, h }) => [id, { x, y, w, h }]));
 
   // Reading order (top to bottom, left to right), used on phones and for the saved order.
@@ -80,8 +57,8 @@
   import Tile from './Tile.svelte';
   import { t } from './i18n.svelte.js';
 
-  // cols below COLS shows a scaled-down copy (phones): tiles can still be opened
-  // and edited, but not moved or resized there.
+  // cols below COLS (phones) shows the tiles flowing, see below: they can still be
+  // opened and edited there, but not moved or resized.
   let { tiles, defs, status, editMode, newTab, local, cols = COLS, dragging = null, findTile, grab, tileDragProps, onEdit, onCommit } = $props();
   let arranging = $derived(editMode && cols === COLS);
 
@@ -95,7 +72,24 @@
   let items = $derived(arrange(tiles, size));
   let preview = $state(null); // positions while a tile is dragged or resized
   let resizing = $state(null);
-  let shown = $derived(preview || (cols === COLS ? items : shrink(items, cols)));
+  let shown = $derived(preview || items);
+
+  // Phones: no fixed rows. Tiles follow the desktop arrangement in reading
+  // order, take the height their content needs, live tiles get the whole
+  // width (those of 2–3 desktop columns half of it) and plain links become icons
+  // that fill rows together. The desktop arrangement itself is not changed.
+  let flow = $derived(cols < COLS);
+  let ordered = $derived.by(() => {
+    if (!flow) return tiles;
+    const at = Object.fromEntries(items.map((i) => [i.id, i]));
+    return [...tiles].sort((a, b) => at[a.id].y - at[b.id].y || at[a.id].x - at[b.id].x);
+  });
+  function phoneKind(tile) {
+    const it = items.find((i) => i.id === tile.id);
+    const live = defs[tile.integration]?.hasWidget && tile.showWidget;
+    if (!live || it.w === 1) return 'icon';
+    return it.w >= 4 ? 'full' : 'half';
+  }
   let byId = $derived(Object.fromEntries(shown.map((i) => [i.id, i])));
   // While arranging, a few empty rows below make room to drop tiles further down.
   let rows = $derived(Math.max(1, ...shown.map((i) => i.y + i.h)) + (arranging ? 3 : 0));
@@ -208,6 +202,18 @@
   const area = (it) => `${it.y + 1} / ${it.x + 1} / span ${it.h} / span ${it.w}`;
 </script>
 
+{#if flow}
+<div class="flow" role="list">
+  {#each ordered as tile (tile.id)}
+    {@const kind = phoneKind(tile)}
+    <!-- Long lists fold here ("show more"), so a tile does not get endlessly tall. -->
+    <div class="fcell {kind}" role="listitem">
+      <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={kind === 'icon' ? 'icons' : ''}
+        onEdit={() => onEdit(tile)} />
+    </div>
+  {/each}
+</div>
+{:else}
 <div class="free" class:editing={arranging} bind:this={gridEl} style:--rows={rows} style:--cols={cols}
   role="list" ondragover={dragover} ondragleave={dragleave} ondrop={drop}>
   {#if arranging}
@@ -234,6 +240,7 @@
     <div class="landing" style:grid-area={area(incoming)}></div>
   {/if}
 </div>
+{/if}
 
 <style>
   .free {
@@ -271,4 +278,13 @@
     border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); border-radius: 0 0 3px 0;
   }
   .resize:hover::after, .resize:focus-visible::after { border-color: var(--accent); }
+
+  /* Phones: four columns, rows as high as their content. "dense" lets icons
+     fill the gap next to a half-width tile. Half-width tiles side by side
+     share the height of the taller one; icons stay square. */
+  .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; grid-auto-flow: row dense; align-items: start; }
+  .fcell { min-width: 0; }
+  .fcell.full { grid-column: 1 / -1; }
+  .fcell.half { grid-column: span 2; align-self: stretch; }
+  .fcell.half > :global(.tile) { height: 100%; }
 </style>
