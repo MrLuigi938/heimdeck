@@ -39,6 +39,11 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
 - Jedes Theme bringt seine **Akzentfarbe** mit; darunter lässt sich eine eigene wählen, ✦ nimmt wieder die des Themes.
 - **Pro Dashboard**: Unter *Einstellungen → Dashboards* bekommt ein Dashboard ein eigenes Theme, z. B. Nord für „Arbeit“.
 - Ein eigenes Hintergrundbild (allgemein oder pro Dashboard) ersetzt den Hintergrund des Themes.
+- **Saison-Deko** (*Aussehen → Saison-Deko*): Zu Silvester (28. Dez. – 2. Jan.), Ostern (Gründonnerstag – Ostermontag), Sommeranfang (20. – 23. Juni), Halloween (Oktober), Advent (1. Advent – 23. Dez.) und Weihnachten (24. – 27. Dez.) schmückt sich Heimdeck von selbst – Feuerwerk, hoppelnder Hase, Seifenblasen, Fledermäuse, Adventskranz, Schnee und Lichterkette. *Nur Deko* lässt dein Theme, *Ganzes Saison-Theme* tauscht auch die Farben. Jeder Anlass lässt sich abschalten; *Ansehen* zeigt ihn sofort. Bewegte Effekte entfallen bei „Bewegung reduzieren“ im System.
+
+## Info und Updates
+
+*Einstellungen → Info* zeigt die installierte Version und, falls es eine gibt, die neue – mit Links zu den Neuerungen auf der Webseite und auf GitHub und zur Update-Anleitung. Ist eine neue Version länger als drei Tage draußen, erscheint zusätzlich ein roter Punkt am Zahnrad. Dazu Links zur Webseite, zur Anleitung und zum Melden von Fehlern (mit vorausgefüllten Versionsangaben), die Systemangaben für Fehlermeldungen und der Debug-Modus.
 
 ## Zuhause oder unterwegs
 
@@ -57,7 +62,7 @@ Taste `/` drücken (oder ins Suchfeld klicken). Eine Suche umfasst deine Kacheln
 
 *Einstellungen → Suche → Darstellung der Ergebnisse* bietet drei Ansichten:
 
-- **Suchfenster** (Standard): klappt direkt unter dem Suchfeld auf, wenn du hineinklickst, oder in der Mitte, wenn du weiter unten auf der Seite das Tastenkürzel drückst (*Beim Tastenkürzel nach oben zum Suchfeld springen* scrollt stattdessen nach oben). Filter oben zeigen nur, was es gibt (Kacheln, Medien, Dokumente, Smart Home …, mit Trefferzahl); ↑ ↓ wählt aus, Enter öffnet, Tab wechselt den Filter, Esc schließt. Rechts zeigt eine Vorschau den gewählten Treffer mit seinen Knöpfen (z. B. Anfragen, Umschalten) und einem Link in den Dienst. Ist das Feld leer, stehen deine letzten Suchen bereit. Auf dem Handy füllt das Fenster den Bildschirm, ein Tipp öffnet die Vorschau von unten.
+- **Suchfenster** (Standard): klappt direkt unter dem Suchfeld auf, wenn du hineinklickst, oder in der Mitte, wenn du weiter unten auf der Seite das Tastenkürzel drückst (ohne *Suchfenster beim Tastenkürzel dort öffnen, wo du gerade bist* springt es stattdessen nach oben). Filter oben zeigen nur, was es gibt (Kacheln, Medien, Dokumente, Smart Home …, mit Trefferzahl); ↑ ↓ oder die Maus wählen einen Treffer aus, Enter öffnet ihn – ohne Auswahl sucht Enter im Web, eine schnelle Websuche öffnet also nie aus Versehen ein Dokument. Tab wechselt den Filter, Esc schließt, Wegscrollen auch. Rechts zeigt eine Vorschau den gewählten Treffer mit seinen Knöpfen (z. B. Anfragen, Umschalten) und einem Link in den Dienst. Ist das Feld leer, stehen deine letzten Suchen bereit; ✕ entfernt eine, *Letzte Suchen merken* schaltet den Verlauf ab. Auf dem Handy füllt das Fenster den Bildschirm, ein Tipp öffnet die Vorschau von unten.
 - **Spalten**: unter dem Suchfeld, eine Spalte pro Dienst, der etwas gefunden hat.
 - **Liste**: die kompakte Liste unter dem Suchfeld.
 
@@ -119,9 +124,9 @@ Das neue Passwort braucht mindestens 8 Zeichen.
 
 ## Fehlersuche
 
-Heimdeck protokolliert immer Fehler, Warnungen und Anfragen, die länger als 5 Sekunden dauern. Hängt es – antworten die Datenbank oder der interne Zustand 5 Sekunden lang nicht –, schreibt es ins Protokoll, wo jeder Programmteil gerade wartet.
+Heimdeck protokolliert immer den Start (Version, Adresse, Datenordner, Anzahl der Kacheln), Fehler, Warnungen, Anfragen über 5 Sekunden, fehlgeschlagene Anmeldungen und Entsperr-Versuche, Dienste, die ausfallen und wieder erreichbar sind, verschickte Benachrichtigungen (und warum eine scheiterte), ausgeführte Aktionen auf Kacheln und neue Versionen. Hängt es – antworten die Datenbank oder der interne Zustand 5 Sekunden lang nicht –, schreibt es ins Protokoll, wo jeder Programmteil gerade wartet.
 
-Für mehr Details **Einstellungen → Fehlersuche → Debug-Modus** einschalten: Das Protokoll zeigt dann jede Anfrage mit ihrer Dauer, jedes Abholen der Live-Daten (samt Fehler) und jede Statusprüfung. Im Browser erscheinen alle Anfragen zusätzlich in der Konsole (F12). Danach wieder ausschalten. Lässt sich Heimdeck gar nicht mehr öffnen, stattdessen `HEIMDECK_DEBUG=true` setzen (Docker: `environment:`, Installationsskript: `/etc/default/heimdeck`) und neu starten.
+Für mehr Details **Einstellungen → Info → Debug-Modus** einschalten: Das Protokoll zeigt dann zusätzlich jede Anfrage mit ihrer Dauer, jedes Abholen der Live-Daten (samt Fehler), jede Statusprüfung, die Suche in jedem Dienst (Treffer, Dauer), Bilder und Favicons, die nicht geladen wurden, und welche Einstellungen gespeichert wurden (nur die Namen, nie die Werte). Im Browser erscheinen alle Anfragen zusätzlich in der Konsole (F12). Danach wieder ausschalten. Lässt sich Heimdeck gar nicht mehr öffnen, stattdessen `HEIMDECK_DEBUG=true` setzen (Docker: `environment:`, Installationsskript: `/etc/default/heimdeck`) und neu starten.
 
 ```sh
 # Docker

@@ -39,6 +39,11 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 - Every theme brings its **accent colour**; pick your own one below the themes, ✦ goes back to the theme's.
 - **Per dashboard**: under *Settings → Dashboards* a dashboard can get its own theme, e.g. Nord for “Work”.
 - A background image of your own (general or per dashboard) replaces the theme's backdrop.
+- **Seasonal decoration** (*Appearance → Seasonal decoration*): for New Year's Eve (Dec 28 – Jan 2), Easter (Maundy Thursday – Easter Monday), the start of summer (June 20 – 23), Halloween (October), Advent (1st Sunday of Advent – Dec 23) and Christmas (Dec 24 – 27) Heimdeck decorates itself – fireworks, a hopping bunny, soap bubbles, bats, an Advent wreath, snow and a string of lights. *Decoration only* keeps your theme, *Whole seasonal theme* switches the colours too. Each season can be switched off; *Preview* shows one right away. Moving effects are left out with "reduce motion" in your system.
+
+## Info and updates
+
+*Settings → Info* shows the installed version and, when there is one, the new version with links to its notes on the website and on GitHub and to the update guide. A new version that is out for more than three days also puts a red dot on the gear. The area has links to the website, the guide and to report a bug (with the version details filled in), the system details for bug reports, and the debug mode.
 
 ## Home or away
 
@@ -57,7 +62,7 @@ Press `/` anywhere (or click the search box). One search covers your tiles and e
 
 *Settings → Search → How results are shown* offers three views:
 
-- **Search window** (default): opens right below the search field when you click it, or in the middle when you press the shortcut further down the page (*Jump up to the search field with the shortcut* scrolls up instead). Filters at the top show only what is there (Tiles, Media, Documents, Smart Home …, with the number of hits); ↑ ↓ select, Enter opens, Tab switches the filter, Esc closes. On the right a preview shows the selected hit with its buttons (e.g. Request, Toggle) and a link into the service. While the field is empty, your recent searches are offered. On phones the window fills the screen and a tap opens the preview from below.
+- **Search window** (default): opens right below the search field when you click it, or in the middle when you press the shortcut further down the page (turn off *Open the search window where you are when using the shortcut* to jump up instead). Filters at the top show only what is there (Tiles, Media, Documents, Smart Home …, with the number of hits); ↑ ↓ or the mouse select a hit and Enter opens it – without a selection Enter searches the web, so a quick web search never opens a document by accident. Tab switches the filter, Esc closes, scrolling the page away closes it too. On the right a preview shows the selected hit with its buttons (e.g. Request, Toggle) and a link into the service. While the field is empty, your recent searches are offered; ✕ removes one, *Remember recent searches* turns the history off. On phones the window fills the screen and a tap opens the preview from below.
 - **Columns**: below the search field, one column per service that found something.
 - **List**: the compact list below the search field.
 
@@ -119,9 +124,9 @@ The new password needs at least 8 characters.
 
 ## Troubleshooting
 
-Heimdeck always logs errors, warnings and requests that take longer than 5 seconds. If it hangs – the database or its internal state does not respond for 5 seconds – it writes where every part of the program is waiting.
+Heimdeck always logs the start (version, address, data folder, number of tiles), errors, warnings, requests that take longer than 5 seconds, failed logins and unlock attempts, services that go down and come back, notifications sent (and why one failed), actions run on tiles, and new versions. If it hangs – the database or its internal state does not respond for 5 seconds – it writes where every part of the program is waiting.
 
-For more detail turn on **Settings → Troubleshooting → Debug mode**: the log then shows every request with its duration, every live data fetch (with the error, if any) and every status check. In the browser all requests also appear in the console (F12). Turn it off again afterwards. If Heimdeck cannot be opened at all, set `HEIMDECK_DEBUG=true` instead (Docker: `environment:`, install script: `/etc/default/heimdeck`) and restart it.
+For more detail turn on **Settings → Info → Debug mode**: the log then also shows every request with its duration, every live data fetch (with the error, if any), every status check, the search in each service (hits, duration), images and favicons that did not load, and which settings were saved (names only, never values). In the browser all requests also appear in the console (F12). Turn it off again afterwards. If Heimdeck cannot be opened at all, set `HEIMDECK_DEBUG=true` instead (Docker: `environment:`, install script: `/etc/default/heimdeck`) and restart it.
 
 ```sh
 # Docker

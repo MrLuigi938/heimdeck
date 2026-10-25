@@ -1,3 +1,5 @@
+import { seasonPreview } from './season.svelte.js';
+
 // Themes: a palette (colours in themes.css) and for the playful ones a skin
 // that also changes shapes and decoration. Neither changes the layout.
 // The setting "theme" holds the id; "auto" follows the system (Heimdeck
@@ -21,14 +23,67 @@ export const THEMES = [
   { id: 'halloween', name: 'Halloween', group: 'fun', mode: 'dark', accent: '#ff7a1a', skin: 'halloween', preview: ['#140a1f', '#22112e', '#ff7a1a', '#b48cff'] },
 ];
 
-export const themeById = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
+// Season themes: only used by the seasonal decoration ("Saison-Deko"), not offered in the picker.
+const SEASON_THEMES = [
+  { id: 'newyear', name: 'Silvester und Neujahr', mode: 'dark', accent: '#f5c84c', skin: 'newyear' },
+  { id: 'easter', name: 'Ostern', mode: 'light', accent: '#9b6fd6', skin: 'easter' },
+  { id: 'summer', name: 'Sommeranfang', mode: 'light', accent: '#f08a24', skin: 'summer' },
+  { id: 'advent', name: 'Advent', mode: 'dark', accent: '#e8b04b', skin: 'advent' },
+  { id: 'christmas', name: 'Weihnachten', mode: 'dark', accent: '#e5484d', skin: 'christmas' },
+];
 
-// The theme in effect: the dashboard's own, else the global one; in October
-// the seasonal option swaps in Halloween.
+export const themeById = (id) => THEMES.find((t) => t.id === id) || SEASON_THEMES.find((t) => t.id === id) || THEMES[0];
+
+// ---- Seasonal decoration ----
+// Each season knows when it is on. Easter and the first Sunday of Advent move
+// every year and are calculated.
+function easterSunday(year) {
+  // Anonymous Gregorian algorithm
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function firstAdvent(year) {
+  const christmas = new Date(year, 11, 25);
+  const fourth = new Date(year, 11, 25 - (christmas.getDay() || 7));
+  return new Date(year, 11, fourth.getDate() - 21); // Date handles the step back into November
+}
+const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const between = (now, from, to) => day(now) >= day(from) && day(now) <= day(to);
+
+export const SEASONS = [
+  { id: 'newyear', name: 'Silvester und Neujahr', when: '28. Dez. – 2. Jan.', on: (n) => (n.getMonth() === 11 && n.getDate() >= 28) || (n.getMonth() === 0 && n.getDate() <= 2) },
+  { id: 'easter', name: 'Ostern', when: 'Gründonnerstag – Ostermontag', on: (n) => { const e = easterSunday(n.getFullYear()); return between(n, new Date(e.getFullYear(), e.getMonth(), e.getDate() - 3), new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1)); } },
+  { id: 'summer', name: 'Sommeranfang', when: '20. – 23. Juni', on: (n) => n.getMonth() === 5 && n.getDate() >= 20 && n.getDate() <= 23 },
+  { id: 'halloween', name: 'Halloween', when: 'ganzer Oktober', on: (n) => n.getMonth() === 9 },
+  { id: 'advent', name: 'Advent', when: '1. Advent – 23. Dez.', on: (n) => between(n, firstAdvent(n.getFullYear()), new Date(n.getFullYear(), 11, 23)) },
+  { id: 'christmas', name: 'Weihnachten', when: '24. – 27. Dez.', on: (n) => n.getMonth() === 11 && n.getDate() >= 24 && n.getDate() <= 27 },
+];
+
+// Which Advent Sunday it is (1–4), for the candles of the wreath.
+export function adventCandles(now = new Date()) {
+  const first = firstAdvent(now.getFullYear());
+  return Math.min(4, Math.max(1, Math.floor((day(now) - day(first)) / (7 * 86400e3)) + 1));
+}
+
+// The season in effect: the preview from the settings, else the calendar –
+// when the seasonal decoration is on and the season is not switched off.
+export function activeSeason(settings, now = new Date()) {
+  if (seasonPreview.id) return SEASONS.find((s) => s.id === seasonPreview.id) || null;
+  if (settings?.seasonal !== 'true') return null;
+  const off = (settings.seasonalOff || '').split(',');
+  return SEASONS.find((s) => !off.includes(s.id) && s.on(now)) || null;
+}
+
+// The theme in effect: the dashboard's own, else the global one; with the
+// seasonal decoration set to "whole theme", the season's theme for its days.
 export function activeTheme(settings, boardTheme = '', now = new Date()) {
-  let id = boardTheme || settings?.theme || 'auto';
-  if (settings?.seasonal === 'true' && now.getMonth() === 9) id = 'halloween';
-  return themeById(id);
+  const season = activeSeason(settings, now);
+  if (season && settings?.seasonalMode === 'theme') return themeById(season.id);
+  return themeById(boardTheme || settings?.theme || 'auto');
 }
 
 // applyTheme sets everything on <html>: data-theme (dark/light base),
@@ -45,6 +100,8 @@ export function applyTheme(settings, boardTheme = '') {
   set('tiles', settings?.tileStyle || '');
   set('font', settings?.font || '');
   set('density', settings?.density || '');
+  // The season adds decoration on top of any theme (status symbols, effects).
+  set('season', activeSeason(settings)?.id || '');
   // An accent of its own beats the theme's; empty = the theme's colour.
   const accent = settings?.accent || theme.accent || '#5b8cff';
   root.style.setProperty('--accent', accent);

@@ -13,7 +13,8 @@
   // one column per service below the field, or the compact list below the field.
   // shortcut is only shown in the placeholder; the dashboard handles the key and calls focus().
   // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
-  let { tiles, defs = {}, view = 'window', jumpTop = false, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  // history: remember recent searches in this browser (setting "searchHistory").
+  let { tiles, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
 
   // The search window opens right under the field when the field is in view
   // (anchored, you type in the field itself), otherwise in the middle of the
@@ -37,8 +38,9 @@
     } else if (fieldInView()) {
       openAnchored();
     } else if (jumpTop) {
-      scrollTo({ top: 0, behavior: 'smooth' });
-      openAnchored();
+      // Without animation: the window is placed under the field once it is back in view.
+      scrollTo({ top: 0, behavior: 'instant' });
+      requestAnimationFrame(openAnchored);
     } else {
       anchored = false;
       windowOpen = true;
@@ -116,16 +118,25 @@
       return [];
     }
   }
-  function remember() {
-    const term = q.trim();
-    if (term.length < 2) return;
-    recent = [term, ...recent.filter((r) => r !== term)].slice(0, 6);
+  function storeRecent(list) {
+    recent = list;
     try {
-      localStorage.setItem(RECENT, JSON.stringify(recent));
+      if (list.length) localStorage.setItem(RECENT, JSON.stringify(list));
+      else localStorage.removeItem(RECENT);
     } catch {
       /* private mode */
     }
   }
+  function remember() {
+    const term = q.trim();
+    if (!history || term.length < 2) return;
+    storeRecent([term, ...recent.filter((r) => r !== term)].slice(0, 6));
+  }
+  const forget = (term) => storeRecent(recent.filter((r) => r !== term));
+  // History turned off in the settings: what was remembered is deleted too.
+  $effect(() => {
+    if (!history && recent.length) storeRecent([]);
+  });
 
   function webSearch() {
     remember();
@@ -309,7 +320,7 @@
 
 {#if windowOpen}
   <SearchWindow bind:this={win} bind:q {anchored} {input} {parsed} {tileHits} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
-    {onInput} {makeAction} {webSearch} {openUrl} onClose={() => reset()} />
+    {onInput} {makeAction} {webSearch} {openUrl} onForget={forget} onClose={() => reset()} />
 {/if}
 
 <style>

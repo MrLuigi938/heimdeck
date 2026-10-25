@@ -3,7 +3,7 @@
 
   // The quiet signature under the login box and at the bottom of every dashboard.
   // On the dashboard it also names the version and, when the server found one,
-  // links a newer release.
+  // links a newer release – to its notes on the project website.
   let { app = false, version = '', update = null } = $props();
   let shownVersion = $derived(version && version !== 'dev' ? version : '');
 </script>
@@ -13,7 +13,7 @@
     {#if app}<b>Heimdeck</b>{#if shownVersion}<span class="version">{shownVersion}</span>{/if}{' · '}{/if}{t('Erdacht mit')} <span class="heart" aria-label={t('Liebe')}>♥</span> {t('von')} <a href="https://github.com/MrLuigi938" target="_blank" rel="noopener noreferrer">Luis Blum</a> · {t('gebaut mit KI')} ✨
   </span>
   {#if app && update}
-    <a class="update on-bg" href={update.url} target="_blank" rel="noopener noreferrer" title={t('Was ist neu in {v}?', { v: update.version })}>
+    <a class="update on-bg" href={update.site || update.url} target="_blank" rel="noopener noreferrer" title={t('Was ist neu in {v}?', { v: update.version })}>
       ⬆ {t('Version {v} ist da', { v: update.version })}
     </a>
   {/if}

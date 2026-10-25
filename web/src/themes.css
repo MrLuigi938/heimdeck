@@ -383,6 +383,118 @@
 :root[data-skin='mmo'] .tile:not(.editing) .head[href]:hover .name,
 :root[data-skin='mmo'] .tile.compact:not(.editing) .square[href]:hover .cname { color: #ffe9a8 !important; text-decoration: underline; }
 
+/* ---------- Seasons ("Saison-Deko") ----------
+   Palettes for the "whole theme" mode; the decoration rules below work on any
+   theme via data-season. The moving effects live in SeasonFx.svelte. */
+
+:root[data-palette='newyear'] {
+  --bg: #0b1026;
+  --surface: rgba(20, 26, 58, 0.88);
+  --surface-2: rgba(30, 38, 78, 0.92);
+  --surface-solid: #141a3a;
+  --border: rgba(245, 200, 76, 0.18);
+  --border-strong: rgba(245, 200, 76, 0.45);
+  --text: #f4f1ff;
+  --muted: #a9aed6;
+  --ok: #5ee6a0;
+  --warn: #f5c84c;
+  --bad: #ff6b7a;
+  --shadow: 0 10px 30px rgba(0, 0, 10, 0.5);
+}
+:root[data-skin='newyear'] body:not(.has-bg) {
+  background: radial-gradient(ellipse at 50% -20%, #2a2f7a, transparent 60%), linear-gradient(#0b1026, #070a1a);
+  background-attachment: fixed;
+}
+
+:root[data-palette='easter'] {
+  --bg: #f6f3ff;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-2: rgba(243, 238, 255, 0.95);
+  --surface-solid: #ffffff;
+  --border: rgba(110, 80, 170, 0.12);
+  --border-strong: rgba(110, 80, 170, 0.26);
+  --text: #2c2540;
+  --muted: #6c6584;
+  --ok: #3aa86b;
+  --warn: #c98a10;
+  --bad: #d94a5a;
+  --shadow: 0 8px 24px rgba(80, 60, 140, 0.1);
+}
+:root[data-skin='easter'] body:not(.has-bg) {
+  background: radial-gradient(circle at 15% 10%, #ffe1f0, transparent 40%), radial-gradient(circle at 85% 20%, #dff6ff, transparent 40%),
+    linear-gradient(#f6f3ff 70%, #e3f5d9);
+  background-attachment: fixed;
+}
+
+:root[data-palette='summer'] {
+  --bg: #fff6e8;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-2: rgba(255, 244, 226, 0.95);
+  --surface-solid: #ffffff;
+  --border: rgba(160, 90, 20, 0.12);
+  --border-strong: rgba(160, 90, 20, 0.26);
+  --text: #3a2a14;
+  --muted: #7d6a52;
+  --ok: #2f9e5f;
+  --warn: #c97a10;
+  --bad: #d9443a;
+  --shadow: 0 8px 24px rgba(160, 90, 20, 0.1);
+}
+:root[data-skin='summer'] body:not(.has-bg) {
+  background: radial-gradient(circle at 88% 6%, #ffe08a 0 60px, rgba(255, 200, 90, 0.35) 62px, transparent 220px),
+    linear-gradient(#ffeccf, #fff6e8 50%, #d9f1ff);
+  background-attachment: fixed;
+}
+
+:root[data-palette='advent'] {
+  --bg: #0e1a14;
+  --surface: rgba(20, 38, 29, 0.9);
+  --surface-2: rgba(28, 50, 38, 0.94);
+  --surface-solid: #16281f;
+  --border: rgba(232, 176, 75, 0.16);
+  --border-strong: rgba(232, 176, 75, 0.4);
+  --text: #f3ecd8;
+  --muted: #a9b79f;
+  --ok: #7fd18a;
+  --warn: #e8b04b;
+  --bad: #e5674d;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+:root[data-skin='advent'] body:not(.has-bg) {
+  background: radial-gradient(ellipse at 50% 120%, rgba(232, 176, 75, 0.18), transparent 60%), #0e1a14;
+  background-attachment: fixed;
+}
+
+:root[data-palette='christmas'] {
+  --bg: #1a0d10;
+  --surface: rgba(42, 18, 22, 0.9);
+  --surface-2: rgba(58, 26, 30, 0.94);
+  --surface-solid: #2a1216;
+  --border: rgba(232, 190, 90, 0.18);
+  --border-strong: rgba(232, 190, 90, 0.42);
+  --text: #fbf1e6;
+  --muted: #c9a9a2;
+  --ok: #6fd08c;
+  --warn: #f2c14e;
+  --bad: #ff6b6b;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+:root[data-skin='christmas'] body:not(.has-bg) {
+  background: radial-gradient(ellipse at 50% -10%, rgba(229, 72, 77, 0.25), transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(60, 140, 80, 0.25), transparent 55%), #1a0d10;
+  background-attachment: fixed;
+}
+
+/* Decoration on any theme: the online dot becomes a seasonal symbol. */
+:root[data-season='halloween'] .dot.up, :root[data-season='halloween'] .dot.down,
+:root[data-season='easter'] .dot.up, :root[data-season='christmas'] .dot.up {
+  background: none; box-shadow: none; width: auto; height: auto; font-size: 13px; line-height: 1;
+}
+:root[data-season='halloween'] .dot.up::before { content: '🎃'; }
+:root[data-season='halloween'] .dot.down::before { content: '👻'; }
+:root[data-season='easter'] .dot.up::before { content: '🥚'; }
+:root[data-season='christmas'] .dot.up::before { content: '⭐'; }
+
 /* ---------- Buttons a skin must leave alone ---------- */
 
 /* Skins restyle buttons. "Show more" then becomes a real button in the

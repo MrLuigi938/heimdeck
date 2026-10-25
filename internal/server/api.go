@@ -230,6 +230,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"username":     name,
 		"version":      s.version,
 		"update":       s.newerRelease(),
+		"system":       s.systemInfo(),
 		"debug":        logging.Debug(),
 		"debugForced":  logging.Forced(), // HEIMDECK_DEBUG=true, the setting cannot turn it off
 	})
@@ -244,7 +245,7 @@ var allowedSettings = map[string]bool{
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 	"debug": true, "telegramChat": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
-	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "searchView": true, "searchJump": true, "monitorExternal": true,
+	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true,
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -274,9 +275,16 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		m["searchUrl"] = u
 	}
 	if err := s.store.SaveSettings(m); err != nil {
+		slog.Error("Einstellungen speichern", "fehler", err)
 		writeErr(w, 500, err)
 		return
 	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	slog.Debug("Einstellungen gespeichert", "schlüssel", strings.Join(keys, ","))
 	if v, ok := m["debug"]; ok {
 		logging.SetDebug(v == "true")
 	}
@@ -693,10 +701,13 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
+	start := time.Now()
 	if err := actioner.Action(ctx, s.instance(t, langOf(r)), body.Action, body.Params); err != nil {
+		slog.Warn("Aktion fehlgeschlagen", "kachel", t.Name, "dienst", t.Integration, "aktion", body.Action, "fehler", logging.Redact(err.Error()))
 		writeErr(w, 502, err)
 		return
 	}
+	slog.Info("Aktion ausgeführt", "kachel", t.Name, "dienst", t.Integration, "aktion", body.Action, "dauer", time.Since(start).Round(time.Millisecond))
 	s.forget(id)
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -724,6 +735,7 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	resp, err := integrations.FetchImage(ctx, src, s.instance(t, langOf(r)), r.URL.Query().Get("p"))
 	if err != nil {
+		slog.Debug("Bild nicht geladen", "kachel", t.Name, "dienst", t.Integration, "fehler", logging.Redact(err.Error()))
 		writeErr(w, 502, err)
 		return
 	}
@@ -798,6 +810,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		go func(t store.Tile) {
 			defer wg.Done()
 			defer logging.Recover("Suche", "kachel", t.ID, "dienst", t.Integration)
+			start := time.Now()
 			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
@@ -805,6 +818,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}
 			if err != nil {
 				g.Error = err.Error()
+				slog.Warn("Suche in einem Dienst fehlgeschlagen", "kachel", t.Name, "dienst", t.Integration, "dauer", time.Since(start).Round(time.Millisecond), "fehler", logging.Redact(err.Error()))
+			} else {
+				slog.Debug("Suche in einem Dienst", "kachel", t.Name, "dienst", t.Integration, "treffer", len(items), "dauer", time.Since(start).Round(time.Millisecond))
 			}
 			mu.Lock()
 			out = append(out, g)

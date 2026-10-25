@@ -220,6 +220,7 @@ func (s *Server) handleUnlockGroup(w http.ResponseWriter, r *http.Request) {
 	// The group's own password, or – if it is forgotten – the password of the
 	// Heimdeck account; unlocked, the group can be deleted or get a new password.
 	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil && !s.accountPassword(r, body.Password) {
+		slog.Warn("Entsperren einer geschützten Gruppe fehlgeschlagen", "gruppe", g.Name, "von", r.RemoteAddr)
 		time.Sleep(500 * time.Millisecond) // slow down guessing
 		writeErr(w, 403, errors.New("Falsches Passwort"))
 		return

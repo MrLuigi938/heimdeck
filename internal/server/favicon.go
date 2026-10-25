@@ -6,6 +6,7 @@ import (
 	"errors"
 	"html"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -178,7 +179,10 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 				var f favicon
 				func() {
 					defer logging.Recover("Favicon", "adresse", base)
-					f, _ = fetchFavicon(ctx, base, t.Insecure)
+					var err error
+					if f, err = fetchFavicon(ctx, base, t.Insecure); err != nil {
+						slog.Debug("Favicon nicht gefunden", "kachel", t.Name, "fehler", logging.Redact(err.Error()))
+					}
 				}()
 				f.at = time.Now()
 				s.mu.Lock()

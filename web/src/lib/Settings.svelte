@@ -8,10 +8,11 @@
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
-  import { THEMES } from './themes.js';
+  import { THEMES, SEASONS } from './themes.js';
+  import { seasonPreview } from './season.svelte.js';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, section = '', onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
 
   // Editable copy of the dashboards list.
   // svelte-ignore state_referenced_locally
@@ -76,7 +77,7 @@
     { id: 'notify', label: 'Benachrichtigungen', icon: '🔔' },
     { id: 'keys', label: 'Tastenkürzel', icon: '⌨️' },
     { id: 'account', label: 'Konto und Sicherung', icon: '🔐' },
-    { id: 'debug', label: 'Fehlersuche', icon: '🐞' },
+    { id: 'info', label: 'Info', icon: 'ℹ️' },
   ];
   const phone = () => matchMedia('(max-width: 640px)').matches;
   // svelte-ignore state_referenced_locally
@@ -192,6 +193,45 @@
   }
   // A theme brings its own accent colour; picking one drops a colour chosen before.
   const pickTheme = (id) => saveSetting({ theme: id, accent: '' });
+  // Seasons switched off one by one (setting "seasonalOff", comma separated).
+  let seasonOff = $derived((s.seasonalOff || '').split(',').filter(Boolean));
+  function toggleSeason(id, on) {
+    const off = on ? seasonOff.filter((x) => x !== id) : [...seasonOff, id];
+    saveSetting({ seasonalOff: off.join(',') });
+  }
+
+  // ---- Info: version, update, links and what a bug report needs ----
+  // svelte-ignore state_referenced_locally
+  const parsedVersion = /^\d+\.\d+\.\d+/.test(version || '');
+  // svelte-ignore state_referenced_locally
+  const channel = !parsedVersion ? (String(version).startsWith('edge') ? t('Entwicklungsstand (edge)') : '') : version.includes('-') ? t('Testversion (Beta)') : t('Stabile Version');
+  const de = () => i18n.lang === 'de';
+  const fmtDate = (d, time = false) =>
+    new Date(d).toLocaleString(i18n.lang === 'de' ? 'de-DE' : 'en-GB', time ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' });
+  const repo = 'https://github.com/MrLuigi938/heimdeck';
+  const updateGuide = $derived(`${repo}/blob/main/docs/${de() ? 'de/installation.md#aktualisieren' : 'installation.md#updating'}`);
+  const docsLink = $derived(`${repo}/blob/main/docs/${de() ? 'de/benutzung.md' : 'usage.md'}`);
+  // svelte-ignore state_referenced_locally
+  const installName = { docker: 'Docker', systemd: t('Installationsskript / Proxmox (systemd)'), binary: t('Einzelne Datei') }[system.install] || '–';
+  const infoText = () =>
+    [
+      `Heimdeck ${version || '?'}`,
+      `${t('Installation')}: ${installName}`,
+      `${t('Plattform')}: ${system.os || '?'} · ${system.go || '?'}`,
+      `${t('Browser')}: ${navigator.userAgent}`,
+      `Debug: ${debug ? 'an' : 'aus'}`,
+    ].join('\n');
+  // "Report a bug" opens a new GitHub issue with the version details filled in.
+  const issueLink = $derived(`${repo}/issues/new?body=${encodeURIComponent('\n\n---\n' + infoText())}`);
+  async function copyInfo() {
+    try {
+      await navigator.clipboard.writeText(infoText());
+      toast(t('Kopiert'));
+    } catch {
+      toast(t('Kopieren nicht möglich – bitte von Hand markieren.'), 'bad');
+    }
+  }
+
   // A custom search engine is only saved together with its address: picking
   // "Custom …" first shows the field, leaving the filled field saves both.
   function pickEngine() {
@@ -320,7 +360,7 @@
       <input class="find" type="search" bind:value={query} placeholder={t('Einstellung suchen …')} aria-label={t('Einstellung suchen …')} />
       {#each SECTIONS.filter((x) => matches.includes(x.id)) as x (x.id)}
         <button class="nav" class:on={current === x.id} onclick={() => open(x.id)} aria-current={current === x.id ? 'page' : undefined}>
-          <span class="nav-icon" aria-hidden="true">{x.icon}</span><span class="nav-label">{t(x.label)}</span><span class="chev" aria-hidden="true">›</span>
+          <span class="nav-icon" aria-hidden="true">{x.icon}</span><span class="nav-label">{t(x.label)}</span>{#if x.id === 'info' && update}<span class="nav-dot" title={t('Update verfügbar')}></span>{/if}<span class="chev" aria-hidden="true">›</span>
         </button>
       {/each}
       {#if !matches.length}<p class="help nothing">{t('Nichts gefunden.')}</p>{/if}
@@ -347,8 +387,6 @@
         <label class="check"><input type="checkbox" checked={s.showGreeting !== 'false'} onchange={setFlag('showGreeting')} /> {t('Begrüßung, Datum und Uhrzeit anzeigen')}</label>
         <label class="check"><input type="checkbox" checked={s.openInNewTab !== 'false'} onchange={setFlag('openInNewTab')} /> {t('Links in neuem Tab öffnen')}</label>
         <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={setFlag('showUptime')} /> {t('Verfügbarkeits-Übersicht unten anzeigen')}</label>
-        <label class="check"><input type="checkbox" checked={s.updateCheck !== 'false'} onchange={setFlag('updateCheck')} /> {t('Auf neue Heimdeck-Versionen hinweisen')}</label>
-        <p class="help indent">{t('Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.')}</p>
       </section>
 
       <section hidden={current !== 'look'} bind:this={sectionEls.look}>
@@ -369,7 +407,34 @@
               {/each}
             </div>
           {/each}
-          <label class="check"><input type="checkbox" checked={s.seasonal === 'true'} onchange={setFlag('seasonal')} /> {t('Im Oktober automatisch Halloween')}</label>
+        </div>
+        <!-- Part of "Appearance": decoration that comes and goes with the seasons. -->
+        <div class="season-box">
+          <div class="season-head">
+            <span class="season-title">🎄 {t('Saison-Deko')}</span>
+            <label class="check"><input type="checkbox" checked={s.seasonal === 'true'} onchange={setFlag('seasonal')} /> {t('automatisch einschalten')}</label>
+          </div>
+          <p class="help">{t('Zu Silvester, Ostern, Sommeranfang, Halloween, Advent und Weihnachten schmückt sich Heimdeck von selbst – und räumt danach wieder auf.')}</p>
+          {#if s.seasonal === 'true'}
+            <div class="seg2" role="radiogroup" aria-label={t('Wie stark')}>
+              <button class:on={(s.seasonalMode || 'deco') === 'deco'} role="radio" aria-checked={(s.seasonalMode || 'deco') === 'deco'} onclick={() => saveSetting({ seasonalMode: 'deco' })}>{t('Nur Deko – dein Theme bleibt')}</button>
+              <button class:on={s.seasonalMode === 'theme'} role="radio" aria-checked={s.seasonalMode === 'theme'} onclick={() => saveSetting({ seasonalMode: 'theme' })}>{t('Ganzes Saison-Theme')}</button>
+            </div>
+          {/if}
+          <div class="seasons">
+            {#each SEASONS as se (se.id)}
+              <div class="season-row">
+                <label class="check">
+                  <input type="checkbox" disabled={s.seasonal !== 'true'} checked={!seasonOff.includes(se.id)} onchange={(e) => toggleSeason(se.id, e.target.checked)} />
+                  <span>{t(se.name)} <span class="muted small">· {t(se.when)}</span></span>
+                </label>
+                <button class="small ghost" class:on={seasonPreview.id === se.id} onclick={() => (seasonPreview.id = seasonPreview.id === se.id ? '' : se.id)}>
+                  {seasonPreview.id === se.id ? t('Vorschau beenden') : t('Ansehen')}
+                </button>
+              </div>
+            {/each}
+          </div>
+          <p class="help">{t('„Ansehen“ zeigt die Deko sofort, nur in diesem Tab und bis zum Neuladen. Bewegte Effekte entfallen, wenn im System „Bewegung reduzieren“ eingeschaltet ist.')}</p>
         </div>
         <div class="grid4">
           <label class="field">
@@ -465,9 +530,12 @@
           </select>
         </label>
         {#if (s.searchView || 'window') === 'window'}
-          <label class="check"><input type="checkbox" checked={s.searchJump === 'true'} onchange={setFlag('searchJump')} /> {t('Beim Tastenkürzel nach oben zum Suchfeld springen')}</label>
-          <p class="help indent">{t('Aus: Weiter unten auf der Seite öffnet das Kürzel das Suchfenster dort, wo du gerade bist. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.')}</p>
+          <!-- Stored as "searchJump" (jump up = true); the switch shows the default, opening in place, as on. -->
+          <label class="check"><input type="checkbox" checked={s.searchJump !== 'true'} onchange={(e) => saveSetting({ searchJump: String(!e.target.checked) })} /> {t('Suchfenster beim Tastenkürzel dort öffnen, wo du gerade bist')}</label>
+          <p class="help indent">{t('Aus: Das Kürzel springt nach oben zum Suchfeld. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.')}</p>
         {/if}
+        <label class="check"><input type="checkbox" checked={s.searchHistory !== 'false'} onchange={setFlag('searchHistory')} /> {t('Letzte Suchen merken')}</label>
+        <p class="help indent">{t('Nur in diesem Browser. Ausschalten löscht auch, was schon gemerkt ist; einzelne Einträge entfernt das ✕ daneben.')}</p>
         <label class="field">
           <span>{t('Websuche')}</span>
           <select bind:value={s.searchEngine} onchange={pickEngine}>
@@ -641,7 +709,51 @@
         </div>
       </section>
 
-      <section hidden={current !== 'debug'} bind:this={sectionEls.debug}>
+      <section hidden={current !== 'info'} bind:this={sectionEls.info}>
+        <h3>{t('Info')}</h3>
+        <div class="version-card" class:new={update}>
+          <div class="v-row">
+            <span class="v-label">{t('Installiert')}</span>
+            <b class="v-num">{version && version !== 'dev' ? version : t('Entwicklerversion')}</b>
+            <span class="v-chan">{channel}</span>
+          </div>
+          {#if update}
+            <div class="v-row">
+              <span class="v-label">{t('Neu')}</span>
+              <b class="v-num accent">{update.version}</b>
+              {#if update.published}<span class="v-chan">{t('seit {date}', { date: fmtDate(update.published) })}</span>{/if}
+            </div>
+            <div class="row wrap">
+              <a class="button primary" href={update.site || update.url} target="_blank" rel="noopener noreferrer">✨ {t('Was ist neu? (Webseite)')}</a>
+              <a class="button" href={update.url} target="_blank" rel="noopener noreferrer">{t('Auf GitHub ansehen')}</a>
+              <a class="button" href={updateGuide} target="_blank" rel="noopener noreferrer">{t('So aktualisierst du')}</a>
+            </div>
+          {:else if s.updateCheck !== 'false' && parsedVersion}
+            <p class="help ok-line">✓ {t('Du hast die neueste Version.')}{#if system.updateChecked} {t('Zuletzt geprüft: {date}', { date: fmtDate(system.updateChecked, true) })}{/if}</p>
+          {/if}
+        </div>
+        <label class="check"><input type="checkbox" checked={s.updateCheck !== 'false'} onchange={setFlag('updateCheck')} /> {t('Auf neue Heimdeck-Versionen hinweisen')}</label>
+        <p class="help indent">{t('Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.')}</p>
+
+        <h3>{t('Links')}</h3>
+        <div class="row wrap">
+          <a class="button small" href="https://blum.ing/heimdeck/" target="_blank" rel="noopener noreferrer">🌐 {t('Webseite')}</a>
+          <a class="button small" href="https://github.com/MrLuigi938/heimdeck" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="button small" href={docsLink} target="_blank" rel="noopener noreferrer">📖 {t('Anleitung')}</a>
+          <a class="button small" href={issueLink} target="_blank" rel="noopener noreferrer">🐞 {t('Fehler melden')}</a>
+        </div>
+
+        <h3>{t('System')}</h3>
+        <dl class="sysinfo">
+          <dt>{t('Version')}</dt><dd>{version || '–'}</dd>
+          <dt>{t('Installation')}</dt><dd>{installName}</dd>
+          <dt>{t('Plattform')}</dt><dd>{system.os || '–'} · {system.go || ''}</dd>
+          <dt>{t('Läuft seit')}</dt><dd>{system.started ? fmtDate(system.started, true) : '–'}</dd>
+          <dt>{t('Kacheln')}</dt><dd>{system.tiles ?? '–'}</dd>
+          <dt>{t('Browser')}</dt><dd class="ua">{navigator.userAgent}</dd>
+        </dl>
+        <div class="row"><button class="small" onclick={copyInfo}>📋 {t('Infos kopieren (für Fehlermeldungen)')}</button></div>
+
         <h3>{t('Fehlersuche')}</h3>
         <label class="check"><input type="checkbox" checked={debug} onchange={toggleDebug} disabled={debugForced} /> {t('Debug-Modus')}</label>
         <p class="help indent">{t('Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.')}</p>
@@ -664,6 +776,36 @@
   .nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 500; }
   .nav-icon { width: 20px; text-align: center; flex: none; }
   .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Seasonal decoration block inside "Appearance". */
+  .season-box { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+  .season-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .season-title { font-weight: 600; }
+  .season-head .check { margin-left: auto; }
+  .season-box .help { margin: 0; }
+  .seg2 { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; justify-self: start; }
+  .seg2 button { border: 0; border-radius: 0; background: transparent; padding: 6px 12px; font-size: 13px; }
+  .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 500; }
+  .seasons { display: grid; gap: 2px; }
+  .season-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .season-row .small.ghost.on { color: var(--accent); }
+  .small { font-size: 12px; }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
+  /* Info: version card, links and system details. */
+  .version-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+  .version-card.new { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .v-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .v-label { width: 82px; font-size: 13px; color: var(--muted); }
+  .v-num { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .v-num.accent { color: var(--accent); }
+  .v-chan { font-size: 12.5px; color: var(--muted); }
+  .ok-line { color: var(--ok); margin: 0; }
+  a.button { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+  a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+  a.button.small { padding: 4px 10px; font-size: 13px; border-radius: var(--r-xs); }
+  .sysinfo { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 13.5px; }
+  .sysinfo dt { color: var(--muted); }
+  .sysinfo dd { margin: 0; overflow-wrap: anywhere; }
+  .sysinfo .ua { font-size: 12px; color: var(--muted); }
   .chev { display: none; color: var(--muted); font-size: 18px; }
   .nothing { padding: 4px 10px; }
   .saved { margin: auto 0 0; padding: 12px 4px 0; font-size: 12px; color: var(--muted); transition: color .2s; }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -86,6 +87,9 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 			}
 			t := names[id]
 			if online {
+				if o.notified {
+					slog.Info("Dienst wieder erreichbar", "kachel", t.Name, "adresse", kind, "ausfall", now.Sub(o.since).Round(time.Second))
+				}
 				if o.notified && recovery {
 					msgs = append(msgs, recoveredMsg(lang, t, kind, now.Sub(o.since)))
 				}
@@ -98,6 +102,7 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 			o.fails++
 			if o.fails >= after && !o.notified {
 				o.notified = true
+				slog.Warn("Dienst nicht erreichbar", "kachel", t.Name, "adresse", kind, "seit", o.since.Format("15:04:05"), "prüfungen", o.fails)
 				msgs = append(msgs, downMsg(lang, t, kind, o.since))
 			}
 		}
@@ -169,14 +174,26 @@ func (s *Server) send(settings map[string]string, msgs []notification) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	for _, m := range msgs {
+		var sent []string
+		deliver := func(channel string, err error) {
+			logErr(channel+"-Benachrichtigung", err)
+			if err == nil {
+				sent = append(sent, channel)
+			}
+		}
 		if sec.DiscordWebhook != "" {
-			logErr("Discord-Benachrichtigung", sendDiscord(ctx, sec.DiscordWebhook, m))
+			deliver("Discord", sendDiscord(ctx, sec.DiscordWebhook, m))
 		}
 		if u := strings.TrimSpace(settings["ntfyUrl"]); u != "" {
-			logErr("ntfy-Benachrichtigung", sendNtfy(ctx, u, sec.NtfyToken, m))
+			deliver("ntfy", sendNtfy(ctx, u, sec.NtfyToken, m))
 		}
 		if chat := strings.TrimSpace(settings["telegramChat"]); sec.TelegramToken != "" && chat != "" {
-			logErr("Telegram-Benachrichtigung", sendTelegram(ctx, sec.TelegramToken, chat, m))
+			deliver("Telegram", sendTelegram(ctx, sec.TelegramToken, chat, m))
+		}
+		if len(sent) > 0 {
+			slog.Info("Benachrichtigung gesendet", "titel", m.Title, "kanäle", strings.Join(sent, ","))
+		} else {
+			slog.Debug("Benachrichtigung nicht gesendet – kein Kanal eingerichtet oder alle fehlgeschlagen", "titel", m.Title)
 		}
 	}
 }

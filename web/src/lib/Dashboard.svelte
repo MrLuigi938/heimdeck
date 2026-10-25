@@ -17,7 +17,9 @@
   import { promptDialog } from './dialog.svelte.js';
   import Modal from './Modal.svelte';
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
-  import { applyTheme } from './themes.js';
+  import { applyTheme, activeSeason } from './themes.js';
+  import { seasonPreview } from './season.svelte.js';
+  import SeasonFx from './SeasonFx.svelte';
 
   let data = $state(null);
   let status = $state({});
@@ -25,6 +27,11 @@
   let editing = $state(null); // tile object (or {groupId} for a new one)
   let showDiscover = $state(false);
   let showSettings = $state(false);
+  let settingsSection = $state(''); // the area the settings open on, e.g. "notify"
+  function openSettings(section = '') {
+    settingsSection = section;
+    showSettings = true;
+  }
   let now = $state(new Date());
   let dragging = $state(null);
   let dropTarget = $state(null);
@@ -180,6 +187,28 @@
     return () => media.removeEventListener('change', apply);
   });
 
+  // The season of the seasonal decoration (or the one previewed in the settings).
+  let season = $derived((seasonPreview.id, activeSeason(settings)?.id || ''));
+
+  // A newer release that is out for more than three days: a red dot on the
+  // settings button, and once per browser session a hint for five seconds.
+  const STALE_DAYS = 3;
+  let updateStale = $derived(!!data?.update?.published && Date.now() - Date.parse(data.update.published) > STALE_DAYS * 86400e3);
+  let updateBubble = $state(false);
+  $effect(() => {
+    if (!updateStale) return;
+    const key = 'heimdeck-update-hint';
+    try {
+      if (sessionStorage.getItem(key) === data.update.version) return;
+      sessionStorage.setItem(key, data.update.version);
+    } catch {
+      /* private mode: show it anyway */
+    }
+    updateBubble = true;
+    const timer = setTimeout(() => (updateBubble = false), 5000);
+    return () => clearTimeout(timer);
+  });
+
   let greeting = $derived.by(() => {
     const h = now.getHours();
     const who = data?.username ? `, ${data.username}` : '';
@@ -216,7 +245,7 @@
     ({
       search: () => searchBox?.focus(),
       edit: () => (editMode = !editMode),
-      settings: () => (showSettings = true),
+      settings: () => openSettings(),
       hidden: () => hasHidden && toggleHidden(),
       network: () => hasExternal && toggleNetwork(),
       prevBoard: () => step(-1),
@@ -416,7 +445,7 @@
           </div>
         {/if}
       </div>
-      <Search bind:this={searchBox} tiles={allTiles} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+      <Search bind:this={searchBox} tiles={allTiles} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
         shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}
@@ -444,10 +473,14 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
           {/if}
         </button>
-        <button class="ghost icon" title={t('Einstellungen')} aria-label={t('Einstellungen')} onclick={() => (showSettings = true)}>
+        <button class="ghost icon settings-btn" title={updateStale ? t('Update verfügbar') : t('Einstellungen')} aria-label={updateStale ? t('Einstellungen – Update verfügbar') : t('Einstellungen')} onclick={() => openSettings(updateStale ? 'info' : '')}>
+          {#if updateStale}<span class="update-dot" aria-hidden="true"></span>{/if}
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
       </div>
+      {#if updateBubble}
+        <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
+      {/if}
     </header>
 
     {#if editMode}
@@ -544,13 +577,16 @@
     {/if}
 
     {#if allTiles.length && settings.showUptime !== 'false'}
-      <Uptime tiles={allTiles} {status} />
+      <Uptime tiles={allTiles} {status} onNotify={() => openSettings('notify')} />
     {/if}
     <Credit app version={data.version} update={data.update} />
   </div>
 
   {#if editing}
     <TileEditor tile={editing} groups={groupOptions} integrations={data.integrations} onClose={() => { editing = null; discoverAfterSave = false; }} onSaved={saved} />
+  {/if}
+  {#if season}
+    {#key season}<SeasonFx {season} />{/key}
   {/if}
   {#if showDiscover}
     <Discover groups={boardGroups.filter((g) => !g.locked)} boardId={board?.id} onClose={() => (showDiscover = false)} onSaved={saved} />
@@ -559,7 +595,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} notify={data.notify} docker={data.docker} username={data.username} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
@@ -593,6 +629,14 @@
   .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
   .tools .on { background: var(--accent); color: var(--on-accent, #fff); }
+  /* A newer release, out for a few days: red dot on the gear and a short hint below the icons. */
+  .settings-btn { position: relative; }
+  .update-dot { position: absolute; top: 4px; right: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 2px var(--surface-solid); }
+  .update-bubble {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 46; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    background: var(--bad); border-color: var(--bad); color: #fff; box-shadow: var(--shadow); animation: bubble .25s ease-out;
+  }
+  @keyframes bubble { from { opacity: 0; transform: translateY(-6px); } }
   .logout.armed { width: auto; padding: 0 10px; background: var(--bad); color: #fff; }
   .logout-ask { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
   .logout-check { display: none; font-weight: 700; }
@@ -631,11 +675,22 @@
   .center { justify-content: center; flex-wrap: wrap; }
 
   @media (max-width: 900px) {
-    .top { grid-template-columns: 1fr auto; }
+    /* minmax(0, …): the title block may shrink and never pushes over the icons. */
+    .top { grid-template-columns: minmax(0, 1fr) auto; }
     .top :global(.search) { grid-column: 1 / -1; grid-row: 2; max-width: none; }
   }
   @media (max-width: 640px) {
     .net-label { display: none; }
+    /* Title and dashboard button stay side by side in every theme: wide theme
+       fonts (monospace, serif, capitals) shrink the title and shorten the
+       dashboard name with "…" instead of wrapping or overlapping the icons. */
+    .title-row { flex-wrap: nowrap; min-width: 0; gap: 8px; }
+    h1 { font-size: clamp(18px, 6.2vw, 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+    .boards { min-width: 0; flex: 0 1 auto; }
+    .board-btn { max-width: 100%; min-width: 0; padding: 3px 8px; font-size: 12.5px; }
+    .board-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .greet { font-size: 12.5px; }
+    .when { white-space: normal; }
     /* Icons in a compact block of two rows that matches the height of the title
        block: 2 + 2 for four icons, 3 + 2 or 3 + 3 when there are more. */
     .tools { display: grid; grid-template-columns: repeat(2, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }

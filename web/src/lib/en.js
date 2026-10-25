@@ -441,9 +441,75 @@ export const en = {
   'Bei allen Kacheln auch die öffentliche Adresse prüfen': 'Check the public address of every tile too',
   'Sonst wird nur die lokale Adresse geprüft – die öffentliche nur bei Kacheln, bei denen du es im Kachel-Editor einschaltest.':
     'Otherwise only the local address is checked – the public one only for tiles where you turn it on in the tile editor.',
-  'Beim Tastenkürzel nach oben zum Suchfeld springen': 'Jump up to the search field with the shortcut',
-  'Aus: Weiter unten auf der Seite öffnet das Kürzel das Suchfenster dort, wo du gerade bist. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.':
-    'Off: further down the page the shortcut opens the search window where you are. Clicking the search field at the top always opens the results right below it.',
+  'Suchfenster beim Tastenkürzel dort öffnen, wo du gerade bist': 'Open the search window where you are when using the shortcut',
+  'Aus: Das Kürzel springt nach oben zum Suchfeld. Ein Klick ins Suchfeld oben öffnet die Ergebnisse immer direkt darunter.':
+    'Off: the shortcut jumps up to the search field. Clicking the search field at the top always opens the results right below it.',
+  'Letzte Suchen merken': 'Remember recent searches',
+  'Nur in diesem Browser. Ausschalten löscht auch, was schon gemerkt ist; einzelne Einträge entfernt das ✕ daneben.':
+    'Only in this browser. Turning it off also deletes what was remembered; the ✕ next to an entry removes just that one.',
+  'Enter sucht im Web nach „{q}“.': 'Enter searches the web for “{q}”.',
+  'Mit ↑ ↓ oder der Maus einen Treffer auswählen – dann öffnet Enter ihn.': 'Pick a hit with ↑ ↓ or the mouse – then Enter opens it.',
+  'öffnen, ohne Auswahl im Web suchen': 'open, without a selection search the web',
+  '„{q}“ aus dem Verlauf entfernen': 'Remove “{q}” from the history',
+  'Aus dem Verlauf entfernen': 'Remove from the history',
+
+  'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.':
+    'By the Heimdeck developer: download videos – right from the search too, just paste the link.',
+
+  // seasonal decoration
+  'Saison-Deko': 'Seasonal decoration',
+  'automatisch einschalten': 'turn on automatically',
+  'Zu Silvester, Ostern, Sommeranfang, Halloween, Advent und Weihnachten schmückt sich Heimdeck von selbst – und räumt danach wieder auf.':
+    'For New Year’s Eve, Easter, the start of summer, Halloween, Advent and Christmas Heimdeck decorates itself – and tidies up afterwards.',
+  'Wie stark': 'How much',
+  'Nur Deko – dein Theme bleibt': 'Decoration only – your theme stays',
+  'Ganzes Saison-Theme': 'Whole seasonal theme',
+  'Silvester und Neujahr': 'New Year’s Eve and New Year',
+  'Ostern': 'Easter',
+  'Sommeranfang': 'Start of summer',
+  'Advent': 'Advent',
+  'Weihnachten': 'Christmas',
+  '28. Dez. – 2. Jan.': 'Dec 28 – Jan 2',
+  'Gründonnerstag – Ostermontag': 'Maundy Thursday – Easter Monday',
+  '20. – 23. Juni': 'June 20 – 23',
+  'ganzer Oktober': 'all of October',
+  '1. Advent – 23. Dez.': '1st Sunday of Advent – Dec 23',
+  '24. – 27. Dez.': 'Dec 24 – 27',
+  'Ansehen': 'Preview',
+  'Vorschau beenden': 'End preview',
+  '„Ansehen“ zeigt die Deko sofort, nur in diesem Tab und bis zum Neuladen. Bewegte Effekte entfallen, wenn im System „Bewegung reduzieren“ eingeschaltet ist.':
+    '“Preview” shows the decoration right away, only in this tab and until you reload. Moving effects are left out when “reduce motion” is on in your system.',
+
+  // info, updates
+  'Update verfügbar': 'Update available',
+  'Einstellungen – Update verfügbar': 'Settings – update available',
+  'Benachrichtigungen bei Ausfällen einrichten': 'Set up notifications for outages',
+  'Info': 'Info',
+  'Installiert': 'Installed',
+  'Entwicklerversion': 'Development build',
+  'Neu': 'New',
+  'seit {date}': 'since {date}',
+  'Was ist neu? (Webseite)': 'What’s new? (website)',
+  'Auf GitHub ansehen': 'View on GitHub',
+  'So aktualisierst du': 'How to update',
+  'Du hast die neueste Version.': 'You have the newest version.',
+  'Zuletzt geprüft: {date}': 'Last checked: {date}',
+  'Links': 'Links',
+  'Webseite': 'Website',
+  'Anleitung': 'Guide',
+  'Fehler melden': 'Report a bug',
+  'Version': 'Version',
+  'Installation': 'Installation',
+  'Plattform': 'Platform',
+  'Läuft seit': 'Running since',
+  'Browser': 'Browser',
+  'Infos kopieren (für Fehlermeldungen)': 'Copy details (for bug reports)',
+  'Entwicklungsstand (edge)': 'Development state (edge)',
+  'Testversion (Beta)': 'Test version (beta)',
+  'Stabile Version': 'Stable version',
+  'Installationsskript / Proxmox (systemd)': 'Install script / Proxmox (systemd)',
+  'Einzelne Datei': 'Single binary',
+  'Kopieren nicht möglich – bitte von Hand markieren.': 'Copying is not possible – please select it by hand.',
 
   // settings layout
   'Einstellung suchen …': 'Search settings …',

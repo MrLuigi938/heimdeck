@@ -3,6 +3,11 @@
   import { toast } from './toast.svelte.js';
   import Modal from './Modal.svelte';
   import Icon from './Icon.svelte';
+
+  // Tools by Heimdeck's own developer, pointed out in the service picker.
+  const OWN = {
+    tubesy: { repo: 'https://github.com/MrLuigi938/tubesy', note: 'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.' },
+  };
   import Widget from './Widget.svelte';
   import { t } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
@@ -209,11 +214,22 @@
       <div class="cat">{cat}</div>
       <div class="picker">
         {#each defs as d}
-          <button class="pick" onclick={() => pick(d)}>
-            <Icon icon={d.icon} name={d.name} size={30} />
-            <span class="pick-name">{d.name}</span>
-            {#if d.hasWidget}<span class="tag">{t('Live-Daten')}</span>{/if}
-          </button>
+          {@const own = OWN[d.id]}
+          <!-- The developer's own tools get a badge and a note with the project link; the card still picks the service. -->
+          <div class="pick-wrap" class:own>
+            <button class="pick" onclick={() => pick(d)}>
+              <Icon icon={d.icon} name={d.name} size={30} />
+              <span class="pick-name">{d.name}</span>
+              {#if d.hasWidget}<span class="tag">{t('Live-Daten')}</span>{/if}
+            </button>
+            {#if own}
+              <span class="own-badge" aria-hidden="true">✨ {t('Neu')}</span>
+              <div class="own-note" role="note">
+                <span>{t(own.note)}</span>
+                <a href={own.repo} target="_blank" rel="noopener noreferrer">{t('Auf GitHub ansehen')} ↗</a>
+              </div>
+            {/if}
+          </div>
         {/each}
       </div>
     {/each}
@@ -445,6 +461,27 @@
   .pick { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; background: var(--surface-2); }
   .pick-name { font-size: 13.5px; text-align: center; }
   .tag { font-size: 10.5px; color: var(--accent); }
+  /* The developer's own tools: a glowing frame, a "✨ New" badge and, on hover, a note with the project link. */
+  .pick-wrap { position: relative; display: grid; }
+  .pick-wrap .pick { width: 100%; }
+  .own .pick { border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+  .own-badge {
+    position: absolute; top: -8px; right: -6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; pointer-events: none;
+    background: var(--accent); color: var(--on-accent, #fff); box-shadow: var(--shadow); animation: sparkle 2.4s ease-in-out infinite;
+  }
+  @keyframes sparkle { 50% { filter: brightness(1.25); transform: scale(1.06); } }
+  @media (prefers-reduced-motion: reduce) { .own-badge { animation: none; } }
+  .own-note {
+    position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 5; width: 230px;
+    display: none; gap: 6px; padding: 10px 12px; border-radius: var(--r-sm); font-size: 12.5px; line-height: 1.4;
+    background: var(--surface-solid); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  }
+  .own-note a { color: var(--accent); font-weight: 600; }
+  .own:hover .own-note, .own:focus-within .own-note { display: grid; }
+  /* Touch screens have no hover: the link sits under the card instead. */
+  @media (hover: none) {
+    .own-note { position: static; transform: none; width: auto; display: grid; margin-top: 6px; box-shadow: none; }
+  }
   .form { display: grid; gap: 14px; }
   .type { display: flex; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; }
   .grow { flex: 1; min-width: 0; }

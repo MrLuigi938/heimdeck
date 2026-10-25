@@ -43,6 +43,9 @@ type Server struct {
 	unlocked map[string]map[int64]time.Time
 	version  string       // set at build time, "dev" otherwise
 	update   *releaseInfo // newer release found by CheckUpdates, nil if none
+	// updateChecked is when GitHub last answered; started when the server came up.
+	updateChecked time.Time
+	started       time.Time
 }
 
 type cached[T any] struct {
@@ -60,7 +63,7 @@ const (
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	srv := &Server{store: s, auth: a, docker: d, updates: docker.NewUpdates(), web: web,
 		widgets: map[string]cached[*integrations.Widget]{}, fetching: map[string]chan struct{}{}, widgetGen: map[string]int{}, favicons: map[string]favicon{}, faviconFetch: map[string]chan struct{}{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
-		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}}
+		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now()}
 	integrations.Register(dockerTile{srv})
 	return srv
 }

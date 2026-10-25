@@ -5,7 +5,8 @@
 
   // Status history of every tile: one bar per address (local and public),
   // 48 half-hour slots for 24 hours or 72 hourly slots for three days.
-  let { tiles, status = {} } = $props();
+  // onNotify: the bell next to the range buttons opens the notification settings.
+  let { tiles, status = {}, onNotify = null } = $props();
 
   const KEY = 'heimdeck-uptime';
   let prefs = $state(readPrefs());
@@ -105,6 +106,11 @@
         <button class:on={prefs.range === '72h'} onclick={() => setRange('72h')}>{t('3 Tage')}</button>
       </div>
     {/if}
+    {#if onNotify}
+      <button class="ghost icon bell on-bg" onclick={onNotify} title={t('Benachrichtigungen bei Ausfällen einrichten')} aria-label={t('Benachrichtigungen bei Ausfällen einrichten')}>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+      </button>
+    {/if}
   </div>
 
   {#if prefs.open}
@@ -162,6 +168,9 @@
   .title { background: none; border: 0; padding: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; gap: 8px; align-items: center; }
   .chev { width: 10px; }
   .sum { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; padding: 1px 8px; border-radius: var(--r-xs); background: var(--surface-2); }
+  .bell { width: 30px; height: 30px; padding: 0; color: var(--muted); flex: none; margin-left: auto; }
+  .seg + .bell { margin-left: 0; }
+  .bell:hover { color: var(--accent); }
   .seg { margin-left: auto; display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
   .seg button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
   .seg button.on { background: var(--surface-2); color: var(--text); }

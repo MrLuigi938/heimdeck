@@ -23,9 +23,14 @@ const updateEvery = 12 * time.Hour
 var releasesURL = "https://api.github.com/repos/MrLuigi938/heimdeck/releases?per_page=20"
 
 type releaseInfo struct {
-	Version string `json:"version"`
-	URL     string `json:"url"`
+	Version   string    `json:"version"`
+	URL       string    `json:"url"`       // the release on GitHub
+	Site      string    `json:"site"`      // the same version on the project website, with the nicer notes
+	Published time.Time `json:"published"` // when it came out; the settings remind after a few days
 }
+
+// siteURL opens a version in the release timeline of the project website.
+func siteURL(v string) string { return "https://blum.ing/heimdeck/#v" + strings.TrimPrefix(v, "v") }
 
 // SetVersion tells the server which version it is (set at build time).
 func (s *Server) SetVersion(v string) { s.version = v }
@@ -63,12 +68,16 @@ func (s *Server) checkUpdate(ctx context.Context) {
 	}
 	newest, err := newestRelease(ctx, s.version)
 	if err != nil {
-		slog.Debug("Update-Prüfung fehlgeschlagen", "fehler", err)
+		slog.Warn("Update-Prüfung fehlgeschlagen", "fehler", err)
 		return
 	}
 	s.mu.Lock()
 	s.update = newest
+	s.updateChecked = time.Now()
 	s.mu.Unlock()
+	if newest == nil {
+		slog.Debug("Update-Prüfung: aktuell", "version", s.version)
+	}
 	if newest != nil {
 		slog.Info("Neue Heimdeck-Version verfügbar", "installiert", s.version, "neu", newest.Version)
 	}
@@ -92,10 +101,11 @@ func newestRelease(ctx context.Context, current string) (*releaseInfo, error) {
 		return nil, &httpStatusError{resp.StatusCode}
 	}
 	var list []struct {
-		Tag        string `json:"tag_name"`
-		URL        string `json:"html_url"`
-		Draft      bool   `json:"draft"`
-		Prerelease bool   `json:"prerelease"`
+		Tag        string    `json:"tag_name"`
+		URL        string    `json:"html_url"`
+		Draft      bool      `json:"draft"`
+		Prerelease bool      `json:"prerelease"`
+		Published  time.Time `json:"published_at"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		return nil, err
@@ -109,7 +119,7 @@ func newestRelease(ctx context.Context, current string) (*releaseInfo, error) {
 			continue
 		}
 		if best == nil || v.newer(bestV) {
-			best, bestV = &releaseInfo{Version: strings.TrimPrefix(r.Tag, "v"), URL: r.URL}, v
+			best, bestV = &releaseInfo{Version: strings.TrimPrefix(r.Tag, "v"), URL: r.URL, Site: siteURL(r.Tag), Published: r.Published}, v
 		}
 	}
 	return best, nil

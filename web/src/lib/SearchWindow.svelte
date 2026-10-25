@@ -10,7 +10,7 @@
   // The search itself (typing, asking the services, opening) lives in Search.svelte.
   let {
     q = $bindable(), parsed, tileHits, groups, loading, noHits, tileById, defs, local, newTab, recent, hasSearchServices,
-    onInput, makeAction, webSearch, openUrl, onClose,
+    onInput, makeAction, webSearch, openUrl, onClose, onForget = null,
     // anchored: opens right below the search field in the header, which stays the input.
     anchored = false, input = null,
   } = $props();
@@ -19,7 +19,9 @@
   let listEl;
   let backdrop;
   let cat = $state('all');
-  let sel = $state(0);
+  // Nothing is selected until you use the arrow keys or point at a hit: Enter
+  // alone searches the web, so a quick web search never opens a document instead.
+  let sel = $state(-1);
   let sheet = $state(false); // phones: the preview slides up as a sheet
   let busy = $state('');
 
@@ -28,9 +30,17 @@
 
   // Anchored, the window sits right under the header's search field.
   let top = $state(0);
-  $effect(() => {
+  const place = () => {
     if (anchored && input) top = Math.round(input.getBoundingClientRect().bottom + 8);
-  });
+  };
+  $effect(place);
+  // Scrolling the page away from the field closes the anchored window.
+  let scrolledFrom = scrollY;
+  function onScroll() {
+    if (!anchored) return;
+    if (Math.abs(scrollY - scrolledFrom) > 40) onClose();
+    else place();
+  }
   let win;
   // Anchored there is no dark backdrop: a click anywhere else closes the window
   // (but not a click in a confirmation dialog opened from it).
@@ -58,13 +68,13 @@
     return list;
   });
   let visible = $derived(cat === 'all' ? entries : entries.filter((e) => e.cat === cat));
-  let current = $derived(visible[Math.min(sel, visible.length - 1)]);
+  let current = $derived(sel >= 0 ? visible[Math.min(sel, visible.length - 1)] : null);
 
   $effect(() => {
     // A new search or filter starts at the top; a filter without hits falls back to all.
     q;
     cat;
-    sel = 0;
+    sel = -1;
   });
   $effect(() => {
     if (cat !== 'all' && !chips.some((c) => c.id === cat)) cat = 'all';
@@ -82,7 +92,7 @@
 
   function move(d) {
     if (!visible.length) return;
-    sel = (Math.min(sel, visible.length - 1) + d + visible.length) % visible.length;
+    sel = sel < 0 ? (d > 0 ? 0 : visible.length - 1) : (Math.min(sel, visible.length - 1) + d + visible.length) % visible.length;
     queueMicrotask(() => listEl?.querySelector('.entry.sel')?.scrollIntoView({ block: 'nearest' }));
   }
 
@@ -147,7 +157,7 @@
   };
 </script>
 
-<svelte:window onkeydown={onWindowKey} onmousedown={onWindowDown} />
+<svelte:window onkeydown={onWindowKey} onmousedown={onWindowDown} onscroll={onScroll} onresize={place} />
 
 <!-- class "backdrop": the dashboard's shortcuts pause while it is open. -->
 <div class="backdrop" class:anchored role="presentation" bind:this={backdrop} style:padding-top={anchored ? top + 'px' : null}
@@ -199,7 +209,7 @@
           {#if !loading && noHits.length}
             <p class="none">{t('Keine Treffer in')}: {noHits.join(', ')}</p>
           {/if}
-          <button class="entry web" onclick={webSearch}>🌐 {t('Im Web suchen: „{q}“', { q: parsed.term || q.trim() })}</button>
+          <button class="entry web" class:sel={!current} onclick={webSearch}>🌐 {t('Im Web suchen: „{q}“', { q: parsed.term || q.trim() })}</button>
         </div>
 
         <div class="preview" class:open={sheet}>
@@ -227,12 +237,17 @@
               </div>
               <p class="muted small from"><Icon icon={current.group.icon} name={current.group.name} favicon={faviconUrl(current.tile)} size={14} /> {current.group.name}</p>
             {/if}
+          {:else}
+            <div class="hint">
+              <p>🌐 {t('Enter sucht im Web nach „{q}“.', { q: parsed.term || q.trim() })}</p>
+              <p class="muted small">{t('Mit ↑ ↓ oder der Maus einen Treffer auswählen – dann öffnet Enter ihn.')}</p>
+            </div>
           {/if}
         </div>
       </div>
       <div class="keys">
         <span><kbd>↑</kbd> <kbd>↓</kbd> {t('auswählen')}</span>
-        <span><kbd>Enter</kbd> {t('öffnen')}</span>
+        <span><kbd>Enter</kbd> {t('öffnen, ohne Auswahl im Web suchen')}</span>
         {#if chips.length > 1}<span><kbd>Tab</kbd> {t('nächster Filter')}</span>{/if}
         <span><kbd>!name</kbd> {t('nur in einem Dienst suchen')}</span>
       </div>
@@ -241,7 +256,9 @@
         {#if recent.length}
           <div class="sec">{t('Zuletzt gesucht')}</div>
           <div class="recent">
-            {#each recent as r}<button class="chip" onclick={() => useRecent(r)}>{r}</button>{/each}
+            {#each recent as r (r)}
+              <span class="rchip"><button class="chip" onclick={() => useRecent(r)}>{r}</button>{#if onForget}<button class="forget" onclick={() => onForget(r)} aria-label={t('„{q}“ aus dem Verlauf entfernen', { q: r })} title={t('Aus dem Verlauf entfernen')}>✕</button>{/if}</span>
+            {/each}
           </div>
         {/if}
         <p class="muted small">
@@ -306,6 +323,12 @@
   .start { padding: 10px 14px 16px; display: grid; gap: 8px; }
   .start .sec { padding: 4px 0 0; }
   .recent { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rchip { display: inline-flex; align-items: center; }
+  .rchip .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+  .forget { border-radius: 0 999px 999px 0; padding: 4px 9px 4px 6px; font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
+  .forget:hover { color: var(--bad); }
+  .hint { display: grid; gap: 6px; padding: 8px 2px; }
+  .hint p { margin: 0; }
   @keyframes fade { from { opacity: 0; } }
 
   /* Phones: full screen, only the list; a tap opens the preview as a sheet from below. */
