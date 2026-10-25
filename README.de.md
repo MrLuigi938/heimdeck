@@ -53,10 +53,6 @@
 
 <p align="center"><img src="docs/images/phone.webp" width="320" alt="Heimdeck auf dem Handy"></p>
 
-**Ein komplettes Dashboard** mit Smart Home, Netzwerk, Schnellzugriff und der Verfügbarkeits-Übersicht
-
-![Komplettes Dashboard](docs/images/dashboard-full.webp)
-
 <sub>Alle Screenshots mit Demo-Daten, Oberfläche auf Englisch.</sub>
 </details>
 

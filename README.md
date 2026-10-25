@@ -53,10 +53,6 @@
 
 <p align="center"><img src="docs/images/phone.webp" width="320" alt="Heimdeck on a phone"></p>
 
-**A full dashboard** with smart home, network, quick links and the availability overview
-
-![Full dashboard](docs/images/dashboard-full.webp)
-
 <sub>All screenshots use demo data.</sub>
 </details>
 

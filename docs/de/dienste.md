@@ -9,11 +9,6 @@
 
 Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und Passwort) eintragen. Schlüssel werden verschlüsselt gespeichert und gelangen nie in den Browser – Cover und Vorschaubilder, die einen Key brauchen, lädt Heimdeck selbst.
 
-<details>
-<summary><b>Beispiel: ein Dashboard mit vielen Integrationen</b> (Demo-Daten, Oberfläche auf Englisch)</summary>
-
-![Dashboard mit Medien-, Download-, Smart-Home-, Netzwerk- und System-Kacheln](../images/dashboard-full.webp)
-</details>
 
 ## Alle Integrationen
 
