@@ -471,16 +471,20 @@
   }
   @keyframes sparkle { 50% { filter: brightness(1.25); transform: scale(1.06); } }
   @media (prefers-reduced-motion: reduce) { .own-badge { animation: none; } }
+  /* The note stays while the pointer moves up to it: an invisible bridge closes
+     the gap, and it only hides after a short delay. */
   .own-note {
     position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 5; width: 230px;
-    display: none; gap: 6px; padding: 10px 12px; border-radius: var(--r-sm); font-size: 12.5px; line-height: 1.4;
+    display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r-sm); font-size: 12.5px; line-height: 1.4;
     background: var(--surface-solid); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+    opacity: 0; visibility: hidden; transition: opacity .15s .6s, visibility 0s .75s;
   }
+  .own-note::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 12px; }
   .own-note a { color: var(--accent); font-weight: 600; }
-  .own:hover .own-note, .own:focus-within .own-note { display: grid; }
+  .own:hover .own-note, .own:focus-within .own-note { opacity: 1; visibility: visible; transition: opacity .15s, visibility 0s; }
   /* Touch screens have no hover: the link sits under the card instead. */
   @media (hover: none) {
-    .own-note { position: static; transform: none; width: auto; display: grid; margin-top: 6px; box-shadow: none; }
+    .own-note { position: static; transform: none; width: auto; display: grid; margin-top: 6px; box-shadow: none; opacity: 1; visibility: visible; }
   }
   .form { display: grid; gap: 14px; }
   .type { display: flex; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; }

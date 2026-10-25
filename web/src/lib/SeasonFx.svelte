@@ -5,7 +5,8 @@
   // Moving decoration of the seasonal themes ("Saison-Deko"): bats at
   // Halloween, fireworks at New Year, snow and a string of lights at Christmas,
   // an Advent wreath, a hopping bunny at Easter, soap bubbles at the start of
-  // summer. It never takes a click (pointer-events: none) and stays sparse.
+  // summer. It runs behind the tiles, never takes a click (pointer-events:
+  // none) and stays sparse.
   // With "reduce motion" in the system only the still parts are shown.
   let { season } = $props();
 
@@ -117,7 +118,8 @@
 </div>
 
 <style>
-  .fx { position: fixed; inset: 0; z-index: 25; pointer-events: none; overflow: hidden; }
+  /* Behind the dashboard (which has z-index 1), in front of the background. */
+  .fx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 
   /* Snow */
   .flake { position: absolute; top: -10px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, .6); animation: fall linear infinite; }
@@ -153,7 +155,8 @@
   @keyframes spark { 0% { transform: translate(0, 0); opacity: 1; } 80% { opacity: .9; } 100% { transform: translate(var(--dx), calc(var(--dy) + 40px)); opacity: 0; } }
 
   /* Easter: a bunny hops along the bottom, eggs in the corner */
-  @keyframes hop-across { 0% { transform: translateX(0); } 45%, 100% { transform: translateX(calc(100vw + 120px)); } }
+  /* The bunny emoji looks to the left; mirrored, it looks where it hops. */
+  @keyframes hop-across { 0% { transform: translateX(0) scaleX(-1); } 45%, 100% { transform: translateX(calc(100vw + 120px)) scaleX(-1); } }
   .bunny { position: absolute; bottom: 10px; left: -60px; font-size: 34px;
     animation-name: hop-across, hop; animation-duration: 22s, .55s; animation-timing-function: linear, ease-out; animation-iteration-count: infinite, infinite; animation-direction: normal, alternate; }
   @keyframes hop { to { margin-bottom: 18px; } }

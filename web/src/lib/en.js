@@ -456,6 +456,9 @@ export const en = {
   'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.':
     'By the Heimdeck developer: download videos – right from the search too, just paste the link.',
 
+  'Studio': 'Studio',
+  'Flüssigglas': 'Fluid Glass',
+
   // seasonal decoration
   'Saison-Deko': 'Seasonal decoration',
   'automatisch einschalten': 'turn on automatically',

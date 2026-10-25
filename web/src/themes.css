@@ -383,6 +383,95 @@
 :root[data-skin='mmo'] .tile:not(.editing) .head[href]:hover .name,
 :root[data-skin='mmo'] .tile.compact:not(.editing) .square[href]:hover .cname { color: #ffe9a8 !important; text-decoration: underline; }
 
+/* ---------- Studio (a light desktop of the Mac kind) ---------- */
+
+:root[data-palette='studio'] {
+  --bg: #dfe6f5;
+  --surface: rgba(246, 246, 248, 0.94);
+  --surface-2: #ffffff;
+  --surface-solid: #f6f6f8;
+  --border: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --ok: #28c840;
+  --warn: #c67e00;
+  --bad: #ff3b30;
+  --shadow: 0 10px 30px rgba(20, 30, 60, 0.18), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
+  --radius: 12px; --r-md: 8px; --r-sm: 8px; --r-xs: 6px;
+}
+:root[data-skin='studio'] body:not(.has-bg) {
+  background: radial-gradient(ellipse at 15% 0%, #b9c8f5, transparent 55%), radial-gradient(ellipse at 90% 20%, #e7b9e6, transparent 50%),
+    radial-gradient(ellipse at 50% 110%, #f6c9a8, transparent 55%), linear-gradient(160deg, #8fa8e8, #b3a3e3 50%, #f0bfd2);
+  background-attachment: fixed;
+}
+:root[data-skin='studio'] .card { backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); }
+/* Every tile is a window: title bar with the three lights on the left. */
+:root[data-skin='studio'] .tile.card:not(.compact) { overflow: hidden; }
+:root[data-skin='studio'] .tile:not(.compact) .head {
+  padding: 8px 12px; gap: 10px; background: linear-gradient(#efeff2, #e4e4e9); border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+:root[data-skin='studio'] .tile:not(.compact) .head::before {
+  content: ''; flex: none; width: 46px; height: 12px;
+  background: radial-gradient(circle at 6px 6px, #ff5f57 5px, transparent 5.6px), radial-gradient(circle at 23px 6px, #febc2e 5px, transparent 5.6px),
+    radial-gradient(circle at 40px 6px, #28c840 5px, transparent 5.6px);
+}
+:root[data-skin='studio'] .tile:not(.compact) .head .name { font-weight: 600; font-size: 13.5px; }
+:root[data-skin='studio'] .tile .body { padding-top: 10px; }
+:root[data-skin='studio'] .stat { background: #fff; border: 1px solid rgba(0, 0, 0, 0.07); }
+:root[data-skin='studio'] button { background: #fff; border-color: rgba(0, 0, 0, 0.14); box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05); }
+:root[data-skin='studio'] button.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-skin='studio'] button.primary { background: var(--accent); border-color: var(--accent); }
+:root[data-skin='studio'] .on-bg { background: rgba(246, 246, 248, 0.8); border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 10px; backdrop-filter: blur(20px); box-shadow: var(--shadow); }
+:root[data-skin='studio'] .brand.on-bg { padding: 8px 14px; justify-self: start; }
+:root[data-skin='studio'] .tools.on-bg { padding: 4px; justify-self: end; }
+:root[data-skin='studio'] h2.on-bg, :root[data-skin='studio'] span.on-bg { padding: 4px 10px; }
+
+/* ---------- Flüssigglas (liquid glass of the new phone kind) ---------- */
+
+:root[data-palette='glass'] {
+  --bg: #1b1440;
+  --surface: rgba(255, 255, 255, 0.14);
+  --surface-2: rgba(255, 255, 255, 0.14);
+  --surface-solid: #2b2160;
+  --border: rgba(255, 255, 255, 0.34);
+  --border-strong: rgba(255, 255, 255, 0.6);
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.72);
+  --ok: #30d158;
+  --warn: #ffd60a;
+  --bad: #ff453a;
+  --shadow: 0 14px 40px rgba(10, 5, 40, 0.35);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
+  --radius: 28px; --r-md: 20px; --r-sm: 18px; --r-xs: 14px;
+}
+:root[data-skin='glass'] body:not(.has-bg) {
+  background: radial-gradient(circle at 18% 18%, #ff8a5b, transparent 42%), radial-gradient(circle at 82% 26%, #4fc3ff, transparent 42%),
+    radial-gradient(circle at 50% 92%, #8a5bff, transparent 48%), radial-gradient(circle at 10% 85%, #ff5bb0, transparent 35%), #1b1440;
+  background-attachment: fixed;
+}
+/* Glass: strong blur, a lit edge at the top, a faint one below. */
+:root[data-skin='glass'] .card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.07));
+  backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 0 -1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
+}
+:root[data-skin='glass'] .modal, :root[data-skin='glass'] .board-menu, :root[data-skin='glass'] .search .panel { --surface-solid: rgba(43, 33, 96, 0.92); }
+:root[data-skin='glass'] .stat { border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.12); }
+:root[data-skin='glass'] button {
+  border-radius: 999px; background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-skin='glass'] button.ghost { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-skin='glass'] button.primary { background: rgba(100, 210, 255, 0.85); border-color: rgba(255, 255, 255, 0.6); color: #04223a; }
+:root[data-skin='glass'] input, :root[data-skin='glass'] select, :root[data-skin='glass'] textarea { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+:root[data-skin='glass'] input::placeholder { color: rgba(255, 255, 255, 0.75); }
+:root[data-skin='glass'] .alerts { color: #fff3b0; background: rgba(40, 20, 0, 0.25); }
+:root[data-skin='glass'] .dot.up { box-shadow: 0 0 8px var(--ok); }
+/* Icon tiles look like apps in a dock. */
+:root[data-skin='glass'] .tile.compact { border-radius: 24px; }
+
 /* ---------- Seasons ("Saison-Deko") ----------
    Palettes for the "whole theme" mode; the decoration rules below work on any
    theme via data-season. The moving effects live in SeasonFx.svelte. */

@@ -21,6 +21,8 @@ export const THEMES = [
   { id: 'hexer', name: 'Hexer', group: 'fun', mode: 'dark', accent: '#c9a45c', skin: 'hexer', preview: ['#14110d', '#24201a', '#c9a45c', '#e8dcc0'] },
   { id: 'mmo', name: 'Gildenhalle', group: 'fun', mode: 'dark', accent: '#a335ee', skin: 'mmo', preview: ['#0d1620', '#14222e', '#c8a24a', '#ffd36b'] },
   { id: 'halloween', name: 'Halloween', group: 'fun', mode: 'dark', accent: '#ff7a1a', skin: 'halloween', preview: ['#140a1f', '#22112e', '#ff7a1a', '#b48cff'] },
+  { id: 'studio', name: 'Studio', group: 'fun', mode: 'light', accent: '#0a84ff', skin: 'studio', preview: ['#8fa8e8', '#f6f6f8', '#0a84ff', '#1d1d1f'] },
+  { id: 'glass', name: 'Flüssigglas', group: 'fun', mode: 'dark', accent: '#64d2ff', skin: 'glass', preview: ['#3b2a7a', '#8f86c9', '#64d2ff', '#ffffff'] },
 ];
 
 // Season themes: only used by the seasonal decoration ("Saison-Deko"), not offered in the picker.

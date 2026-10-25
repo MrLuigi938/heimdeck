@@ -193,13 +193,16 @@
   // A newer release that is out for more than three days: a red dot on the
   // settings button, and once per browser session a hint for five seconds.
   const STALE_DAYS = 3;
-  let updateStale = $derived(!!data?.update?.published && Date.now() - Date.parse(data.update.published) > STALE_DAYS * 86400e3);
+  // ?updatehint in the address shows dot and hint right away, to try them out
+  // (only when a newer version is actually there).
+  const forceHint = new URLSearchParams(location.search).has('updatehint');
+  let updateStale = $derived(!!data?.update?.published && (forceHint || Date.now() - Date.parse(data.update.published) > STALE_DAYS * 86400e3));
   let updateBubble = $state(false);
   $effect(() => {
     if (!updateStale) return;
     const key = 'heimdeck-update-hint';
     try {
-      if (sessionStorage.getItem(key) === data.update.version) return;
+      if (!forceHint && sessionStorage.getItem(key) === data.update.version) return;
       sessionStorage.setItem(key, data.update.version);
     } catch {
       /* private mode: show it anyway */
@@ -611,7 +614,8 @@
 {/if}
 
 <style>
-  .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; }
+  /* Its own layer above the seasonal effects, which run behind the tiles. */
+  .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; position: relative; z-index: 1; }
   /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
   .top { display: grid; grid-template-columns: 1fr minmax(0, 620px) 1fr; gap: 16px; align-items: center; position: relative; z-index: 30; }
   /* The brand block (with the dashboard menu) sits above the icons and search next to it. */
