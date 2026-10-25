@@ -16,7 +16,7 @@
   <a href="README.md">English</a> · <b>Deutsch</b>
 </p>
 
-![Heimdeck-Dashboard](docs/images/dashboard-de.jpg)
+![Heimdeck-Dashboard](docs/images/dashboard-de.webp)
 <p align="center"><sub>Screenshot mit Demo-Daten</sub></p>
 
 ## Das kann Heimdeck
@@ -25,7 +25,8 @@
 - **Findet deine Dienste** – liest deine Docker-Container und (wenn verbunden) deine Proxmox-VMs und LXC-Container aus und schlägt Kacheln mit Icon, Adresse und Dienst-Typ vor.
 - **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss, Anruflisten und mehr für mehr als 40 Dienste. Pro Kachel wählbar, welche Werte sie zeigt.
 - **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Smart-Home-Geräte in Home Assistant, ioBroker, Shelly oder der FRITZ!Box schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Webhooks aufrufen …
-- **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld. Dazu weitere Tastenkürzel, alle änderbar.
+- **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld: als großes Fenster mit Filtern, Vorschau und Tastatursteuerung, als Spalte pro Dienst oder als kompakte Liste. Dazu weitere Tastenkürzel, alle änderbar.
+- **Themes** – 21 Stück: klassische Paletten, verspielte wie Neon City, Luna 2001, Studio oder Flüssigglas und Festtags-Themes für Silvester, Ostern, Halloween, Advent und Weihnachten, die sich zu ihren Tagen selbst einschalten – mit Feuerwerk, Schnee oder Fledermäusen hinter den Kacheln. Dazu Ecken, Glas- oder massive Kacheln, Schrift und Abstände; pro Dashboard ein eigenes Theme.
 - **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy, Telegram oder Browser gemeldet.
 - **Zuhause oder unterwegs** – jede Kachel kann eine lokale und eine öffentliche Adresse haben; Heimdeck nimmt automatisch die richtige.
 - **Eigene API und Webhooks** – jede JSON-Schnittstelle wird zur Live-Kachel mit Werten, Liste und Knöpfen, oder Skripte schicken Meldungen an eine Kachel.
@@ -34,12 +35,23 @@
 - **Deutsch und Englisch**, sicher von Haus aus (Passwörter mit bcrypt, API-Keys mit AES-256 verschlüsselt und nie im Browser), mit Debug-Modus, wenn etwas nicht klappt.
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).
 
+![Dasselbe Dashboard in sechs Themes](docs/images/themes.webp)
+<p align="center"><sub>Dasselbe Dashboard in Heimdeck Dunkel, Studio, Flüssigglas, Neon City, Luna 2001 und Halloween</sub></p>
+
 <details>
 <summary><b>Weitere Screenshots</b></summary>
 
-**Eine Suche über alle Dienste** (Taste `/`)
+**Eine Suche über alle Dienste** (Taste `/`) – Filter, Tastatursteuerung und eine Vorschau mit den Knöpfen des Treffers
 
 ![Suche](docs/images/search.webp)
+
+**Einstellungen** – Seitenleiste mit Bereichen, eigene Suche, alles wird sofort gespeichert
+
+![Einstellungen](docs/images/settings.webp)
+
+**Auf dem Handy** – das freie Raster fließt: Kacheln werden so hoch wie nötig, Links zu Icons
+
+<p align="center"><img src="docs/images/phone.webp" width="320" alt="Heimdeck auf dem Handy"></p>
 
 **Ein komplettes Dashboard** mit Smart Home, Netzwerk, Schnellzugriff und der Verfügbarkeits-Übersicht
 

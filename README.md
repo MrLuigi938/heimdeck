@@ -25,7 +25,8 @@
 - **Finds your services** – reads your Docker containers and (once connected) your Proxmox VMs and LXC containers and suggests tiles with icon, address and service type.
 - **Live data** – download queues, active streams, pending requests, broken indexers, energy flow, call lists and more for more than 40 services. Choose per tile which values it shows.
 - **Actions** – approve Jellyseerr requests, pause SABnzbd or AdGuard, switch the evcc charge mode, toggle Home Assistant, ioBroker, Shelly or FRITZ!Box smart-home devices, switch WLED presets, restart UniFi devices, call webhooks …
-- **One search** (press `/`) – tiles, media libraries, documents, photos, games, files, smart-home devices, DNS queries and more in a single search box. More keyboard shortcuts, all changeable.
+- **One search** (press `/`) – tiles, media libraries, documents, photos, games, files, smart-home devices, DNS queries and more in a single search box: as a large window with filters, preview and keyboard control, as one column per service or as a compact list. More keyboard shortcuts, all changeable.
+- **Themes** – 21 of them: classic palettes, playful ones like Neon City, Luna 2001, Studio or Fluid Glass, and festive themes for New Year's Eve, Easter, Halloween, Advent and Christmas that switch themselves on for their days, with fireworks, snow or bats behind the tiles. Corners, glass or solid tiles, font and spacing on top; a theme of its own per dashboard.
 - **Uptime and alerts** – every service is checked once a minute, with a 24 h / 3 day history. Outages are reported via Discord, ntfy, Telegram or browser notifications.
 - **Home or away** – each tile can have a local and a public address; Heimdeck picks the right one automatically.
 - **Custom API and webhook tiles** – turn any JSON endpoint into a live tile with values, a list and buttons, or let scripts post messages to a tile.
@@ -34,12 +35,23 @@
 - **English and German**, secure by default (bcrypt passwords, AES-256 encrypted API keys that never reach the browser), with a debug mode when something does not work.
 - **One small image** for amd64 and arm64 (Raspberry Pi, NAS).
 
+![The same dashboard in six themes](docs/images/themes.webp)
+<p align="center"><sub>The same dashboard in Heimdeck Dark, Studio, Fluid Glass, Neon City, Luna 2001 and Halloween</sub></p>
+
 <details>
 <summary><b>More screenshots</b></summary>
 
-**Search across all services** (press `/`)
+**Search across all services** (press `/`) – filters, keyboard control and a preview with the hit's buttons
 
 ![Search](docs/images/search.webp)
+
+**Settings** – a sidebar with areas, a search of its own, everything saved right away
+
+![Settings](docs/images/settings.webp)
+
+**On the phone** – the free grid flows: tiles take the height they need, links become icons
+
+<p align="center"><img src="docs/images/phone.webp" width="320" alt="Heimdeck on a phone"></p>
 
 **A full dashboard** with smart home, network, quick links and the availability overview
 
