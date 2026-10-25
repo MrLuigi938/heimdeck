@@ -459,6 +459,21 @@ export const en = {
   'Studio': 'Studio',
   'Flüssigglas': 'Fluid Glass',
 
+  // festive themes
+  'Festtage': 'Festive days',
+  'Festtage automatisch zur passenden Zeit': 'Festive days automatically at the right time',
+  'Zur Zeit verwenden als': 'Use during the days as',
+  'Deko auf meinem Theme': 'decoration on my theme',
+  'ganzes Theme': 'whole theme',
+  'Effekte': 'Effects',
+  'an (hinter den Kacheln)': 'on (behind the tiles)',
+  'aus': 'off',
+  'automatisch': 'automatically',
+  'Silvester': 'New Year’s Eve',
+  'Erst „Festtage automatisch“ einschalten': 'Turn on “festive days automatically” first',
+  'Klick auf eine Karte: dieses Theme jetzt verwenden – Festtage auch außerhalb ihrer Zeit. „automatisch“: zur passenden Zeit von selbst ein- und danach wieder ausschalten. Bewegte Effekte entfallen, wenn im System „Bewegung reduzieren“ eingeschaltet ist.':
+    'Click a card: use this theme now – festive ones outside their days too. “automatically”: switch on by itself at the right time and off again afterwards. Moving effects are left out when “reduce motion” is on in your system.',
+
   // seasonal decoration
   'Saison-Deko': 'Seasonal decoration',
   'automatisch einschalten': 'turn on automatically',

@@ -40,20 +40,34 @@
       timers.push(setInterval(flock, 15000));
     }
     if (season === 'newyear') {
-      const colors = ['#f5c84c', '#ff6b7a', '#7cc8ff', '#b693ff', '#7ee0a1'];
+      // A rocket climbs, then bursts into two rings of streaks that fall with
+      // gravity and fade; now and then a slow golden "willow" instead.
+      const colors = ['#f5c84c', '#ff6b7a', '#7cc8ff', '#b693ff', '#7ee0a1', '#ffffff'];
+      const pick = () => colors[Math.floor(rnd(0, colors.length))];
       const burst = () => {
         const id = next++;
-        const color = colors[Math.floor(rnd(0, colors.length))];
-        bursts.push({ id, x: rnd(10, 90), y: rnd(8, 40), color, sparks: many(16, (i) => ({ a: (i / 16) * Math.PI * 2, r: rnd(60, 110) })) });
-        later(1600, () => (bursts = bursts.filter((b) => b.id !== id)));
+        const willow = Math.random() < 0.25;
+        const [c1, c2] = willow ? ['#f5c84c', '#ffe7a3'] : [pick(), pick()];
+        const y = rnd(5, 24); // high up, where the sky over the header is free
+        const rise = rnd(0.8, 1.1);
+        const ring = (n, r0, r1, color, len) =>
+          many(n, (i) => ({ deg: (i / n) * 360 + rnd(-4, 4), r: rnd(r0, r1), color, len: rnd(len * 0.7, len) }));
+        const sparks = willow ? ring(34, 100, 160, c1, 34) : [...ring(28, 120, 180, c1, 24), ...ring(14, 55, 90, c2, 16)];
+        bursts.push({ id, x: rnd(12, 88), y, rise, willow, sparks, dur: willow ? 2.8 : 1.6, c: c1 });
+        later((rise + (willow ? 3 : 1.9)) * 1000, () => (bursts = bursts.filter((b) => b.id !== id)));
       };
-      burst();
-      timers.push(setInterval(burst, 2400));
+      later(300, burst);
+      timers.push(setInterval(() => {
+        burst();
+        if (Math.random() < 0.3) later(rnd(250, 600), burst); // sometimes two at once
+      }, 2000));
     }
     return () => timers.forEach((t) => (clearTimeout(t), clearInterval(t)));
   }
 
   const candles = adventCandles();
+  // New Year's starry sky, upper part of the screen; it twinkles unless motion is reduced.
+  const stars = many(80, () => ({ x: rnd(0, 100), y: rnd(0, 75), size: rnd(1, 2.6), delay: -rnd(0, 4), dur: rnd(2.5, 5) }));
 </script>
 
 <div class="fx" class:still aria-hidden="true">
@@ -95,18 +109,23 @@
   {/if}
 
   {#if season === 'newyear'}
+    {#each stars as st}
+      <span class="star" style:left="{st.x}%" style:top="{st.y}%" style:width="{st.size}px" style:height="{st.size}px"
+        style:animation-duration="{st.dur}s" style:animation-delay="{st.delay}s"></span>
+    {/each}
     {#each bursts as b (b.id)}
-      <div class="burst" style:left="{b.x}%" style:top="{b.y}%" style:--c={b.color}>
+      <div class="burst" class:willow={b.willow} style:left="{b.x}%" style:top="{b.y}%" style:--rise="{b.rise}s" style:--rise-from="{100 - b.y}vh" style:--dur="{b.dur}s" style:--c={b.c}>
+        <span class="rocket"></span>
+        <span class="flash"></span>
         {#each b.sparks as s}
-          <span class="spark" style:--dx="{Math.cos(s.a) * s.r}px" style:--dy="{Math.sin(s.a) * s.r}px"></span>
+          <span class="spark" style:--deg="{s.deg}deg" style:--r="{s.r}px" style:--len="{s.len}px" style:--c={s.color}></span>
         {/each}
       </div>
     {/each}
   {/if}
 
-  {#if season === 'easter'}
-    {#if !still}<span class="bunny">🐇</span>{/if}
-    <div class="eggs"><span>🥚</span><span style="background:#ffd6e8"></span><span style="background:#d6f0ff"></span><span style="background:#fff1b8"></span></div>
+  {#if season === 'easter' && !still}
+    <span class="bunny">🐇</span>
   {/if}
 
   {#if season === 'summer' && !still}
@@ -149,10 +168,36 @@
   .bat { fill: #120a18; filter: drop-shadow(0 0 2px rgba(255, 140, 40, .35)); animation: flap .28s ease-in-out infinite alternate; }
   @keyframes flap { to { transform: scaleY(.45); } }
 
-  /* Fireworks */
+  /* Starry sky for New Year's Eve */
+  .star { position: absolute; border-radius: 50%; background: #fff; box-shadow: 0 0 4px rgba(255, 255, 255, .8); animation: twinkle-star ease-in-out infinite alternate; }
+  @keyframes twinkle-star { from { opacity: .25; } to { opacity: .95; } }
+  .still .star { animation: none; opacity: .7; }
+
+  /* Fireworks: rocket climbs, flash, two rings of falling streaks */
   .burst { position: absolute; width: 0; height: 0; }
-  .spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); animation: spark 1.5s ease-out forwards; }
-  @keyframes spark { 0% { transform: translate(0, 0); opacity: 1; } 80% { opacity: .9; } 100% { transform: translate(var(--dx), calc(var(--dy) + 40px)); opacity: 0; } }
+  .rocket { position: absolute; left: -1.5px; width: 3px; height: 14px; border-radius: 2px; background: linear-gradient(transparent, #fff6d0);
+    box-shadow: 0 0 6px #ffe7a3; animation: rocket var(--rise) cubic-bezier(.25, .7, .4, 1) forwards; }
+  @keyframes rocket { from { transform: translateY(var(--rise-from)); opacity: 1; } 92% { opacity: 1; } to { transform: translateY(0); opacity: 0; } }
+  .flash { position: absolute; left: -70px; top: -70px; width: 140px; height: 140px; border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--c) 70%, #fff) 0, transparent 65%); opacity: 0; animation: flash .5s ease-out var(--rise) both; }
+  @keyframes flash { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.4); } }
+  /* A streak: bright at its outer tip, fading back towards the centre. */
+  .spark { position: absolute; left: -1.5px; top: 0; width: 3px; height: var(--len); border-radius: 3px; transform-origin: 50% 0;
+    background: linear-gradient(transparent, var(--c) 70%, #fff); box-shadow: 0 0 8px var(--c), 0 0 2px #fff; opacity: 0;
+    animation: spark var(--dur) cubic-bezier(.12, .7, .35, 1) var(--rise) both; }
+  @keyframes spark {
+    0% { transform: rotate(var(--deg)) translateY(0) scaleY(.2); opacity: 1; }
+    55% { opacity: 1; }
+    100% { transform: translateY(46px) rotate(var(--deg)) translateY(var(--r)) scaleY(1); opacity: 0; }
+  }
+  /* Willow: golden, slower, hanging down further */
+  .willow .spark { animation-timing-function: cubic-bezier(.1, .6, .3, 1); }
+  .willow .spark { animation-name: spark-willow; }
+  @keyframes spark-willow {
+    0% { transform: rotate(var(--deg)) translateY(0) scaleY(.2); opacity: 1; }
+    60% { opacity: .95; }
+    100% { transform: translateY(120px) rotate(var(--deg)) translateY(var(--r)) scaleY(1.4); opacity: 0; }
+  }
 
   /* Easter: a bunny hops along the bottom, eggs in the corner */
   /* The bunny emoji looks to the left; mirrored, it looks where it hops. */
@@ -160,8 +205,6 @@
   .bunny { position: absolute; bottom: 10px; left: -60px; font-size: 34px;
     animation-name: hop-across, hop; animation-duration: 22s, .55s; animation-timing-function: linear, ease-out; animation-iteration-count: infinite, infinite; animation-direction: normal, alternate; }
   @keyframes hop { to { margin-bottom: 18px; } }
-  .eggs { position: absolute; right: 18px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; font-size: 24px; }
-  .eggs span:not(:first-child) { width: 18px; height: 24px; border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%; border: 2px solid rgba(0, 0, 0, .08); }
 
   /* Summer: soap bubbles rising */
   .bubble { position: absolute; bottom: -50px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .7);

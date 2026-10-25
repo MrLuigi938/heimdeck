@@ -18,7 +18,6 @@
   import Modal from './Modal.svelte';
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
   import { applyTheme, activeSeason } from './themes.js';
-  import { seasonPreview } from './season.svelte.js';
   import SeasonFx from './SeasonFx.svelte';
 
   let data = $state(null);
@@ -187,8 +186,8 @@
     return () => media.removeEventListener('change', apply);
   });
 
-  // The season of the seasonal decoration (or the one previewed in the settings).
-  let season = $derived((seasonPreview.id, activeSeason(settings)?.id || ''));
+  // The festive season in effect; its moving effects can be turned off (setting seasonalFx).
+  let season = $derived(settings.seasonalFx === 'false' ? '' : activeSeason(settings, board?.theme)?.id || '');
 
   // A newer release that is out for more than three days: a red dot on the
   // settings button, and once per browser session a hint for five seconds.

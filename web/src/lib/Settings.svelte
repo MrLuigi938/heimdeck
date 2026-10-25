@@ -9,7 +9,6 @@
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
   import { THEMES, SEASONS } from './themes.js';
-  import { seasonPreview } from './season.svelte.js';
 
   // section: the area to open first, e.g. "notify".
   let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
@@ -393,48 +392,53 @@
         <h3>{t('Aussehen')}</h3>
         <div class="field">
           <span>{t('Theme')}</span>
-          {#each [['classic', 'Klassisch'], ['fun', 'Verspielt']] as [group, label]}
+          {#each [['classic', 'Klassisch'], ['fun', 'Verspielt'], ['festive', 'Festtage']] as [group, label]}
             <div class="theme-group">{t(label)}</div>
+            {#if group === 'festive'}
+              <!-- Festive themes can be picked like any other – and switch themselves on for their days. -->
+              <div class="festive-opts">
+                <label class="check"><input type="checkbox" checked={s.seasonal === 'true'} onchange={setFlag('seasonal')} /> {t('Festtage automatisch zur passenden Zeit')}</label>
+                {#if s.seasonal === 'true'}
+                  <div class="opt-row">
+                    <span class="muted">{t('Zur Zeit verwenden als')}</span>
+                    <div class="seg2" role="radiogroup" aria-label={t('Zur Zeit verwenden als')}>
+                      <button class:on={(s.seasonalMode || 'deco') === 'deco'} role="radio" aria-checked={(s.seasonalMode || 'deco') === 'deco'} onclick={() => saveSetting({ seasonalMode: 'deco' })}>{t('Deko auf meinem Theme')}</button>
+                      <button class:on={s.seasonalMode === 'theme'} role="radio" aria-checked={s.seasonalMode === 'theme'} onclick={() => saveSetting({ seasonalMode: 'theme' })}>{t('ganzes Theme')}</button>
+                    </div>
+                  </div>
+                {/if}
+                <div class="opt-row">
+                  <span class="muted">{t('Effekte')}</span>
+                  <div class="seg2" role="radiogroup" aria-label={t('Effekte')}>
+                    <button class:on={s.seasonalFx !== 'false'} role="radio" aria-checked={s.seasonalFx !== 'false'} onclick={() => saveSetting({ seasonalFx: 'true' })}>{t('an (hinter den Kacheln)')}</button>
+                    <button class:on={s.seasonalFx === 'false'} role="radio" aria-checked={s.seasonalFx === 'false'} onclick={() => saveSetting({ seasonalFx: 'false' })}>{t('aus')}</button>
+                  </div>
+                </div>
+              </div>
+            {/if}
             <div class="themes">
               {#each THEMES.filter((th) => th.group === group) as th (th.id)}
                 {@const [bg, surface, accent, text] = th.preview}
-                <button class="theme" class:active={(s.theme || 'auto') === th.id} onclick={() => pickTheme(th.id)} aria-pressed={(s.theme || 'auto') === th.id}>
-                  <span class="swatch-preview" style="background:{th.id === 'auto' ? `linear-gradient(135deg, ${bg} 50%, ${surface} 50%)` : bg}">
-                    <span class="mini" style="background:{surface};color:{text}"><span class="mini-line" style="background:{text}"></span><span class="mini-dot" style="background:{accent}"></span></span>
-                  </span>
-                  <span class="theme-name">{t(th.name)}</span>
-                </button>
+                {@const se = SEASONS.find((x) => x.id === th.id)}
+                <div class="theme-cell">
+                  <button class="theme" class:active={(s.theme || 'auto') === th.id} onclick={() => pickTheme(th.id)} aria-pressed={(s.theme || 'auto') === th.id}>
+                    <span class="swatch-preview" style="background:{th.id === 'auto' ? `linear-gradient(135deg, ${bg} 50%, ${surface} 50%)` : bg}">
+                      <span class="mini" style="background:{surface};color:{text}"><span class="mini-line" style="background:{text}"></span><span class="mini-dot" style="background:{accent}"></span></span>
+                    </span>
+                    <span class="theme-name">{t(th.name)}</span>
+                    {#if se}<span class="theme-when">{t(se.when)}</span>{/if}
+                  </button>
+                  {#if se}
+                    <label class="auto" class:off={s.seasonal !== 'true'} title={s.seasonal !== 'true' ? t('Erst „Festtage automatisch“ einschalten') : ''}>
+                      <input type="checkbox" disabled={s.seasonal !== 'true'} checked={!seasonOff.includes(se.id)} onchange={(e) => toggleSeason(se.id, e.target.checked)} />
+                      {t('automatisch')}
+                    </label>
+                  {/if}
+                </div>
               {/each}
             </div>
           {/each}
-        </div>
-        <!-- Part of "Appearance": decoration that comes and goes with the seasons. -->
-        <div class="season-box">
-          <div class="season-head">
-            <span class="season-title">🎄 {t('Saison-Deko')}</span>
-            <label class="check"><input type="checkbox" checked={s.seasonal === 'true'} onchange={setFlag('seasonal')} /> {t('automatisch einschalten')}</label>
-          </div>
-          <p class="help">{t('Zu Silvester, Ostern, Sommeranfang, Halloween, Advent und Weihnachten schmückt sich Heimdeck von selbst – und räumt danach wieder auf.')}</p>
-          {#if s.seasonal === 'true'}
-            <div class="seg2" role="radiogroup" aria-label={t('Wie stark')}>
-              <button class:on={(s.seasonalMode || 'deco') === 'deco'} role="radio" aria-checked={(s.seasonalMode || 'deco') === 'deco'} onclick={() => saveSetting({ seasonalMode: 'deco' })}>{t('Nur Deko – dein Theme bleibt')}</button>
-              <button class:on={s.seasonalMode === 'theme'} role="radio" aria-checked={s.seasonalMode === 'theme'} onclick={() => saveSetting({ seasonalMode: 'theme' })}>{t('Ganzes Saison-Theme')}</button>
-            </div>
-          {/if}
-          <div class="seasons">
-            {#each SEASONS as se (se.id)}
-              <div class="season-row">
-                <label class="check">
-                  <input type="checkbox" disabled={s.seasonal !== 'true'} checked={!seasonOff.includes(se.id)} onchange={(e) => toggleSeason(se.id, e.target.checked)} />
-                  <span>{t(se.name)} <span class="muted small">· {t(se.when)}</span></span>
-                </label>
-                <button class="small ghost" class:on={seasonPreview.id === se.id} onclick={() => (seasonPreview.id = seasonPreview.id === se.id ? '' : se.id)}>
-                  {seasonPreview.id === se.id ? t('Vorschau beenden') : t('Ansehen')}
-                </button>
-              </div>
-            {/each}
-          </div>
-          <p class="help">{t('„Ansehen“ zeigt die Deko sofort, nur in diesem Tab und bis zum Neuladen. Bewegte Effekte entfallen, wenn im System „Bewegung reduzieren“ eingeschaltet ist.')}</p>
+          <p class="help">{t('Klick auf eine Karte: dieses Theme jetzt verwenden – Festtage auch außerhalb ihrer Zeit. „automatisch“: zur passenden Zeit von selbst ein- und danach wieder ausschalten. Bewegte Effekte entfallen, wenn im System „Bewegung reduzieren“ eingeschaltet ist.')}</p>
         </div>
         <div class="grid4">
           <label class="field">
@@ -776,19 +780,16 @@
   .nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 500; }
   .nav-icon { width: 20px; text-align: center; flex: none; }
   .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Seasonal decoration block inside "Appearance". */
-  .season-box { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
-  .season-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .season-title { font-weight: 600; }
-  .season-head .check { margin-left: auto; }
-  .season-box .help { margin: 0; }
-  .seg2 { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; justify-self: start; }
-  .seg2 button { border: 0; border-radius: 0; background: transparent; padding: 6px 12px; font-size: 13px; }
+  /* Festive themes: options above the cards, an "automatically" switch under each card. */
+  .festive-opts { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+  .opt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 26px; font-size: 13px; }
+  .seg2 { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; }
+  .seg2 button { border: 0; border-radius: 0; background: transparent; padding: 5px 11px; font-size: 13px; }
   .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 500; }
-  .seasons { display: grid; gap: 2px; }
-  .season-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-  .season-row .small.ghost.on { color: var(--accent); }
-  .small { font-size: 12px; }
+  .theme-cell { display: grid; gap: 4px; align-content: start; }
+  .theme-when { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-left: 4px; cursor: pointer; }
+  .auto.off { opacity: .55; cursor: default; }  .small { font-size: 12px; }
   .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
   /* Info: version card, links and system details. */
   .version-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }

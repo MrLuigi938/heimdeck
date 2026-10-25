@@ -1,5 +1,3 @@
-import { seasonPreview } from './season.svelte.js';
-
 // Themes: a palette (colours in themes.css) and for the playful ones a skin
 // that also changes shapes and decoration. Neither changes the layout.
 // The setting "theme" holds the id; "auto" follows the system (Heimdeck
@@ -20,21 +18,19 @@ export const THEMES = [
   { id: 'aero', name: 'Aero-Glas', group: 'fun', mode: 'dark', accent: '#4aa3e8', skin: 'aero', preview: ['#123f66', '#7fb0d8', '#f5f8fb', '#ffffff'] },
   { id: 'hexer', name: 'Hexer', group: 'fun', mode: 'dark', accent: '#c9a45c', skin: 'hexer', preview: ['#14110d', '#24201a', '#c9a45c', '#e8dcc0'] },
   { id: 'mmo', name: 'Gildenhalle', group: 'fun', mode: 'dark', accent: '#a335ee', skin: 'mmo', preview: ['#0d1620', '#14222e', '#c8a24a', '#ffd36b'] },
-  { id: 'halloween', name: 'Halloween', group: 'fun', mode: 'dark', accent: '#ff7a1a', skin: 'halloween', preview: ['#140a1f', '#22112e', '#ff7a1a', '#b48cff'] },
   { id: 'studio', name: 'Studio', group: 'fun', mode: 'light', accent: '#0a84ff', skin: 'studio', preview: ['#8fa8e8', '#f6f6f8', '#0a84ff', '#1d1d1f'] },
   { id: 'glass', name: 'Flüssigglas', group: 'fun', mode: 'dark', accent: '#64d2ff', skin: 'glass', preview: ['#3b2a7a', '#8f86c9', '#64d2ff', '#ffffff'] },
+  // Festive themes: like any other theme, and they also switch themselves on
+  // for their days (see SEASONS). They bring decoration and effects along.
+  { id: 'newyear', name: 'Silvester', group: 'festive', mode: 'dark', accent: '#f5c84c', skin: 'newyear', preview: ['#0b1026', '#1e2650', '#f5c84c', '#f4f1ff'] },
+  { id: 'easter', name: 'Ostern', group: 'festive', mode: 'light', accent: '#9b6fd6', skin: 'easter', preview: ['#f6f3ff', '#ffffff', '#9b6fd6', '#2c2540'] },
+  { id: 'summer', name: 'Sommeranfang', group: 'festive', mode: 'light', accent: '#f08a24', skin: 'summer', preview: ['#ffeccf', '#ffffff', '#f08a24', '#3a2a14'] },
+  { id: 'halloween', name: 'Halloween', group: 'festive', mode: 'dark', accent: '#ff7a1a', skin: 'halloween', preview: ['#140a1f', '#22112e', '#ff7a1a', '#b48cff'] },
+  { id: 'advent', name: 'Advent', group: 'festive', mode: 'dark', accent: '#e8b04b', skin: 'advent', preview: ['#0e1a14', '#1c3226', '#e8b04b', '#f3ecd8'] },
+  { id: 'christmas', name: 'Weihnachten', group: 'festive', mode: 'dark', accent: '#e5484d', skin: 'christmas', preview: ['#1a0d10', '#3a1a1e', '#e5484d', '#fbf1e6'] },
 ];
 
-// Season themes: only used by the seasonal decoration ("Saison-Deko"), not offered in the picker.
-const SEASON_THEMES = [
-  { id: 'newyear', name: 'Silvester und Neujahr', mode: 'dark', accent: '#f5c84c', skin: 'newyear' },
-  { id: 'easter', name: 'Ostern', mode: 'light', accent: '#9b6fd6', skin: 'easter' },
-  { id: 'summer', name: 'Sommeranfang', mode: 'light', accent: '#f08a24', skin: 'summer' },
-  { id: 'advent', name: 'Advent', mode: 'dark', accent: '#e8b04b', skin: 'advent' },
-  { id: 'christmas', name: 'Weihnachten', mode: 'dark', accent: '#e5484d', skin: 'christmas' },
-];
-
-export const themeById = (id) => THEMES.find((t) => t.id === id) || SEASON_THEMES.find((t) => t.id === id) || THEMES[0];
+export const themeById = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
 
 // ---- Seasonal decoration ----
 // Each season knows when it is on. Easter and the first Sunday of Advent move
@@ -57,7 +53,7 @@ const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const between = (now, from, to) => day(now) >= day(from) && day(now) <= day(to);
 
 export const SEASONS = [
-  { id: 'newyear', name: 'Silvester und Neujahr', when: '28. Dez. – 2. Jan.', on: (n) => (n.getMonth() === 11 && n.getDate() >= 28) || (n.getMonth() === 0 && n.getDate() <= 2) },
+  { id: 'newyear', name: 'Silvester', when: '28. Dez. – 2. Jan.', on: (n) => (n.getMonth() === 11 && n.getDate() >= 28) || (n.getMonth() === 0 && n.getDate() <= 2) },
   { id: 'easter', name: 'Ostern', when: 'Gründonnerstag – Ostermontag', on: (n) => { const e = easterSunday(n.getFullYear()); return between(n, new Date(e.getFullYear(), e.getMonth(), e.getDate() - 3), new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1)); } },
   { id: 'summer', name: 'Sommeranfang', when: '20. – 23. Juni', on: (n) => n.getMonth() === 5 && n.getDate() >= 20 && n.getDate() <= 23 },
   { id: 'halloween', name: 'Halloween', when: 'ganzer Oktober', on: (n) => n.getMonth() === 9 },
@@ -71,23 +67,26 @@ export function adventCandles(now = new Date()) {
   return Math.min(4, Math.max(1, Math.floor((day(now) - day(first)) / (7 * 86400e3)) + 1));
 }
 
-// The season in effect: the preview from the settings, else the calendar –
-// when the seasonal decoration is on and the season is not switched off.
-export function activeSeason(settings, now = new Date()) {
-  if (seasonPreview.id) return SEASONS.find((s) => s.id === seasonPreview.id) || null;
+// The season in effect – its decoration and effects:
+// - a festive theme picked for good (globally or for this dashboard), or else
+// - with "festive days automatically" on, the one whose days these are,
+//   unless its own "automatically" switch is off.
+export function activeSeason(settings, boardTheme = '', now = new Date()) {
+  const chosen = themeById(boardTheme || settings?.theme || 'auto');
+  if (chosen.group === 'festive') return SEASONS.find((s) => s.id === chosen.id) || null;
   if (settings?.seasonal !== 'true') return null;
   const off = (settings.seasonalOff || '').split(',');
   return SEASONS.find((s) => !off.includes(s.id) && s.on(now)) || null;
 }
 
-// The theme in effect: the dashboard's own, else the global one; with the
-// seasonal decoration set to "whole theme", the season's theme for its days.
+// The theme in effect: the dashboard's own, else the global one; on festive
+// days with "whole theme", the festive theme for those days.
 export function activeTheme(settings, boardTheme = '', now = new Date()) {
-  const season = activeSeason(settings, now);
-  if (season && settings?.seasonalMode === 'theme') return themeById(season.id);
-  return themeById(boardTheme || settings?.theme || 'auto');
+  const chosen = themeById(boardTheme || settings?.theme || 'auto');
+  const season = activeSeason(settings, boardTheme, now);
+  if (season && chosen.group !== 'festive' && settings?.seasonalMode === 'theme') return themeById(season.id);
+  return chosen;
 }
-
 // applyTheme sets everything on <html>: data-theme (dark/light base),
 // data-palette and data-skin, the style options and the accent colour.
 export function applyTheme(settings, boardTheme = '') {
@@ -103,7 +102,7 @@ export function applyTheme(settings, boardTheme = '') {
   set('font', settings?.font || '');
   set('density', settings?.density || '');
   // The season adds decoration on top of any theme (status symbols, effects).
-  set('season', activeSeason(settings)?.id || '');
+  set('season', activeSeason(settings, boardTheme)?.id || '');
   // An accent of its own beats the theme's; empty = the theme's colour.
   const accent = settings?.accent || theme.accent || '#5b8cff';
   root.style.setProperty('--accent', accent);
