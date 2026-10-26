@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -20,7 +21,7 @@ func init() { register(paperless{}) }
 func (paperless) Def() Definition {
 	return Definition{
 		ID: "paperless", Name: "Paperless-ngx", Icon: "paperless-ngx", Category: "Dokumente",
-		Description: "Anzahl Dokumente, Posteingang, Volltextsuche",
+		Description: "Dokumente, Posteingang mit Vorschaubildern, Korrespondenten, Tags, fehlgeschlagene Importe, Volltextsuche",
 		Fields: []Field{{Key: "apiKey", Label: "API-Token", Type: "password", Required: true, Secret: true,
 			Help: "Profil (oben rechts) → API-Auth-Token"}},
 		HasWidget: true, HasSearch: true, Images: []string{"paperless"}, Port: 8000,
@@ -33,16 +34,82 @@ func (paperless) get(ctx context.Context, in *Instance, path string, q url.Value
 
 func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var st struct {
-		Total int `json:"documents_total"`
-		Inbox int `json:"documents_inbox"`
+		Total          int  `json:"documents_total"`
+		Inbox          int  `json:"documents_inbox"`
+		InboxTag       *int `json:"inbox_tag"`
+		Tags           int  `json:"tag_count"`
+		Correspondents int  `json:"correspondent_count"`
+		DocTypes       int  `json:"document_type_count"`
+		StoragePaths   int  `json:"storage_path_count"`
+		Characters     int  `json:"character_count"`
 	}
 	if err := p.get(ctx, in, "/api/statistics/", nil, &st); err != nil {
 		return nil, err
 	}
-	return &Widget{Stats: []Stat{
+	w := &Widget{Stats: []Stat{
 		{Label: in.T("Dokumente"), Value: in.Num(st.Total)},
 		{Label: in.T("Posteingang"), Value: in.Num(st.Inbox), Tone: toneIf(st.Inbox > 0, "warn")},
-	}}, nil
+		{Label: in.T("Korrespondenten"), Value: in.Num(st.Correspondents)},
+		{Label: in.T("Tags"), Value: in.Num(st.Tags)},
+		{Label: in.T("Dokumenttypen"), Value: in.Num(st.DocTypes)},
+	}}
+	if st.StoragePaths > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Speicherpfade"), Value: in.Num(st.StoragePaths)})
+	}
+	if st.Characters > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Zeichen erkannt"), Value: in.Num(st.Characters)})
+	}
+	// Consumption tasks that failed (e.g. a broken PDF), still to be acknowledged.
+	var tasks []struct {
+		Status       string `json:"status"`
+		TaskFileName string `json:"task_file_name"`
+		Acknowledged bool   `json:"acknowledged"`
+	}
+	if p.get(ctx, in, "/api/tasks/", url.Values{"status": {"FAILURE"}}, &tasks) == nil {
+		failed := 0
+		for _, t := range tasks {
+			if t.Status == "FAILURE" && !t.Acknowledged {
+				failed++
+				if failed <= 3 {
+					w.Alerts = append(w.Alerts, in.T("Import fehlgeschlagen: %s", t.TaskFileName))
+				}
+			}
+		}
+		if failed > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Import-Fehler"), Value: in.Num(failed), Tone: "bad"})
+		}
+	}
+	// The inbox, or else the documents added last, with their thumbnails.
+	var docs struct {
+		Results []struct {
+			ID      int    `json:"id"`
+			Title   string `json:"title"`
+			Created string `json:"created"`
+			Added   string `json:"added"`
+		} `json:"results"`
+	}
+	q := url.Values{"ordering": {"-added"}, "page_size": {"5"}}
+	w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+	if st.Inbox > 0 && st.InboxTag != nil {
+		q.Set("tags__id__all", fmt.Sprint(*st.InboxTag))
+		w.ItemsTitle = in.T("Posteingang")
+	}
+	if p.get(ctx, in, "/api/documents/", q, &docs) == nil {
+		for _, d := range docs.Results {
+			w.Items = append(w.Items, Item{Title: d.Title, Subtitle: in.Date(firstNonEmpty(d.Added, d.Created)),
+				URL: in.Link(fmt.Sprintf("/documents/%d/details", d.ID)), Image: in.Proxy(fmt.Sprintf("/api/documents/%d/thumb/", d.ID))})
+		}
+	}
+	return w, nil
+}
+
+var paperlessThumbRe = regexp.MustCompile(`^/api/documents/\d+/thumb/$`)
+
+func (paperless) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
+	if !paperlessThumbRe.MatchString(path) {
+		return "", nil, in.Errorf("nicht gefunden")
+	}
+	return path, map[string]string{"Authorization": "Token " + in.V("apiKey")}, nil
 }
 
 func (p paperless) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {

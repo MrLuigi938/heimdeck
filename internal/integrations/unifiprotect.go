@@ -97,6 +97,43 @@ func (p unifiProtect) Fetch(ctx context.Context, in *Instance) (*Widget, error) 
 		}
 	}
 	w.Stats = []Stat{{Label: in.T("Kameras online"), Value: fmt.Sprintf("%d/%d", online, len(cams)), Tone: toneIf(online < len(cams), "warn")}}
+	// Sensors (doors, windows, motion), lights and chimes of the same console.
+	var sensors []struct {
+		Name     string `json:"name"`
+		State    string `json:"state"`
+		IsOpened bool   `json:"isOpened"`
+		Battery  *struct {
+			Percentage *float64 `json:"percentage"`
+			IsLow      bool     `json:"isLow"`
+		} `json:"batteryStatus"`
+	}
+	if p.get(ctx, in, "/v1/sensors", &sensors) == nil && len(sensors) > 0 {
+		open := 0
+		for _, s := range sensors {
+			if s.IsOpened {
+				open++
+			}
+			if s.Battery != nil && s.Battery.IsLow {
+				w.Alerts = append(w.Alerts, in.T("Sensor „%s“: Batterie fast leer", s.Name))
+			}
+			if s.State != "" && s.State != "CONNECTED" {
+				w.Alerts = append(w.Alerts, in.T("Sensor „%s“ ist offline", s.Name))
+			}
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Sensoren"), Value: in.Num(len(sensors))}, Stat{Label: in.T("Offen"), Value: in.Num(open), Tone: toneIf(open > 0, "warn")})
+	}
+	for _, kind := range []struct{ path, label string }{{"/v1/lights", "Lichter"}, {"/v1/chimes", "Türgongs"}} {
+		var list []struct{}
+		if p.get(ctx, in, kind.path, &list) == nil && len(list) > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T(kind.label), Value: in.Num(len(list))})
+		}
+	}
+	var info struct {
+		Version string `json:"applicationVersion"`
+	}
+	if p.get(ctx, in, "/v1/meta/info", &info) == nil && info.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: info.Version})
+	}
 	// Offline cameras first, then the rest.
 	sort.SliceStable(cams, func(i, j int) bool { return cams[i].State != "CONNECTED" && cams[j].State == "CONNECTED" })
 	for _, c := range cams[:min(4, len(cams))] {

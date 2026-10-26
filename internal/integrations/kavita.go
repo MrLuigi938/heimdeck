@@ -71,10 +71,14 @@ type kavitaSeries struct {
 func (k kavita) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	w := &Widget{}
 	var st struct {
-		SeriesCount int     `json:"seriesCount"`
-		VolumeCount int     `json:"volumeCount"`
-		TotalFiles  int     `json:"totalFiles"`
-		TotalSize   float64 `json:"totalSize"`
+		SeriesCount      int     `json:"seriesCount"`
+		VolumeCount      int     `json:"volumeCount"`
+		ChapterCount     int     `json:"chapterCount"`
+		TotalFiles       int     `json:"totalFiles"`
+		TotalSize        float64 `json:"totalSize"`
+		TotalGenres      int     `json:"totalGenres"`
+		TotalPeople      int     `json:"totalPeople"`
+		TotalReadingTime float64 `json:"totalReadingTime"` // hours
 	}
 	err := k.call(ctx, in, "GET", "/api/Stats/server/stats", nil, nil, &st)
 	var he *HTTPError
@@ -96,18 +100,39 @@ func (k kavita) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			{Label: in.T("Dateien"), Value: in.Num(st.TotalFiles)},
 			{Label: in.T("Größe"), Value: in.Bytes(st.TotalSize)},
 		}
+		for _, s := range []struct {
+			label string
+			n     int
+		}{{"Kapitel", st.ChapterCount}, {"Genres", st.TotalGenres}, {"Personen", st.TotalPeople}, {"Stunden gelesen", int(st.TotalReadingTime)}} {
+			if s.n > 0 {
+				w.Stats = append(w.Stats, Stat{Label: in.T(s.label), Value: in.Num(s.n)})
+			}
+		}
 	}
 
+	item := func(s kavitaSeries) Item {
+		it := Item{Title: s.Name, Subtitle: s.LibraryName, URL: in.Link(fmt.Sprintf("/library/%d/series/%d", s.LibraryID, s.ID)),
+			Image: in.Proxy("/api/image/series-cover?seriesId=" + strconv.Itoa(s.ID))}
+		if s.Pages > 0 && s.PagesRead > 0 {
+			it.Progress = pct(float64(s.PagesRead) / float64(s.Pages) * 100)
+		}
+		return it
+	}
 	var deck []kavitaSeries
 	q := url.Values{"libraryId": {"0"}, "PageNumber": {"1"}, "PageSize": {"5"}}
 	if err := k.call(ctx, in, "POST", "/api/Series/on-deck", q, map[string]any{}, &deck); err == nil && len(deck) > 0 {
 		w.ItemsTitle = in.T("Weiterlesen")
 		for _, s := range deck {
-			it := Item{Title: s.Name, Subtitle: s.LibraryName, URL: in.Link(fmt.Sprintf("/library/%d/series/%d", s.LibraryID, s.ID))}
-			if s.Pages > 0 {
-				it.Progress = pct(float64(s.PagesRead) / float64(s.Pages) * 100)
-			}
-			w.Items = append(w.Items, it)
+			w.Items = append(w.Items, item(s))
+		}
+		return w, nil
+	}
+	// Nothing started: the newest series.
+	var recent []kavitaSeries
+	if k.call(ctx, in, "POST", "/api/Series/recently-added-v2", url.Values{"PageNumber": {"1"}, "PageSize": {"5"}}, map[string]any{}, &recent) == nil && len(recent) > 0 {
+		w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+		for _, s := range recent {
+			w.Items = append(w.Items, item(s))
 		}
 	}
 	return w, nil

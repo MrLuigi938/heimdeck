@@ -22,7 +22,7 @@ func (immich) Def() Definition {
 		Description: "Fotos, Videos und Speicherplatz, Suche nach Personen und Fotos (auf Wunsch per Beschreibung, z. B. „Strand bei Sonnenuntergang“)",
 		Fields: []Field{
 			{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
-				Help: "Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read (für die Gesamtstatistik als Admin: server.statistics)."},
+				Help: "Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read, album.read (für die Gesamtstatistik, freien Speicher und Hintergrundaufgaben als Admin: server.statistics, server.storage, job.read)."},
 			{Key: "smartSearch", Label: "Fotos nach Inhalt suchen (KI-Suche)", Type: "checkbox",
 				Help: "Findet Fotos per Beschreibung, z. B. „Hund am Strand“. Braucht den Machine-Learning-Container von Immich und zeigt zu fast jedem Suchbegriff ähnliche Fotos. Ohne: Suche nach Personen und Dateinamen."},
 		},
@@ -65,10 +65,12 @@ func (i immich) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		if err := i.call(ctx, in, "GET", "/assets/statistics", nil, nil, &own); err != nil {
 			return nil, err
 		}
-		return &Widget{Stats: []Stat{
+		w := &Widget{Stats: []Stat{
 			{Label: in.T("Fotos"), Value: in.Num(own.Images)},
 			{Label: in.T("Videos"), Value: in.Num(own.Videos)},
-		}}, nil
+		}}
+		i.more(ctx, in, w, false)
+		return w, nil
 	}
 	if err != nil {
 		return nil, err
@@ -78,14 +80,69 @@ func (i immich) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		{Label: in.T("Videos"), Value: in.Num(st.Videos)},
 		{Label: in.T("Speicher"), Value: in.Bytes(st.Usage)},
 	}}
+	i.more(ctx, in, w, true)
 	if len(st.UsageByUser) > 1 {
 		w.ItemsTitle = in.T("Benutzer")
+		w.Items, w.Thumbs = nil, false
 		for _, u := range st.UsageByUser {
 			w.Items = append(w.Items, Item{Title: u.UserName,
 				Subtitle: in.T("%s Fotos, %s Videos", in.Num(u.Photos), in.Num(u.Videos)), Badge: in.Bytes(u.Usage)})
 		}
 	}
 	return w, nil
+}
+
+// more adds what each key may see (albums, people, the newest photos) and,
+// for an admin key, free disk space and the background jobs.
+func (i immich) more(ctx context.Context, in *Instance, w *Widget, admin bool) {
+	var albums []struct{}
+	if i.call(ctx, in, "GET", "/albums", nil, nil, &albums) == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Alben"), Value: in.Num(len(albums))})
+	}
+	var people struct {
+		Total  int `json:"total"`
+		Hidden int `json:"hidden"`
+	}
+	if i.call(ctx, in, "GET", "/people", url.Values{"withHidden": {"false"}, "size": {"1"}}, nil, &people) == nil && people.Total > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Personen"), Value: in.Num(people.Total - people.Hidden)})
+	}
+	if admin {
+		var disk struct {
+			DiskAvailableRaw    float64 `json:"diskAvailableRaw"`
+			DiskUsagePercentage float64 `json:"diskUsagePercentage"`
+		}
+		if i.call(ctx, in, "GET", "/server/storage", nil, nil, &disk) == nil && disk.DiskAvailableRaw > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Frei"), Value: in.Bytes(disk.DiskAvailableRaw), Tone: toneIf(disk.DiskUsagePercentage >= 90, "warn")})
+		}
+		// Background jobs (thumbnails, faces, smart search …) still to do.
+		var jobs map[string]struct {
+			JobCounts struct {
+				Active  int `json:"active"`
+				Waiting int `json:"waiting"`
+				Failed  int `json:"failed"`
+			} `json:"jobCounts"`
+		}
+		if i.call(ctx, in, "GET", "/jobs", nil, nil, &jobs) == nil {
+			open, failed := 0, 0
+			for _, j := range jobs {
+				open += j.JobCounts.Active + j.JobCounts.Waiting
+				failed += j.JobCounts.Failed
+			}
+			w.Stats = append(w.Stats, Stat{Label: in.T("Aufgaben"), Value: in.Num(open), Tone: toneIf(open > 0, "warn")})
+			if failed > 0 {
+				w.Alerts = append(w.Alerts, in.T("%d Aufgaben fehlgeschlagen", failed))
+			}
+		}
+	}
+	// The newest photos as small pictures.
+	var res immichAssets
+	if i.call(ctx, in, "POST", "/search/metadata", nil, map[string]any{"size": 6, "order": "desc", "type": "IMAGE"}, &res) == nil && len(res.Assets.Items) > 0 {
+		w.ItemsTitle, w.Thumbs = in.T("Neueste Fotos"), true
+		for _, a := range res.Assets.Items {
+			w.Items = append(w.Items, Item{Title: a.OriginalFileName, Subtitle: in.Date(firstNonEmpty(a.LocalDateTime, a.FileCreatedAt)),
+				URL: in.Link("/photos/" + a.ID), Image: in.Proxy("/api/assets/" + a.ID + "/thumbnail?size=thumbnail")})
+		}
+	}
 }
 
 type immichAssets struct {

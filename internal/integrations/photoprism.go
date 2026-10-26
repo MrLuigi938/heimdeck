@@ -47,7 +47,14 @@ type ppConfig struct {
 		People    int `json:"people"`
 		Review    int `json:"review"`
 		Favorites int `json:"favorites"`
+		Live      int `json:"live"`
+		Places    int `json:"places"`
+		Labels    int `json:"labels"`
+		Folders   int `json:"folders"`
+		Files     int `json:"files"`
+		Archived  int `json:"archived"`
 	} `json:"count"`
+	Version string `json:"version"`
 }
 
 // ppTokens remembers the preview token per tile for the image proxy.
@@ -117,6 +124,15 @@ func (p photoprism) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}}
 	if c.Count.Review > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Zu prüfen"), Value: in.Num(c.Count.Review), Tone: "warn"})
+	}
+	for _, s := range []struct {
+		label string
+		n     int
+	}{{"Favoriten", c.Count.Favorites}, {"Live-Fotos", c.Count.Live}, {"Orte", c.Count.Places}, {"Motive", c.Count.Labels},
+		{"Ordner", c.Count.Folders}, {"Dateien", c.Count.Files}, {"Archiviert", c.Count.Archived}} {
+		if s.n > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T(s.label), Value: in.Num(s.n)})
+		}
 	}
 	var photos []ppPhoto
 	if p.get(ctx, in, "/photos", url.Values{"count": {"3"}, "order": {"added"}, "merged": {"true"}}, &photos) == nil && len(photos) > 0 {

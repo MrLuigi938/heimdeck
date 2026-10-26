@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Download clients with a session login: qBittorrent (WebUI API v2),
@@ -136,6 +137,7 @@ type qbtTorrent struct {
 	ETA      float64 `json:"eta"`
 	State    string  `json:"state"`
 	Size     float64 `json:"size"`
+	Done     int64   `json:"completion_on"` // unix seconds, <= 0 while not finished
 }
 
 func (q qbittorrent) Test(ctx context.Context, in *Instance) error {
@@ -202,8 +204,39 @@ func (q qbittorrent) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if errs > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Fehler"), Value: in.Num(errs), Tone: "bad"})
 	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Torrents"), Value: in.Num(len(all))}, Stat{Label: in.T("Pausiert"), Value: in.Num(paused)})
+	// Totals, ratio and free space are only in the server state of the sync API.
+	var md struct {
+		State struct {
+			AlltimeDL   float64 `json:"alltime_dl"`
+			AlltimeUL   float64 `json:"alltime_ul"`
+			Ratio       string  `json:"global_ratio"`
+			FreeSpace   float64 `json:"free_space_on_disk"`
+			AltSpeed    bool    `json:"use_alt_speed_limits"`
+			SessionDL   float64 `json:"dl_info_data"`
+			DLRateLimit float64 `json:"dl_rate_limit"`
+		} `json:"server_state"`
+	}
+	if q.call(ctx, in, "GET", "/api/v2/sync/maindata?rid=0", nil, &md) == nil {
+		s := md.State
+		w.Stats = append(w.Stats, Stat{Label: in.T("Seit Start geladen"), Value: in.Bytes(s.SessionDL)})
+		if s.AlltimeDL > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Insgesamt geladen"), Value: in.Bytes(s.AlltimeDL)}, Stat{Label: in.T("Insgesamt hochgeladen"), Value: in.Bytes(s.AlltimeUL)})
+		}
+		if s.Ratio != "" {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Verhältnis"), Value: s.Ratio})
+		}
+		if s.FreeSpace > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(s.FreeSpace), Tone: toneIf(s.FreeSpace < 20e9, "warn")})
+		}
+		if s.AltSpeed {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Tempolimit"), Value: in.T("aktiv"), Tone: "warn"})
+		}
+	}
 	if info.Status == "disconnected" {
 		w.Alerts = append(w.Alerts, in.T("qBittorrent ist nicht mit dem Netzwerk verbunden"))
+	} else if info.Status == "firewalled" {
+		w.Alerts = append(w.Alerts, in.T("qBittorrent ist von außen nicht erreichbar (Port nicht weitergeleitet)"))
 	}
 	sort.Slice(active, func(i, j int) bool { return active[i].DLSpeed > active[j].DLSpeed })
 	w.ItemsTitle = in.T("Downloads")
@@ -212,6 +245,25 @@ func (q qbittorrent) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			break
 		}
 		w.Items = append(w.Items, q.item(in, t))
+	}
+	// Nothing loading: the torrents finished last.
+	if len(w.Items) == 0 {
+		var done []qbtTorrent
+		for _, t := range all {
+			if t.Done > 0 {
+				done = append(done, t)
+			}
+		}
+		sort.Slice(done, func(i, j int) bool { return done[i].Done > done[j].Done })
+		if len(done) > 0 {
+			w.ItemsTitle = in.T("Zuletzt fertig")
+			for i, t := range done {
+				if i == 5 {
+					break
+				}
+				w.Items = append(w.Items, Item{Title: t.Name, Subtitle: in.Since(time.Unix(t.Done, 0)), Badge: in.Bytes(t.Size), URL: in.Link("/")})
+			}
+		}
 	}
 	if paused > 0 && paused == len(all) {
 		w.Actions = []Action{{ID: "start", Label: in.T("Alle fortsetzen"), Tone: "primary"}}
@@ -335,9 +387,10 @@ type trTorrent struct {
 	Status      int     `json:"status"`
 	Size        float64 `json:"totalSize"`
 	Error       int     `json:"error"`
+	DoneDate    int64   `json:"doneDate"` // unix seconds, 0 while not finished
 }
 
-var trFields = []string{"id", "name", "percentDone", "rateDownload", "eta", "status", "totalSize", "error"}
+var trFields = []string{"id", "name", "percentDone", "rateDownload", "eta", "status", "totalSize", "error", "doneDate"}
 
 func (tr transmission) torrents(ctx context.Context, in *Instance) ([]trTorrent, error) {
 	var res struct {
@@ -385,6 +438,13 @@ func (tr transmission) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 		Active int     `json:"activeTorrentCount"`
 		Paused int     `json:"pausedTorrentCount"`
 		Count  int     `json:"torrentCount"`
+		Total  struct {
+			Down float64 `json:"downloadedBytes"`
+			Up   float64 `json:"uploadedBytes"`
+		} `json:"cumulative-stats"`
+		Session struct {
+			Down float64 `json:"downloadedBytes"`
+		} `json:"current-stats"`
 	}
 	if err := tr.call(ctx, in, "session-stats", map[string]any{}, &st); err != nil {
 		return nil, err
@@ -416,6 +476,26 @@ func (tr transmission) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 	if errs > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Fehler"), Value: in.Num(errs), Tone: "bad"})
 	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Torrents"), Value: in.Num(st.Count)}, Stat{Label: in.T("Pausiert"), Value: in.Num(st.Paused)},
+		Stat{Label: in.T("Seit Start geladen"), Value: in.Bytes(st.Session.Down)})
+	if st.Total.Down > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Insgesamt geladen"), Value: in.Bytes(st.Total.Down)}, Stat{Label: in.T("Insgesamt hochgeladen"), Value: in.Bytes(st.Total.Up)})
+	}
+	var sess struct {
+		Dir      string `json:"download-dir"`
+		AltSpeed bool   `json:"alt-speed-enabled"`
+	}
+	if tr.call(ctx, in, "session-get", map[string]any{"fields": []string{"download-dir", "alt-speed-enabled"}}, &sess) == nil {
+		var free struct {
+			Size float64 `json:"size-bytes"`
+		}
+		if sess.Dir != "" && tr.call(ctx, in, "free-space", map[string]any{"path": sess.Dir}, &free) == nil && free.Size > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(free.Size), Tone: toneIf(free.Size < 20e9, "warn")})
+		}
+		if sess.AltSpeed {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Tempolimit"), Value: in.T("aktiv"), Tone: "warn"})
+		}
+	}
 	sort.Slice(active, func(i, j int) bool { return active[i].Rate > active[j].Rate })
 	w.ItemsTitle = in.T("Downloads")
 	for i, t := range active {
@@ -423,6 +503,24 @@ func (tr transmission) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 			break
 		}
 		w.Items = append(w.Items, tr.item(in, t))
+	}
+	if len(w.Items) == 0 {
+		var done []trTorrent
+		for _, t := range all {
+			if t.DoneDate > 0 {
+				done = append(done, t)
+			}
+		}
+		sort.Slice(done, func(i, j int) bool { return done[i].DoneDate > done[j].DoneDate })
+		if len(done) > 0 {
+			w.ItemsTitle = in.T("Zuletzt fertig")
+			for i, t := range done {
+				if i == 5 {
+					break
+				}
+				w.Items = append(w.Items, Item{Title: t.Name, Subtitle: in.Since(time.Unix(t.DoneDate, 0)), Badge: in.Bytes(t.Size), URL: in.Link("/transmission/web/")})
+			}
+		}
 	}
 	if st.Count > 0 && st.Paused == st.Count {
 		w.Actions = []Action{{ID: "start", Label: in.T("Alle fortsetzen"), Tone: "primary"}}
@@ -548,25 +646,31 @@ type delugeTorrent struct {
 	ETA      float64 `json:"eta"`
 	State    string  `json:"state"`
 	Size     float64 `json:"total_size"`
+	Done     float64 `json:"completed_time"` // unix seconds, 0 while not finished
 }
 
-func (d deluge) ui(ctx context.Context, in *Instance) (map[string]delugeTorrent, float64, float64, error) {
+type delugeStats struct {
+	Down        float64 `json:"download_rate"`
+	Up          float64 `json:"upload_rate"`
+	FreeSpace   float64 `json:"free_space"`
+	Connections int     `json:"num_connections"`
+	Incoming    bool    `json:"has_incoming_connections"`
+}
+
+func (d deluge) ui(ctx context.Context, in *Instance) (map[string]delugeTorrent, delugeStats, error) {
 	var res struct {
 		Connected bool                     `json:"connected"`
 		Torrents  map[string]delugeTorrent `json:"torrents"`
-		Stats     struct {
-			Down float64 `json:"download_rate"`
-			Up   float64 `json:"upload_rate"`
-		} `json:"stats"`
+		Stats     delugeStats              `json:"stats"`
 	}
-	keys := []string{"name", "progress", "download_payload_rate", "eta", "state", "total_size"}
+	keys := []string{"name", "progress", "download_payload_rate", "eta", "state", "total_size", "completed_time"}
 	if err := d.rpc(ctx, in, "web.update_ui", []any{keys, map[string]any{}}, &res); err != nil {
-		return nil, 0, 0, err
+		return nil, res.Stats, err
 	}
 	if !res.Connected {
-		return nil, 0, 0, in.Errorf("Deluge ist mit keinem Daemon verbunden – in der Weboberfläche im Verbindungsmanager verbinden")
+		return nil, res.Stats, in.Errorf("Deluge ist mit keinem Daemon verbunden – in der Weboberfläche im Verbindungsmanager verbinden")
 	}
-	return res.Torrents, res.Stats.Down, res.Stats.Up, nil
+	return res.Torrents, res.Stats, nil
 }
 
 func (d deluge) item(in *Instance, t delugeTorrent) Item {
@@ -590,10 +694,11 @@ func (d deluge) item(in *Instance, t delugeTorrent) Item {
 }
 
 func (d deluge) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
-	all, down, up, err := d.ui(ctx, in)
+	all, stats, err := d.ui(ctx, in)
 	if err != nil {
 		return nil, err
 	}
+	down, up := stats.Down, stats.Up
 	downloading, seeding, paused, errs := 0, 0, 0, 0
 	var active []delugeTorrent
 	for _, t := range all {
@@ -618,6 +723,11 @@ func (d deluge) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if errs > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Fehler"), Value: in.Num(errs), Tone: "bad"})
 	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Torrents"), Value: in.Num(len(all))}, Stat{Label: in.T("Pausiert"), Value: in.Num(paused)},
+		Stat{Label: in.T("Verbindungen"), Value: in.Num(stats.Connections)})
+	if stats.FreeSpace > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(stats.FreeSpace), Tone: toneIf(stats.FreeSpace < 20e9, "warn")})
+	}
 	sort.Slice(active, func(i, j int) bool { return active[i].Rate > active[j].Rate })
 	w.ItemsTitle = in.T("Downloads")
 	for i, t := range active {
@@ -625,6 +735,24 @@ func (d deluge) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			break
 		}
 		w.Items = append(w.Items, d.item(in, t))
+	}
+	if len(w.Items) == 0 {
+		var done []delugeTorrent
+		for _, t := range all {
+			if t.Done > 0 {
+				done = append(done, t)
+			}
+		}
+		sort.Slice(done, func(i, j int) bool { return done[i].Done > done[j].Done })
+		if len(done) > 0 {
+			w.ItemsTitle = in.T("Zuletzt fertig")
+			for i, t := range done {
+				if i == 5 {
+					break
+				}
+				w.Items = append(w.Items, Item{Title: t.Name, Subtitle: in.Since(time.Unix(int64(t.Done), 0)), Badge: in.Bytes(t.Size), URL: in.Link("/")})
+			}
+		}
 	}
 	if len(all) > 0 && paused == len(all) {
 		w.Actions = []Action{{ID: "start", Label: in.T("Alle fortsetzen"), Tone: "primary"}}
@@ -635,7 +763,7 @@ func (d deluge) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 }
 
 func (d deluge) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {
-	all, _, _, err := d.ui(ctx, in)
+	all, _, err := d.ui(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -716,6 +844,11 @@ func (n nzbget) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		DownloadPaused  bool    `json:"DownloadPaused"`
 		FreeDiskSpaceLo float64 `json:"FreeDiskSpaceLo"`
 		FreeDiskSpaceHi float64 `json:"FreeDiskSpaceHi"`
+		DownloadedLo    float64 `json:"DownloadedSizeLo"`
+		DownloadedHi    float64 `json:"DownloadedSizeHi"`
+		DownloadLimit   float64 `json:"DownloadLimit"` // bytes/s, 0 = none
+		PostJobCount    int     `json:"PostJobCount"`
+		UpTimeSec       int     `json:"UpTimeSec"`
 	}
 	if err := n.rpc(ctx, in, "status", []any{}, &st); err != nil {
 		return nil, err
@@ -746,8 +879,55 @@ func (n nzbget) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if rate > 0 && remaining > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Restzeit"), Value: shortDuration(int(remaining / rate))})
 	}
-	if free := lohi(st.FreeDiskSpaceLo, st.FreeDiskSpaceHi); free > 0 && free < 10*1024*1024*1024 {
-		w.Alerts = append(w.Alerts, in.T("Wenig freier Speicher: %s", in.Bytes(free)))
+	if st.PostJobCount > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Nachbearbeitung"), Value: in.Num(st.PostJobCount)})
+	}
+	if st.DownloadLimit > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Tempolimit"), Value: in.Bytes(st.DownloadLimit) + "/s", Tone: "warn"})
+	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Seit Start geladen"), Value: in.Bytes(lohi(st.DownloadedLo, st.DownloadedHi))})
+	if st.UpTimeSec > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: shortDuration(st.UpTimeSec)})
+	}
+	if free := lohi(st.FreeDiskSpaceLo, st.FreeDiskSpaceHi); free > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(free), Tone: toneIf(free < 10*1024*1024*1024, "warn")})
+		if free < 10*1024*1024*1024 {
+			w.Alerts = append(w.Alerts, in.T("Wenig freier Speicher: %s", in.Bytes(free)))
+		}
+	}
+	// The last finished downloads: failures as notes, and the list while the queue is empty.
+	var hist []struct {
+		Name     string  `json:"Name"`
+		Status   string  `json:"Status"` // SUCCESS/…, FAILURE/…, WARNING/…, DELETED/…
+		FileMB   float64 `json:"FileSizeMB"`
+		HistTime int64   `json:"HistoryTime"`
+	}
+	if n.rpc(ctx, in, "history", []any{false}, &hist) == nil {
+		failed := 0
+		for i, h := range hist {
+			if i == 20 {
+				break
+			}
+			if strings.HasPrefix(h.Status, "FAILURE") {
+				failed++
+			}
+		}
+		if failed > 0 {
+			w.Alerts = append(w.Alerts, in.T("%d der letzten Downloads fehlgeschlagen", failed))
+		}
+		if len(groups) == 0 && len(hist) > 0 {
+			w.ItemsTitle = in.T("Zuletzt fertig")
+			for i, h := range hist {
+				if i == 5 {
+					break
+				}
+				it := Item{Title: h.Name, Subtitle: in.Since(time.Unix(h.HistTime, 0)), Badge: in.Bytes(h.FileMB * 1024 * 1024), URL: in.Link("/")}
+				if strings.HasPrefix(h.Status, "FAILURE") {
+					it.Badge = in.Status("failed")
+				}
+				w.Items = append(w.Items, it)
+			}
+		}
 	}
 	for i, g := range groups {
 		if i == 5 {

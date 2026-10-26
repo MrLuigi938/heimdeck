@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -44,6 +45,7 @@ type haState struct {
 		Title        string `json:"title"`
 		Installed    string `json:"installed_version"`
 		Latest       string `json:"latest_version"`
+		DeviceClass  string `json:"device_class"`
 	} `json:"attributes"`
 }
 
@@ -162,6 +164,8 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 	}
 
 	lights, switches, unavailable := 0, 0, 0
+	automations, home, people, open := 0, 0, 0, 0
+	var lowBattery []string
 	var updates []Item
 	for _, s := range states {
 		switch {
@@ -169,6 +173,21 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 			lights++
 		case s.domain() == "switch" && s.State == "on":
 			switches++
+		case s.domain() == "automation" && s.State == "on":
+			automations++
+		case s.domain() == "person":
+			people++
+			if s.State == "home" {
+				home++
+			}
+		case s.domain() == "binary_sensor" && s.State == "on" && (s.Attributes.DeviceClass == "door" || s.Attributes.DeviceClass == "window" || s.Attributes.DeviceClass == "garage_door" || s.Attributes.DeviceClass == "opening"):
+			open++
+		case s.domain() == "sensor" && s.Attributes.DeviceClass == "battery" && s.Attributes.Unit == "%":
+			if v, err := strconv.ParseFloat(s.State, 64); err == nil && v < 20 {
+				lowBattery = append(lowBattery, s.name())
+			}
+		case s.domain() == "alarm_control_panel" && s.State == "triggered":
+			w.Alerts = append(w.Alerts, in.T("Alarm ausgelöst: %s", s.name()))
 		case s.domain() == "update" && s.State == "on":
 			title := s.Attributes.Title
 			if title == "" {
@@ -185,6 +204,23 @@ func (h homeAssistant) Fetch(ctx context.Context, in *Instance) (*Widget, error)
 		{Label: in.T("Schalter an"), Value: in.Num(switches)},
 		{Label: in.T("Updates"), Value: in.Num(len(updates)), Tone: toneIf(len(updates) > 0, "warn")},
 		{Label: in.T("Nicht verfügbar"), Value: in.Num(unavailable), Tone: toneIf(unavailable > 0, "warn")},
+		{Label: in.T("Automationen an"), Value: in.Num(automations)},
+		{Label: in.T("Türen und Fenster offen"), Value: in.Num(open), Tone: toneIf(open > 0, "warn")},
+		{Label: in.T("Batterie schwach"), Value: in.Num(len(lowBattery)), Tone: toneIf(len(lowBattery) > 0, "warn")},
+		{Label: in.T("Entitäten"), Value: in.Num(len(states))},
+	}
+	if people > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Zuhause"), Value: fmt.Sprintf("%d/%d", home, people)})
+	}
+	if len(lowBattery) > 0 {
+		sort.Strings(lowBattery)
+		w.Alerts = append(w.Alerts, in.T("Batterie schwach: %s", strings.Join(lowBattery[:min(3, len(lowBattery))], ", ")))
+	}
+	var cfg struct {
+		Version string `json:"version"`
+	}
+	if h.get(ctx, in, "/api/config", &cfg) == nil && cfg.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: cfg.Version})
 	}
 	if len(updates) > 0 {
 		sort.Slice(updates, func(i, j int) bool { return updates[i].Title < updates[j].Title })

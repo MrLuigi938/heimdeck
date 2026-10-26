@@ -109,10 +109,12 @@ func (n norish) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if err := in.do(ctx, n.req(in, "GET", "/groceries", nil), &groceries); err != nil {
 		return nil, err
 	}
-	open := 0
+	open, done := 0, 0
 	for _, g := range groceries {
 		if !g.IsDone {
 			open++
+		} else {
+			done++
 		}
 	}
 	// The week (Monday to Sunday) shows today's meals and, if there are none, the next ones.
@@ -145,6 +147,8 @@ func (n norish) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		{Label: in.T("Heute geplant"), Value: in.Num(len(todays))},
 		{Label: in.T("Einkaufsliste"), Value: in.Num(open), Tone: toneIf(open > 0, "warn")},
 		{Label: in.T("Rezepte"), Value: in.Num(all.Total)},
+		{Label: in.T("Diese Woche geplant"), Value: in.Num(len(week))},
+		{Label: in.T("Schon eingekauft"), Value: in.Num(done)},
 	}}
 	list, showDate := todays, false
 	w.ItemsTitle = in.T("Heute auf dem Plan")

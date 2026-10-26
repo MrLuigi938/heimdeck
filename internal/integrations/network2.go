@@ -102,17 +102,23 @@ func (p pihole) legacy(ctx context.Context, in *Instance, q string, out any) err
 func (p pihole) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var sum struct {
 		Queries struct {
-			Total   float64 `json:"total"`
-			Blocked float64 `json:"blocked"`
-			Percent float64 `json:"percent_blocked"`
+			Total     float64 `json:"total"`
+			Blocked   float64 `json:"blocked"`
+			Percent   float64 `json:"percent_blocked"`
+			Forwarded float64 `json:"forwarded"`
+			Cached    float64 `json:"cached"`
+			Unique    float64 `json:"unique_domains"`
 		} `json:"queries"`
 		Clients struct {
 			Active int `json:"active"`
+			Total  int `json:"total"`
 		} `json:"clients"`
 		Gravity struct {
-			Domains float64 `json:"domains_being_blocked"`
+			Domains    float64 `json:"domains_being_blocked"`
+			LastUpdate float64 `json:"last_update"`
 		} `json:"gravity"`
 	}
+	legacy := false
 	var blocking struct {
 		Blocking string   `json:"blocking"`
 		Timer    *float64 `json:"timer"`
@@ -133,6 +139,7 @@ func (p pihole) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		sum.Queries.Total, sum.Queries.Blocked, sum.Queries.Percent = v5.Queries, v5.Blocked, v5.Percent
 		sum.Clients.Active, sum.Gravity.Domains = v5.Clients, v5.Domains
 		blocking.Blocking = v5.Status
+		legacy = true
 	} else if err != nil {
 		return nil, err
 	} else {
@@ -156,6 +163,51 @@ func (p pihole) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Actions = []Action{
 			{ID: "disable", Label: in.T("5 Min. pausieren"), Params: map[string]string{"minutes": "5"}},
 			{ID: "disable", Label: in.T("30 Min. pausieren"), Params: map[string]string{"minutes": "30"}},
+		}
+	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Domains auf der Sperrliste"), Value: in.Num(int(sum.Gravity.Domains))})
+	if legacy {
+		return w, nil
+	}
+	w.Stats = append(w.Stats,
+		Stat{Label: in.T("Weitergeleitet"), Value: in.Num(int(sum.Queries.Forwarded))},
+		Stat{Label: in.T("Aus dem Cache"), Value: in.Num(int(sum.Queries.Cached))},
+		Stat{Label: in.T("Verschiedene Domains"), Value: in.Num(int(sum.Queries.Unique))},
+	)
+	if sum.Gravity.LastUpdate > 0 {
+		upd := time.Unix(int64(sum.Gravity.LastUpdate), 0)
+		w.Stats = append(w.Stats, Stat{Label: in.T("Listen aktualisiert"), Value: in.Since(upd), Tone: toneIf(time.Since(upd) > 14*24*time.Hour, "warn")})
+	}
+	// Updates of the three parts of Pi-hole.
+	var ver struct {
+		Version map[string]struct {
+			Local struct {
+				Version string `json:"version"`
+			} `json:"local"`
+			Remote struct {
+				Version string `json:"version"`
+			} `json:"remote"`
+		} `json:"version"`
+	}
+	if p.call(ctx, in, "GET", "/info/version", nil, nil, &ver) == nil {
+		for _, part := range []string{"core", "web", "ftl"} {
+			v, ok := ver.Version[part]
+			if ok && v.Local.Version != "" && v.Remote.Version != "" && v.Local.Version != v.Remote.Version {
+				w.Alerts = append(w.Alerts, in.T("Update verfügbar: %s %s", "Pi-hole "+map[string]string{"core": "Core", "web": "Web", "ftl": "FTL"}[part], v.Remote.Version))
+			}
+		}
+	}
+	// The domains blocked most often today.
+	var top struct {
+		Domains []struct {
+			Domain string `json:"domain"`
+			Count  int    `json:"count"`
+		} `json:"domains"`
+	}
+	if p.call(ctx, in, "GET", "/stats/top_domains", url.Values{"blocked": {"true"}, "count": {"5"}}, nil, &top) == nil && len(top.Domains) > 0 {
+		w.ItemsTitle = in.T("Am häufigsten blockiert")
+		for _, d := range top.Domains {
+			w.Items = append(w.Items, Item{Title: d.Domain, Badge: in.Num(d.Count), URL: in.Link("/admin/queries?domain=" + url.QueryEscape(d.Domain))})
 		}
 	}
 	return w, nil
@@ -354,6 +406,38 @@ func (o opnsense) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if fw.Status == "update" || fw.Status == "upgrade" {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Updates"), Value: fw.Product.Latest, Tone: "warn"})
 	}
+	if fw.Product.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: fw.Product.Version})
+	}
+	// The hottest sensor.
+	var temps []struct {
+		Device      string `json:"device"`
+		Temperature any    `json:"temperature"`
+	}
+	if o.get(ctx, in, "/diagnostics/system/system_temperature", &temps) == nil {
+		hot := 0.0
+		for _, t := range temps {
+			hot = max(hot, numStr(t.Temperature))
+		}
+		if hot > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Temperatur"), Value: fmt.Sprintf("%.0f °C", hot), Tone: toneIf(hot >= 80, "warn")})
+		}
+	}
+	// Disk usage of the system partition.
+	var disk struct {
+		Devices []struct {
+			Mount   string `json:"mountpoint"`
+			UsedPct any    `json:"used_pct"`
+		} `json:"devices"`
+	}
+	if o.get(ctx, in, "/diagnostics/system/system_disk", &disk) == nil {
+		for _, d := range disk.Devices {
+			if d.Mount == "/" {
+				used := numStr(d.UsedPct)
+				w.Stats = append(w.Stats, Stat{Label: in.T("Festplatte"), Value: fmt.Sprintf("%.0f %%", used), Tone: toneIf(used >= 90, "warn")})
+			}
+		}
+	}
 
 	var gw struct {
 		Items []struct {
@@ -429,6 +513,10 @@ func (t tdarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 					Name  string  `json:"name"`
 					Value float64 `json:"value"`
 				} `json:"transcode"`
+				Healthcheck []struct {
+					Name  string  `json:"name"`
+					Value float64 `json:"value"`
+				} `json:"healthcheck"`
 			} `json:"status"`
 		} `json:"pieStats"`
 	}
@@ -453,6 +541,16 @@ func (t tdarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		}
 		if failed > 0 {
 			w.Stats = append(w.Stats, Stat{Label: in.T("Fehler"), Value: in.Num(int(failed)), Tone: "bad"})
+		}
+		unhealthy := 0.0
+		for _, s := range ps.Status.Healthcheck {
+			if strings.Contains(strings.ToLower(s.Name), "error") {
+				unhealthy += s.Value
+			}
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Health-Checks"), Value: in.Num(int(ps.TotalHealth))})
+		if unhealthy > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Defekte Dateien"), Value: in.Num(int(unhealthy)), Tone: "bad"})
 		}
 	} else {
 		// Older servers: the statistics document.
@@ -509,7 +607,7 @@ func (t tdarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				w.Alerts = append(w.Alerts, in.T("Node %s ist pausiert", n.Name))
 			}
 		}
-		w.Stats = append(w.Stats, Stat{Label: in.T("Worker aktiv"), Value: in.Num(active)})
+		w.Stats = append(w.Stats, Stat{Label: in.T("Worker aktiv"), Value: in.Num(active)}, Stat{Label: in.T("Nodes"), Value: in.Num(len(nodes))})
 		if len(w.Items) > 0 {
 			w.ItemsTitle = in.T("Läuft gerade")
 			sort.Slice(w.Items, func(i, j int) bool { return *w.Items[i].Progress > *w.Items[j].Progress })

@@ -101,10 +101,36 @@ func (s speedtest) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var list struct {
 		Data []speedResult `json:"data"`
 	}
-	q := url.Values{"sort": {"-created_at"}, "page[size]": {"5"}}
+	q := url.Values{"sort": {"-created_at"}, "page[size]": {"20"}}
 	if err := s.call(ctx, in, "GET", "/api/v1/results", q, nil, &list); err == nil && len(list.Data) > 1 {
-		w.ItemsTitle = in.T("Verlauf")
+		// Averages and failures of the last (up to) 20 measurements.
+		var down, up, ping float64
+		n, pings, failed := 0, 0, 0
 		for _, h := range list.Data {
+			if h.Failed || h.Status == "failed" {
+				failed++
+				continue
+			}
+			if h.Download != nil && h.Upload != nil {
+				down += *h.Download
+				up += *h.Upload
+				n++
+			}
+			if h.Ping != nil {
+				ping += *h.Ping
+				pings++
+			}
+		}
+		if n > 1 {
+			avgDown, avgUp := down/float64(n), up/float64(n)
+			w.Stats = append(w.Stats, Stat{Label: in.T("Ø Download"), Value: mbit(&avgDown, true)}, Stat{Label: in.T("Ø Upload"), Value: mbit(&avgUp, true)})
+		}
+		if pings > 1 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Ø Ping"), Value: fmt.Sprintf("%.0f ms", ping/float64(pings))})
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Fehlgeschlagen"), Value: in.Num(failed), Tone: toneIf(failed > 0, "warn")})
+		w.ItemsTitle = in.T("Verlauf")
+		for _, h := range list.Data[:min(5, len(list.Data))] {
 			it := Item{Title: "↓ " + mbit(h.Download, true) + "  ↑ " + mbit(h.Upload, true), URL: in.Link("/admin/results")}
 			if t, err := time.ParseInLocation("2006-01-02 15:04:05", h.CreatedAt, time.Local); err == nil {
 				it.Subtitle = in.Since(t)

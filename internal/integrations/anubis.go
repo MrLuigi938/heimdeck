@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Anubis has no API, but it exports Prometheus metrics on a separate port
@@ -165,6 +166,27 @@ func (a anubis) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}}
 	if p := sum["anubis_proxied_requests_total"]; p > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Durchgelassen"), Value: in.Num(int(p))})
+	}
+	if issued > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Erfolgsquote"), Value: fmt.Sprintf("%.0f %%", passed/issued*100)})
+	}
+	// Requests per decision of the policy.
+	byAction := map[string]float64{}
+	for r, n := range rules {
+		byAction[strings.ToUpper(actions[r])] += n
+	}
+	if n := byAction["DENY"]; n > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Blockiert"), Value: in.Num(int(n)), Tone: "warn"})
+	}
+	if n := byAction["ALLOW"]; n > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Direkt erlaubt"), Value: in.Num(int(n))})
+	}
+	// The usual process metrics of Go programs.
+	if mem := sum["process_resident_memory_bytes"]; mem > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("RAM"), Value: in.Bytes(mem)})
+	}
+	if start := sum["process_start_time_seconds"]; start > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, float64(time.Now().Unix())-start)})
 	}
 
 	type rule struct {

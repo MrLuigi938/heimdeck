@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -110,12 +111,64 @@ func (r readarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			}
 		}
 	}
+	if lib, ok := r.library(ctx, in); ok {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Autoren"), Value: in.Num(lib.authors)}, Stat{Label: in.T("Bücher vorhanden"), Value: in.Num(lib.books)},
+			Stat{Label: in.T("Auf der Platte"), Value: in.Bytes(lib.size)})
+	}
+	var roots []struct {
+		FreeSpace float64 `json:"freeSpace"`
+	}
+	if r.call(ctx, in, "GET", "/rootfolder", nil, nil, &roots) == nil && len(roots) > 0 {
+		free := roots[0].FreeSpace
+		for _, x := range roots[1:] {
+			free = min(free, x.FreeSpace)
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(free), Tone: toneIf(free < 50e9, "warn")})
+	}
+	errs := 0
 	for _, h := range health {
+		if h.Type == "error" {
+			errs++
+		}
 		if len(w.Alerts) < 3 {
 			w.Alerts = append(w.Alerts, h.Message)
 		}
 	}
+	if len(health) > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Warnungen"), Value: in.Num(len(health)), Tone: map[bool]string{true: "bad", false: "warn"}[errs > 0]})
+	}
 	return w, nil
+}
+
+type readarrLibrary struct {
+	at             time.Time
+	authors, books int
+	size           float64
+}
+
+// readarrLibraries caches the library size per address for ten minutes.
+var readarrLibraries sync.Map
+
+func (r readarr) library(ctx context.Context, in *Instance) (readarrLibrary, bool) {
+	if v, ok := readarrLibraries.Load(in.BaseURL); ok && time.Since(v.(readarrLibrary).at) < 10*time.Minute {
+		return v.(readarrLibrary), true
+	}
+	var authors []struct {
+		Statistics struct {
+			BookFileCount int     `json:"bookFileCount"`
+			SizeOnDisk    float64 `json:"sizeOnDisk"`
+		} `json:"statistics"`
+	}
+	if r.call(ctx, in, "GET", "/author", nil, nil, &authors) != nil {
+		return readarrLibrary{}, false
+	}
+	lib := readarrLibrary{at: time.Now(), authors: len(authors)}
+	for _, a := range authors {
+		lib.books += a.Statistics.BookFileCount
+		lib.size += a.Statistics.SizeOnDisk
+	}
+	readarrLibraries.Store(in.BaseURL, lib)
+	return lib, true
 }
 
 func (r readarr) Search(ctx context.Context, in *Instance, query string) ([]Item, error) {

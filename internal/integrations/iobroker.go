@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -313,6 +314,44 @@ func (b iobroker) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	w.Stats = []Stat{
 		{Label: in.T("Adapter aktiv"), Value: fmt.Sprintf("%d/%d", running, enabled), Tone: toneIf(running < enabled, "warn")},
 	}
+	// The host(s) ioBroker runs on: CPU, free memory, free disk, uptime.
+	var host map[string]struct {
+		Val any `json:"val"`
+	}
+	if b.call(ctx, in, "/v1/states", "/states", url.Values{"filter": {"system.host.*"}}, url.Values{"pattern": {"system.host.*"}}, &host) == nil {
+		val := func(suffix string) (float64, bool) {
+			for id, s := range host {
+				if strings.HasSuffix(id, "."+suffix) && strings.Count(id, ".") == 3 {
+					switch v := s.Val.(type) {
+					case float64:
+						return v, true
+					case string:
+						if f, err := strconv.ParseFloat(v, 64); err == nil {
+							return f, true
+						}
+					}
+				}
+			}
+			return 0, false
+		}
+		if v, ok := val("cpu"); ok {
+			w.Stats = append(w.Stats, Stat{Label: in.T("CPU"), Value: fmt.Sprintf("%.0f %%", v), Tone: toneIf(v > 90, "warn")})
+		}
+		if v, ok := val("freemem"); ok {
+			w.Stats = append(w.Stats, Stat{Label: in.T("RAM frei"), Value: in.Bytes(v * 1024 * 1024)})
+		}
+		if v, ok := val("diskFree"); ok {
+			tone := ""
+			if size, ok := val("diskSize"); ok && size > 0 && v/size < 0.1 {
+				tone = "warn"
+			}
+			w.Stats = append(w.Stats, Stat{Label: in.T("Speicher frei"), Value: in.Bytes(v * 1024 * 1024), Tone: tone})
+		}
+		if v, ok := val("uptime"); ok {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, v)})
+		}
+	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("Instanzen"), Value: in.Num(len(objs))})
 	if len(down) > 0 {
 		w.ItemsTitle = in.T("Gestoppte Adapter")
 		for _, d := range down {

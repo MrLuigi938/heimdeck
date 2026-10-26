@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/heimdeck/heimdeck/internal/logging"
 )
@@ -157,6 +159,70 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	w.Stats = append(w.Stats, Stat{Label: in.T("Gäste aktiv"), Value: fmt.Sprintf("%d/%d", running, guests)})
 	if len(nodes) == 1 && nodes[0].Uptime > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, nodes[0].Uptime)})
+	}
+	vms, lxcs := 0, 0
+	for _, r := range res {
+		if isGuest(r) {
+			if r.Type == "qemu" {
+				vms++
+			} else {
+				lxcs++
+			}
+		}
+	}
+	w.Stats = append(w.Stats, Stat{Label: in.T("VMs"), Value: in.Num(vms)}, Stat{Label: in.T("Container"), Value: in.Num(lxcs)})
+	if maxDisk > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Speicher frei"), Value: in.Bytes(maxDisk - disk)})
+	}
+	var ver struct {
+		Data struct {
+			Version string `json:"version"`
+		} `json:"data"`
+	}
+	if p.call(ctx, in, "GET", "/version", &ver) == nil && ver.Data.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: ver.Data.Version})
+	}
+	// Package updates the nodes know of (from their last apt update).
+	updates := 0
+	for _, n := range nodes {
+		var pk struct {
+			Data []struct{} `json:"data"`
+		}
+		if n.Status == "online" && p.call(ctx, in, "GET", "/nodes/"+url.PathEscape(n.Node)+"/apt/update", &pk) == nil {
+			updates += len(pk.Data)
+		}
+	}
+	if updates > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Updates"), Value: in.Num(updates), Tone: "warn"})
+	}
+	// Tasks that failed in the last day, e.g. a backup.
+	var tasks struct {
+		Data []struct {
+			Type    string  `json:"type"`
+			ID      string  `json:"id"`
+			Node    string  `json:"node"`
+			Status  string  `json:"status"`
+			EndTime float64 `json:"endtime"`
+		} `json:"data"`
+	}
+	if p.call(ctx, in, "GET", "/cluster/tasks", &tasks) == nil {
+		failed := 0
+		for _, t := range tasks.Data {
+			if t.Status == "" || t.Status == "OK" || t.EndTime == 0 || time.Since(time.Unix(int64(t.EndTime), 0)) > 24*time.Hour {
+				continue
+			}
+			failed++
+			if failed <= 3 {
+				what := t.Type
+				if t.ID != "" {
+					what += " " + t.ID
+				}
+				w.Alerts = append(w.Alerts, in.T("Aufgabe fehlgeschlagen: %s (%s)", what, t.Node))
+			}
+		}
+		if failed > 0 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Fehlgeschlagene Aufgaben (24 h)"), Value: in.Num(failed), Tone: "bad"})
+		}
 	}
 
 	if len(nodes) > 1 {

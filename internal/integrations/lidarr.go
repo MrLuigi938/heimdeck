@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -113,6 +114,26 @@ func (l lidarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		{Label: in.T("Neue Alben (30 Tage)"), Value: in.Num(len(upcoming))},
 		{Label: in.T("Fehlende Alben"), Value: in.Num(missing.TotalRecords), Tone: toneIf(missing.TotalRecords > 0, "warn")},
 	}
+	var cutoff struct {
+		TotalRecords int `json:"totalRecords"`
+	}
+	if l.call(ctx, in, "GET", "/wanted/cutoff", url.Values{"pageSize": {"1"}, "monitored": {"true"}}, nil, &cutoff) == nil && cutoff.TotalRecords > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Qualität verbesserbar"), Value: in.Num(cutoff.TotalRecords)})
+	}
+	if lib, ok := l.library(ctx, in); ok {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Künstler"), Value: in.Num(lib.artists)}, Stat{Label: in.T("Alben"), Value: in.Num(lib.albums)},
+			Stat{Label: in.T("Titel"), Value: in.Num(lib.tracks)}, Stat{Label: in.T("Auf der Platte"), Value: in.Bytes(lib.size)})
+	}
+	var roots []struct {
+		FreeSpace float64 `json:"freeSpace"`
+	}
+	if l.call(ctx, in, "GET", "/rootfolder", nil, nil, &roots) == nil && len(roots) > 0 {
+		free := roots[0].FreeSpace
+		for _, r := range roots[1:] {
+			free = min(free, r.FreeSpace)
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Freier Speicher"), Value: in.Bytes(free), Tone: toneIf(free < 50e9, "warn")})
+	}
 	if len(w.Items) == 0 && len(upcoming) > 0 {
 		w.ItemsTitle = in.T("Demnächst")
 		w.Items = upcoming
@@ -133,6 +154,34 @@ func (l lidarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Warnungen"), Value: in.Num(len(health)), Tone: map[bool]string{true: "bad", false: "warn"}[errs > 0]})
 	}
 	return w, nil
+}
+
+type lidarrLibrary struct {
+	at                      time.Time
+	artists, albums, tracks int
+	size                    float64
+}
+
+// lidarrLibraries caches the library size per address for ten minutes, like
+// the one of Sonarr and Radarr: the artist list can be large.
+var lidarrLibraries sync.Map
+
+func (l lidarr) library(ctx context.Context, in *Instance) (lidarrLibrary, bool) {
+	if v, ok := lidarrLibraries.Load(in.BaseURL); ok && time.Since(v.(lidarrLibrary).at) < 10*time.Minute {
+		return v.(lidarrLibrary), true
+	}
+	var artists []lidarrArtist
+	if l.call(ctx, in, "GET", "/artist", nil, nil, &artists) != nil {
+		return lidarrLibrary{}, false
+	}
+	lib := lidarrLibrary{at: time.Now(), artists: len(artists)}
+	for _, a := range artists {
+		lib.albums += a.Statistics.AlbumCount
+		lib.tracks += a.Statistics.TrackFileCount
+		lib.size += a.Statistics.SizeOnDisk
+	}
+	lidarrLibraries.Store(in.BaseURL, lib)
+	return lib, true
 }
 
 func (l lidarr) upcoming(ctx context.Context, in *Instance) []Item {

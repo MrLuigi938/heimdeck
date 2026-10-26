@@ -75,6 +75,26 @@ func (b bazarr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Probleme"), Value: in.Num(badges.Status), Tone: "bad"})
 		w.Alerts = append(w.Alerts, in.T("Bazarr meldet Probleme – siehe System → Status"))
 	}
+	// Subtitles downloaded in the last week (the numbers of the History → Statistics page).
+	var hist struct {
+		Series []struct {
+			Count int `json:"count"`
+		} `json:"series"`
+		Movies []struct {
+			Count int `json:"count"`
+		} `json:"movies"`
+	}
+	q := url.Values{"timeFrame": {"week"}, "action": {"All"}, "provider": {"All"}, "language": {"All"}}
+	if b.call(ctx, in, "GET", "/history/stats", q, &hist) == nil {
+		series, films := 0, 0
+		for _, d := range hist.Series {
+			series += d.Count
+		}
+		for _, d := range hist.Movies {
+			films += d.Count
+		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Geladen (7 Tage): Folgen"), Value: in.Num(series)}, Stat{Label: in.T("Geladen (7 Tage): Filme"), Value: in.Num(films)})
+	}
 
 	var eps struct {
 		Data []struct {

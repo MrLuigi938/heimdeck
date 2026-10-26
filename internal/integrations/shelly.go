@@ -168,6 +168,8 @@ type shellyReading struct {
 	Power, EnergyWh  *float64
 	TempC, Humidity  *float64
 	Battery, RSSI    *float64
+	Voltage, Current *float64
+	Uptime           *float64 // seconds
 	Update           string
 	Overtemp, Online bool
 }
@@ -214,9 +216,12 @@ func (s shelly) readGen1(ctx context.Context, in *Instance) (*shellyReading, err
 			Total *float64 `json:"total"` // watt-minutes
 		} `json:"meters"`
 		EMeters []struct {
-			Power *float64 `json:"power"`
-			Total *float64 `json:"total"` // Wh
+			Power   *float64 `json:"power"`
+			Total   *float64 `json:"total"` // Wh
+			Voltage *float64 `json:"voltage"`
+			Current *float64 `json:"current"`
 		} `json:"emeters"`
+		Uptime      *float64 `json:"uptime"`
 		Temperature *float64 `json:"temperature"`
 		Overtemp    bool     `json:"overtemperature"`
 		Tmp         *struct {
@@ -284,7 +289,12 @@ func (s shelly) readGen1(ctx context.Context, in *Instance) (*shellyReading, err
 		if m.Total != nil {
 			addF(&r.EnergyWh, *m.Total)
 		}
+		setF(&r.Voltage, m.Voltage)
+		if m.Current != nil {
+			addF(&r.Current, *m.Current)
+		}
 	}
+	setF(&r.Uptime, st.Uptime)
 	setF(&r.TempC, st.Temperature)
 	if st.Tmp != nil {
 		setF(&r.TempC, st.Tmp.TC)
@@ -341,6 +351,9 @@ func (s shelly) readGen2(ctx context.Context, in *Instance) (*shellyReading, err
 				Percent *float64 `json:"percent"`
 			} `json:"battery"`
 			RSSI    *float64 `json:"rssi"`
+			Voltage *float64 `json:"voltage"`
+			Current *float64 `json:"current"`
+			Uptime  *float64 `json:"uptime"`
 			Errors  []string `json:"errors"`
 			Updates map[string]struct {
 				Version string `json:"version"`
@@ -372,6 +385,7 @@ func (s shelly) readGen2(ctx context.Context, in *Instance) (*shellyReading, err
 			setF(&r.RSSI, c.RSSI)
 			continue
 		case "sys":
+			setF(&r.Uptime, c.Uptime)
 			if u, ok := c.Updates["stable"]; ok {
 				r.Update = firstNonEmpty(u.Version, "?")
 			}
@@ -388,6 +402,10 @@ func (s shelly) readGen2(ctx context.Context, in *Instance) (*shellyReading, err
 		}
 		if c.AEnergy != nil && c.AEnergy.Total != nil {
 			addF(&r.EnergyWh, *c.AEnergy.Total)
+		}
+		setF(&r.Voltage, c.Voltage)
+		if c.Current != nil {
+			addF(&r.Current, *c.Current)
 		}
 		if c.Temperature != nil && c.Temperature.TC != nil && r.TempC == nil {
 			r.TempC = c.Temperature.TC
@@ -429,6 +447,15 @@ func (s shelly) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	if r.RSSI != nil {
 		w.Stats = append(w.Stats, Stat{Label: in.T("WLAN"), Value: num(*r.RSSI, 0, "dBm"), Tone: toneIf(*r.RSSI < -80, "warn")})
+	}
+	if r.Voltage != nil && *r.Voltage > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Spannung"), Value: num(*r.Voltage, 0, "V")})
+	}
+	if r.Current != nil && *r.Current > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Strom"), Value: num(*r.Current, 2, "A")})
+	}
+	if r.Uptime != nil && *r.Uptime > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, *r.Uptime)})
 	}
 	for _, c := range r.Channels {
 		w.Items = append(w.Items, s.channelItem(in, c, len(r.Channels)))

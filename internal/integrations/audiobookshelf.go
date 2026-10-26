@@ -86,6 +86,66 @@ func (a audiobookshelf) Fetch(ctx context.Context, in *Instance) (*Widget, error
 		Stat{Label: in.T("Stunden"), Value: in.Num(int(dur / 3600))},
 		Stat{Label: in.T("Größe"), Value: in.Bytes(size)},
 	)
+	// Authors per book library (the detailed statistics of each library).
+	authors := 0
+	for _, l := range libs {
+		if l.MediaType == "podcast" {
+			continue
+		}
+		var st struct {
+			TotalAuthors int `json:"totalAuthors"`
+		}
+		if a.get(ctx, in, "/api/libraries/"+l.ID+"/stats", nil, &st) == nil {
+			authors += st.TotalAuthors
+		}
+	}
+	if authors > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Autoren"), Value: in.Num(authors)})
+	}
+	// Your own listening time.
+	var ls struct {
+		Today     float64 `json:"today"`     // seconds
+		TotalTime float64 `json:"totalTime"` // seconds
+	}
+	if a.get(ctx, in, "/api/me/listening-stats", nil, &ls) == nil && ls.TotalTime > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Heute gehört"), Value: in.T("%d Min.", int(ls.Today/60))},
+			Stat{Label: in.T("Insgesamt gehört"), Value: in.T("%d Std.", int(ls.TotalTime/3600))})
+	}
+	cover := func(id string) string { return in.Proxy("/api/items/" + id + "/cover?width=120&format=jpeg") }
+
+	// Who is listening right now (needs an admin key; otherwise left out).
+	var online struct {
+		UsersOnline []struct {
+			Username string `json:"username"`
+			Session  *struct {
+				LibraryItemID string  `json:"libraryItemId"`
+				DisplayTitle  string  `json:"displayTitle"`
+				DisplayAuthor string  `json:"displayAuthor"`
+				CurrentTime   float64 `json:"currentTime"`
+				Duration      float64 `json:"duration"`
+			} `json:"session"`
+		} `json:"usersOnline"`
+	}
+	if a.get(ctx, in, "/api/users/online", nil, &online) == nil {
+		listening := 0
+		for _, u := range online.UsersOnline {
+			s := u.Session
+			if s == nil {
+				continue
+			}
+			listening++
+			it := Item{Title: s.DisplayTitle, Subtitle: strings.Trim(s.DisplayAuthor+" · "+u.Username, " ·"), URL: in.Link("/item/" + s.LibraryItemID), Image: cover(s.LibraryItemID)}
+			if s.Duration > 0 {
+				it.Progress = pct(s.CurrentTime / s.Duration * 100)
+			}
+			w.Items = append(w.Items, it)
+		}
+		w.Stats = append([]Stat{{Label: in.T("Hören gerade"), Value: in.Num(listening)}}, w.Stats...)
+		if listening > 0 {
+			w.ItemsTitle = in.T("Läuft gerade")
+			return w, nil
+		}
+	}
 
 	var prog struct {
 		LibraryItems []struct {
@@ -99,8 +159,32 @@ func (a audiobookshelf) Fetch(ctx context.Context, in *Instance) (*Widget, error
 		w.ItemsTitle = in.T("Weiterhören")
 		for _, it := range prog.LibraryItems {
 			m := it.Media.Metadata
-			w.Items = append(w.Items, Item{Title: m.Title, Subtitle: firstNonEmpty(m.AuthorName, m.Author), URL: in.Link("/item/" + it.ID)})
+			w.Items = append(w.Items, Item{Title: m.Title, Subtitle: firstNonEmpty(m.AuthorName, m.Author), URL: in.Link("/item/" + it.ID), Image: cover(it.ID)})
 		}
+		return w, nil
+	}
+	// Nothing started: what was added last, from the first book library.
+	for _, l := range libs {
+		if l.MediaType == "podcast" {
+			continue
+		}
+		var res struct {
+			Results []struct {
+				ID    string `json:"id"`
+				Media struct {
+					Metadata absMetadata `json:"metadata"`
+				} `json:"media"`
+			} `json:"results"`
+		}
+		q := url.Values{"sort": {"addedAt"}, "desc": {"1"}, "limit": {"5"}}
+		if a.get(ctx, in, "/api/libraries/"+l.ID+"/items", q, &res) == nil && len(res.Results) > 0 {
+			w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+			for _, it := range res.Results {
+				m := it.Media.Metadata
+				w.Items = append(w.Items, Item{Title: m.Title, Subtitle: firstNonEmpty(m.AuthorName, m.Author), URL: in.Link("/item/" + it.ID), Image: cover(it.ID)})
+			}
+		}
+		break
 	}
 	return w, nil
 }

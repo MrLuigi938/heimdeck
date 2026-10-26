@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 // ---- Plex ----
@@ -60,6 +61,15 @@ type plexItem struct {
 		Title string `json:"title"`
 		State string `json:"state"`
 	} `json:"Player"`
+	Session *struct {
+		Bandwidth int    `json:"bandwidth"` // kbit/s
+		Location  string `json:"location"`  // lan | wan
+	} `json:"Session"`
+	TranscodeSession *struct {
+		VideoDecision string `json:"videoDecision"`
+		AudioDecision string `json:"audioDecision"`
+	} `json:"TranscodeSession"`
+	AddedAt int64 `json:"addedAt"`
 }
 
 var plexMachines sync.Map // BaseURL → machineIdentifier
@@ -101,8 +111,9 @@ func (p plex) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		} `json:"MediaContainer"`
 	}
 	p.get(ctx, in, "/library/sections", nil, &secs)
-	counts := map[string]int{}
-	for _, d := range secs.MediaContainer.Directory {
+	// Library size: the items of each section, plus episodes of TV and albums
+	// and tracks of music libraries (Plex types 4, 9 and 10).
+	count := func(key, typ string) (int, bool) {
 		var c struct {
 			MediaContainer struct {
 				TotalSize int `json:"totalSize"`
@@ -110,16 +121,48 @@ func (p plex) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			} `json:"MediaContainer"`
 		}
 		q := url.Values{"X-Plex-Container-Start": {"0"}, "X-Plex-Container-Size": {"0"}}
-		if p.get(ctx, in, "/library/sections/"+d.Key+"/all", q, &c) == nil {
-			n := c.MediaContainer.TotalSize
-			if n == 0 {
-				n = c.MediaContainer.Size
-			}
+		if typ != "" {
+			q.Set("type", typ)
+		}
+		if p.get(ctx, in, "/library/sections/"+key+"/all", q, &c) != nil {
+			return 0, false
+		}
+		if c.MediaContainer.TotalSize > 0 {
+			return c.MediaContainer.TotalSize, true
+		}
+		return c.MediaContainer.Size, true
+	}
+	counts := map[string]int{}
+	for _, d := range secs.MediaContainer.Directory {
+		if n, ok := count(d.Key, ""); ok {
 			counts[d.Type] += n
+		}
+		switch d.Type {
+		case "show":
+			if n, ok := count(d.Key, "4"); ok {
+				counts["episode"] += n
+			}
+		case "artist":
+			if n, ok := count(d.Key, "9"); ok {
+				counts["album"] += n
+			}
+			if n, ok := count(d.Key, "10"); ok {
+				counts["track"] += n
+			}
 		}
 	}
 	w := &Widget{ItemsTitle: in.T("Läuft gerade")}
+	transcoding, bandwidth, remote := 0, 0, 0
 	for _, m := range sess.MediaContainer.Metadata {
+		if m.TranscodeSession != nil && (m.TranscodeSession.VideoDecision == "transcode" || m.TranscodeSession.AudioDecision == "transcode") {
+			transcoding++
+		}
+		if m.Session != nil {
+			bandwidth += m.Session.Bandwidth
+			if m.Session.Location == "wan" {
+				remote++
+			}
+		}
 		it := Item{Title: plexTitle(m), URL: p.link(ctx, in, m.RatingKey)}
 		var sub []string
 		if m.User != nil {
@@ -137,10 +180,42 @@ func (p plex) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		}
 		w.Items = append(w.Items, it)
 	}
-	w.Stats = []Stat{{Label: in.T("Streams"), Value: in.Num(len(w.Items))}}
-	for _, k := range []struct{ typ, label string }{{"movie", "Filme"}, {"show", "Serien"}, {"artist", "Künstler"}} {
+	w.Stats = []Stat{
+		{Label: in.T("Streams"), Value: in.Num(len(w.Items))},
+		{Label: in.T("Transkodiert"), Value: in.Num(transcoding), Tone: toneIf(transcoding > 0, "warn")},
+		{Label: in.T("Von unterwegs"), Value: in.Num(remote)},
+	}
+	if bandwidth > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Bandbreite"), Value: fmt.Sprintf("%.1f Mbit/s", float64(bandwidth)/1000)})
+	}
+	for _, k := range []struct{ typ, label string }{{"movie", "Filme"}, {"show", "Serien"}, {"episode", "Folgen"}, {"artist", "Künstler"}, {"album", "Alben"}, {"track", "Titel"}} {
 		if n, ok := counts[k.typ]; ok {
 			w.Stats = append(w.Stats, Stat{Label: in.T(k.label), Value: in.Num(n)})
+		}
+	}
+	// Nobody watching: what was added last, with covers.
+	if len(w.Items) == 0 {
+		var recent struct {
+			MediaContainer struct {
+				Metadata []plexItem `json:"Metadata"`
+			} `json:"MediaContainer"`
+		}
+		q := url.Values{"X-Plex-Container-Start": {"0"}, "X-Plex-Container-Size": {"5"}}
+		if p.get(ctx, in, "/library/recentlyAdded", q, &recent) == nil && len(recent.MediaContainer.Metadata) > 0 {
+			w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+			for _, m := range recent.MediaContainer.Metadata {
+				it := Item{Title: plexTitle(m), URL: p.link(ctx, in, m.RatingKey)}
+				if m.Type == "season" {
+					it.Title = m.ParentTitle + " · " + m.Title
+				}
+				if m.AddedAt > 0 {
+					it.Subtitle = in.Since(time.Unix(m.AddedAt, 0))
+				}
+				if m.Thumb != "" && plexThumbRe.MatchString(m.Thumb) {
+					it.Image = in.Proxy(m.Thumb)
+				}
+				w.Items = append(w.Items, it)
+			}
 		}
 	}
 	return w, nil
@@ -273,9 +348,10 @@ func (n navidrome) Test(ctx context.Context, in *Instance) error {
 func (n navidrome) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var scan struct {
 		ScanStatus struct {
-			Scanning    bool `json:"scanning"`
-			Count       int  `json:"count"`
-			FolderCount int  `json:"folderCount"`
+			Scanning    bool   `json:"scanning"`
+			Count       int    `json:"count"`
+			FolderCount int    `json:"folderCount"`
+			LastScan    string `json:"lastScan"` // Navidrome extension
 		} `json:"scanStatus"`
 	}
 	if err := n.call(ctx, in, "getScanStatus", nil, &scan); err != nil {
@@ -296,12 +372,36 @@ func (n navidrome) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		} `json:"nowPlaying"`
 	}
 	n.call(ctx, in, "getNowPlaying", nil, &np)
+	// Artists and albums from the artist index (each artist lists its album count).
+	var idx struct {
+		Artists struct {
+			Index []struct {
+				Artist []struct {
+					AlbumCount int `json:"albumCount"`
+				} `json:"artist"`
+			} `json:"index"`
+		} `json:"artists"`
+	}
+	artists, albums := 0, 0
+	if n.call(ctx, in, "getArtists", nil, &idx) == nil {
+		for _, ix := range idx.Artists.Index {
+			artists += len(ix.Artist)
+			for _, a := range ix.Artist {
+				albums += a.AlbumCount
+			}
+		}
+	}
 	w := &Widget{Stats: []Stat{
 		{Label: in.T("Streams"), Value: in.Num(len(np.NowPlaying.Entry))},
 		{Label: in.T("Titel"), Value: in.Num(scan.ScanStatus.Count)},
 	}}
+	if artists > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Künstler"), Value: in.Num(artists)}, Stat{Label: in.T("Alben"), Value: in.Num(albums)})
+	}
 	if scan.ScanStatus.Scanning {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Scan"), Value: in.T("Läuft"), Tone: "warn"})
+	} else if t, err := time.Parse(time.RFC3339, scan.ScanStatus.LastScan); err == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Letzter Scan"), Value: in.Since(t)})
 	}
 	w.ItemsTitle = in.T("Läuft gerade")
 	for _, e := range np.NowPlaying.Entry {
@@ -310,6 +410,26 @@ func (n navidrome) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			it.Progress = pct(e.PosMS / 1000 / e.Duration * 100)
 		}
 		w.Items = append(w.Items, it)
+	}
+	// Nothing playing: the newest albums, with covers.
+	if len(w.Items) == 0 {
+		var list struct {
+			AlbumList2 struct {
+				Album []struct {
+					ID, Name, Artist, CoverArt, Created string
+				} `json:"album"`
+			} `json:"albumList2"`
+		}
+		if n.call(ctx, in, "getAlbumList2", url.Values{"type": {"newest"}, "size": {"5"}}, &list) == nil && len(list.AlbumList2.Album) > 0 {
+			w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+			for _, a := range list.AlbumList2.Album {
+				it := Item{Title: a.Name, Subtitle: a.Artist, URL: in.Link("/app/#/album/" + a.ID + "/show")}
+				if a.CoverArt != "" {
+					it.Image = in.Proxy("/rest/getCoverArt?id=" + url.QueryEscape(a.CoverArt) + "&size=120")
+				}
+				w.Items = append(w.Items, it)
+			}
+		}
 	}
 	return w, nil
 }

@@ -71,8 +71,14 @@ func (n nextcloud) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			Data struct {
 				Nextcloud struct {
 					System struct {
-						Version   string   `json:"version"`
-						Freespace *float64 `json:"freespace"`
+						Version   string    `json:"version"`
+						Freespace *float64  `json:"freespace"`
+						CPULoad   []float64 `json:"cpuload"`
+						MemTotal  float64   `json:"mem_total"` // KiB
+						MemFree   float64   `json:"mem_free"`
+						Apps      struct {
+							Updates int `json:"num_updates_available"`
+						} `json:"apps"`
 					} `json:"system"`
 					Storage struct {
 						Users int `json:"num_users"`
@@ -80,9 +86,16 @@ func (n nextcloud) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 					} `json:"storage"`
 					Shares struct {
 						Shares int `json:"num_shares"`
+						Links  int `json:"num_shares_link"`
 					} `json:"shares"`
 				} `json:"nextcloud"`
+				Server struct {
+					Database struct {
+						Size float64 `json:"size"`
+					} `json:"database"`
+				} `json:"server"`
 				ActiveUsers struct {
+					Last5m  int `json:"last5minutes"`
 					Last24h int `json:"last24hours"`
 				} `json:"activeUsers"`
 			} `json:"data"`
@@ -109,6 +122,26 @@ func (n nextcloud) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}}
 	if f := d.Nextcloud.System.Freespace; f != nil {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Frei"), Value: in.Bytes(*f), Tone: toneIf(*f < 10*1024*1024*1024, "warn")})
+	}
+	sys := d.Nextcloud.System
+	w.Stats = append(w.Stats,
+		Stat{Label: in.T("Aktiv (5 Min.)"), Value: in.Num(d.ActiveUsers.Last5m)},
+		Stat{Label: in.T("Öffentliche Links"), Value: in.Num(d.Nextcloud.Shares.Links)})
+	if len(sys.CPULoad) > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Last"), Value: fmt.Sprintf("%.2f", sys.CPULoad[0])})
+	}
+	if sys.MemTotal > 0 {
+		used := (sys.MemTotal - sys.MemFree) / sys.MemTotal * 100
+		w.Stats = append(w.Stats, Stat{Label: in.T("RAM"), Value: fmt.Sprintf("%.0f %%", used), Tone: toneIf(used >= 90, "warn")})
+	}
+	if s := d.Server.Database.Size; s > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Datenbank"), Value: in.Bytes(s)})
+	}
+	if sys.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: sys.Version})
+	}
+	if sys.Apps.Updates > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("App-Updates"), Value: in.Num(sys.Apps.Updates), Tone: "warn"})
 	}
 	return w, nil
 }

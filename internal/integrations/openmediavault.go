@@ -222,9 +222,14 @@ func (o openmediavault) Fetch(ctx context.Context, in *Instance) (*Widget, error
 		return nil, err
 	}
 	sort.SliceStable(fss, func(i, j int) bool { return fss[i].Percentage > fss[j].Percentage })
+	var total, free float64
 	for _, fs := range fss {
 		if fs.Size <= 0 {
 			continue
+		}
+		if fs.MountPoint != "/" {
+			total += float64(fs.Size)
+			free += float64(fs.Available)
 		}
 		name := firstNonEmpty(fs.Label, fs.MountPoint, fs.DeviceFile)
 		if fs.MountPoint == "/" {
@@ -242,6 +247,12 @@ func (o openmediavault) Fetch(ctx context.Context, in *Instance) (*Widget, error
 		w.ItemsTitle = in.T("Dateisysteme")
 		w.Items = w.Items[:min(5, len(w.Items))]
 	}
+	if total > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Daten frei"), Value: in.Bytes(free)}, Stat{Label: in.T("Daten gesamt"), Value: in.Bytes(total)})
+	}
+	if info.Version != "" {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Version"), Value: strings.SplitN(info.Version, " ", 2)[0]})
+	}
 
 	// S.M.A.R.T. is optional: some disks (USB, virtual) do not support it.
 	var disks []struct {
@@ -251,14 +262,23 @@ func (o openmediavault) Fetch(ctx context.Context, in *Instance) (*Widget, error
 		OverallStatus string `json:"overallstatus"`
 	}
 	if o.rpc(ctx, in, "Smart", "enumerateDevices", nil, &disks) == nil && len(disks) > 0 {
-		bad := 0
+		bad, hot := 0, 0.0
 		for _, d := range disks {
 			if d.OverallStatus != "" && d.OverallStatus != "GOOD" {
 				bad++
 				w.Alerts = append(w.Alerts, in.T("Festplatte %s: S.M.A.R.T.-Warnung", firstNonEmpty(d.Model, d.DeviceFile)))
 			}
+			switch t := d.Temperature.(type) {
+			case float64:
+				hot = max(hot, t)
+			case string:
+				hot = max(hot, parseOmvNum(strings.TrimSuffix(strings.TrimSpace(t), "°C")))
+			}
 		}
 		w.Stats = append(w.Stats, Stat{Label: in.T("Platten OK"), Value: fmt.Sprintf("%d/%d", len(disks)-bad, len(disks)), Tone: toneIf(bad > 0, "bad")})
+		if hot > 0 && hot < 120 {
+			w.Stats = append(w.Stats, Stat{Label: in.T("Wärmste Platte"), Value: fmt.Sprintf("%.0f °C", hot), Tone: toneIf(hot >= 50, "warn")})
+		}
 	}
 	return w, nil
 }

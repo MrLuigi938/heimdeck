@@ -81,19 +81,45 @@ func (k komga) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	k.call(ctx, in, "POST", "/books/list", url.Values{"size": {"5"}, "sort": {"readProgress.readDate,desc"}},
 		map[string]any{"condition": map[string]any{"readStatus": map[string]string{"operator": "is", "value": "IN_PROGRESS"}}}, &reading)
 
+	status := func(s string) int {
+		var p komgaPage[komgaBook]
+		k.call(ctx, in, "POST", "/books/list", url.Values{"size": {"1"}},
+			map[string]any{"condition": map[string]any{"readStatus": map[string]string{"operator": "is", "value": s}}}, &p)
+		return p.TotalElements
+	}
+	var libs []struct{}
+	k.call(ctx, in, "GET", "/libraries", nil, nil, &libs)
+
 	w := &Widget{Stats: []Stat{
 		{Label: in.T("Serien"), Value: in.Num(series.TotalElements)},
 		{Label: in.T("Bücher"), Value: in.Num(books.TotalElements)},
 		{Label: in.T("Angefangen"), Value: in.Num(reading.TotalElements)},
+		{Label: in.T("Gelesen"), Value: in.Num(status("READ"))},
+		{Label: in.T("Ungelesen"), Value: in.Num(status("UNREAD"))},
 	}}
+	if len(libs) > 0 {
+		w.Stats = append(w.Stats, Stat{Label: in.T("Bibliotheken"), Value: in.Num(len(libs))})
+	}
+	book := func(b komgaBook) Item {
+		it := Item{Title: b.SeriesTitle, Subtitle: b.Metadata.Title, URL: in.Link("/book/" + b.ID), Image: in.Proxy("/api/v1/books/" + b.ID + "/thumbnail")}
+		if b.ReadProgress != nil && b.Media.PagesCount > 0 {
+			it.Progress = pct(float64(b.ReadProgress.Page) / float64(b.Media.PagesCount) * 100)
+		}
+		return it
+	}
 	if len(reading.Content) > 0 {
 		w.ItemsTitle = in.T("Weiterlesen")
 		for _, b := range reading.Content {
-			it := Item{Title: b.SeriesTitle, Subtitle: b.Metadata.Title, URL: in.Link("/book/" + b.ID)}
-			if b.ReadProgress != nil && b.Media.PagesCount > 0 {
-				it.Progress = pct(float64(b.ReadProgress.Page) / float64(b.Media.PagesCount) * 100)
-			}
-			w.Items = append(w.Items, it)
+			w.Items = append(w.Items, book(b))
+		}
+		return w, nil
+	}
+	// Nothing started: the newest books.
+	var recent komgaPage[komgaBook]
+	if k.call(ctx, in, "POST", "/books/list", url.Values{"size": {"5"}, "sort": {"createdDate,desc"}}, map[string]any{}, &recent) == nil && len(recent.Content) > 0 {
+		w.ItemsTitle = in.T("Zuletzt hinzugefügt")
+		for _, b := range recent.Content {
+			w.Items = append(w.Items, book(b))
 		}
 	}
 	return w, nil

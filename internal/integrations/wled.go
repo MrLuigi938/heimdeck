@@ -33,9 +33,14 @@ type wledState struct {
 	Bri int  `json:"bri"`
 	PS  int  `json:"ps"`
 	Seg []struct {
-		FX int  `json:"fx"`
-		On bool `json:"on"`
+		FX  int  `json:"fx"`
+		Pal int  `json:"pal"`
+		On  bool `json:"on"`
 	} `json:"seg"`
+	NL struct {
+		On  bool `json:"on"`
+		Dur int  `json:"dur"` // minutes
+	} `json:"nl"`
 }
 
 type wledAll struct {
@@ -48,10 +53,12 @@ type wledAll struct {
 			Pwr   int `json:"pwr"` // mA
 		} `json:"leds"`
 		Wifi struct {
-			Signal int `json:"signal"`
+			Signal int `json:"signal"` // percent
 		} `json:"wifi"`
+		Uptime int `json:"uptime"` // seconds
 	} `json:"info"`
-	Effects []string `json:"effects"`
+	Effects  []string `json:"effects"`
+	Palettes []string `json:"palettes"`
 }
 
 // presets returns preset ID → name; playlists and empty slots included.
@@ -101,6 +108,22 @@ func (w wled) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if all.Info.Leds.Count > 0 {
 		wd.Stats = append(wd.Stats, Stat{Label: in.T("LEDs"), Value: in.Num(all.Info.Leds.Count)})
 	}
+	if len(st.Seg) > 0 && st.Seg[0].Pal >= 0 && st.Seg[0].Pal < len(all.Palettes) {
+		wd.Stats = append(wd.Stats, Stat{Label: in.T("Palette"), Value: all.Palettes[st.Seg[0].Pal]})
+	}
+	if len(st.Seg) > 1 {
+		wd.Stats = append(wd.Stats, Stat{Label: in.T("Segmente"), Value: in.Num(len(st.Seg))})
+	}
+	if st.NL.On {
+		wd.Stats = append(wd.Stats, Stat{Label: in.T("Nachtlicht"), Value: in.T("%d Min.", st.NL.Dur)})
+	}
+	if s := all.Info.Wifi.Signal; s > 0 {
+		wd.Stats = append(wd.Stats, Stat{Label: in.T("WLAN"), Value: fmt.Sprintf("%d %%", s), Tone: toneIf(s < 40, "warn")})
+	}
+	if all.Info.Uptime > 0 {
+		wd.Stats = append(wd.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, float64(all.Info.Uptime))})
+	}
+	wd.Stats = append(wd.Stats, Stat{Label: in.T("Version"), Value: all.Info.Ver})
 
 	toggle := Action{ID: "toggle", Label: in.T("Einschalten"), Tone: "primary"}
 	if st.On {
