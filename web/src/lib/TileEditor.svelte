@@ -9,7 +9,8 @@
     tubesy: { repo: 'https://github.com/MrLuigi938/tubesy', note: 'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.' },
   };
   import Widget from './Widget.svelte';
-  import { APPS, androidLink, shortcutLink } from './apps.js';
+  import { APPS, ANDROID_APPS, androidApp, packageOf, shortcutLink } from './apps.js';
+  import { platform } from './network.svelte.js';
   import { t } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
 
@@ -24,6 +25,8 @@
   });
   form.config ??= {};
   form.hide ??= [];
+  // The Android field shows only the package name; the server turns it into the link.
+  form.appAndroid = packageOf(form.appAndroid);
   let secrets = $state({});
   let step = $state(form.integration || form.id ? 'form' : 'pick');
   let filter = $state('');
@@ -34,6 +37,28 @@
 
   let def = $derived(integrations.find((d) => d.id === (form.integration || 'link')));
   let app = $derived(APPS[form.integration]);
+
+  // Tries the Android app link right away on the phone: the page goes to the
+  // background when the app opens; if not, Chrome comes back to this page
+  // (the fallback only changes the #), so the result can be shown here.
+  let appTest = $state('');
+  function testApp() {
+    const back = '#app-test-failed';
+    let link = androidApp(form.appAndroid);
+    if (/^intent:/i.test(link) && /;end$/.test(link) && !link.includes('S.browser_fallback_url=')) {
+      link = link.replace(/;end$/, `;S.browser_fallback_url=${encodeURIComponent(location.href.split('#')[0] + back)};end`);
+    }
+    let opened = false;
+    const hidden = () => { if (document.hidden) opened = true; };
+    document.addEventListener('visibilitychange', hidden);
+    appTest = 'trying';
+    location.href = link;
+    setTimeout(() => {
+      document.removeEventListener('visibilitychange', hidden);
+      if (location.hash === back) history.replaceState(null, '', location.pathname + location.search);
+      appTest = opened ? 'ok' : 'failed';
+    }, 2500);
+  }
   let general = $derived(t('Allgemein'));
   let categories = $derived.by(() => {
     const f = filter.trim().toLowerCase();
@@ -436,12 +461,24 @@
             <label class="field">
               <span>Android</span>
               <div class="row">
-                <input bind:value={form.appAndroid} placeholder="intent://#Intent;package=…;end" spellcheck="false" autocomplete="off" />
-                {#if app?.android && form.appAndroid !== androidLink(app.android)}
-                  <button type="button" class="small" onclick={() => (form.appAndroid = androidLink(app.android))}>{t('{app}-App', { app: app.name })}</button>
+                <input bind:value={form.appAndroid} oninput={() => (appTest = '')} list="android-apps" placeholder={t('z. B. {pkg}', { pkg: 'dev.jdtech.jellyfin' })} spellcheck="false" autocomplete="off" autocapitalize="off" />
+                {#if app?.android && form.appAndroid !== app.android}
+                  <button type="button" class="small" onclick={() => { form.appAndroid = app.android; appTest = ''; }}>{t('{app}-App', { app: app.name })}</button>
+                {/if}
+                {#if platform === 'android' && form.appAndroid.trim()}
+                  <button type="button" class="small" disabled={appTest === 'trying'} onclick={testApp}>{t('Testen')}</button>
                 {/if}
               </div>
-              <span class="help">{t('Andere Apps: den Paketnamen aus der Play-Store-Adresse (hinter „id=“) einsetzen. Ist die App nicht installiert, öffnet sich die Webseite.')}</span>
+              <datalist id="android-apps">
+                {#each ANDROID_APPS as a (a.android)}<option value={a.android}>{a.name}</option>{/each}
+              </datalist>
+              {#if appTest === 'ok'}
+                <span class="help ok">✓ {t('Die App hat sich geöffnet.')}</span>
+              {:else if appTest === 'failed'}
+                <span class="help bad">{t('Die App hat sich nicht geöffnet. Entweder ist sie nicht installiert, der Paketname stimmt nicht – oder die App lässt sich nicht von einer Webseite aus öffnen. Dann öffnet die Kachel weiter die Webseite.')}</span>
+              {/if}
+              <span class="help">{t('Den Paketnamen der App eintragen – er steht in der Play-Store-Adresse hinter „id=“ (die ganze Adresse einfügen geht auch).')}</span>
+              <span class="help">⚠️ {t('Android lässt Webseiten nur Apps öffnen, die das erlauben – viele Apps tun das nicht. Dann öffnet die Kachel einfach weiter die Webseite; an Heimdeck liegt das nicht.')}{platform === 'android' ? ' ' + t('Mit „Testen“ siehst du sofort, ob es klappt.') : ' ' + t('Ob es klappt, kannst du im Editor auf dem Android-Handy mit „Testen“ prüfen.')}</span>
             </label>
             <label class="field">
               <span>iPhone / iPad</span>
@@ -552,6 +589,9 @@
   .cid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); }
   .cval { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
   .bad { color: var(--bad); }
+  .help.ok { color: var(--ok); }
+  .app .row { flex-wrap: wrap; }
+  .app .row input { min-width: 180px; }
   .test { padding: 12px; border-radius: var(--r-md); font-size: 14px; }
   .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
   .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }

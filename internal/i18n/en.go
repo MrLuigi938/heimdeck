@@ -812,7 +812,7 @@ var en = map[string]string{
 	"Dieses Konto ist gesperrt":                                                             "This account is disabled",
 	"unbekannte Rolle":                                                                      "unknown role",
 	"unbekannter Benutzer":                                                                  "unknown user",
-	"App-Link: bitte einen vollständigen Link angeben, z. B. intent://… oder shortcuts://…": "App link: please enter a complete link, e.g. intent://… or shortcuts://…",
+	"App-Link: bitte den Paketnamen der App (z. B. dev.jdtech.jellyfin) oder einen vollständigen Link angeben": "App link: please enter the app's package name (e.g. dev.jdtech.jellyfin) or a complete link",
 	"App-Link: diese Art von Link ist nicht erlaubt":                                        "App link: this kind of link is not allowed",
 	"App-Link ist zu lang":                                                                  "App link is too long",
 }

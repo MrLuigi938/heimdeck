@@ -469,13 +469,31 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 	}
 	t.Hide = hide
 	var err error
-	if t.AppAndroid, err = appLink(t.AppAndroid); err == nil {
+	if t.AppAndroid, err = appLink(androidApp(t.AppAndroid)); err == nil {
 		t.AppIOS, err = appLink(t.AppIOS)
 	}
 	return t, err
 }
 
 var appSchemeRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
+
+var (
+	androidPkgRe  = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$`)
+	playStoreIDRe = regexp.MustCompile(`^https://play\.google\.com/store/apps/details\?(?:.*&)?id=([a-zA-Z][a-zA-Z0-9_.]*)`)
+)
+
+// androidApp turns what people paste for the Android app – the package name
+// or its Play Store address – into the link that opens the app.
+func androidApp(u string) string {
+	u = strings.TrimSpace(u)
+	if m := playStoreIDRe.FindStringSubmatch(u); m != nil {
+		u = m[1]
+	}
+	if androidPkgRe.MatchString(u) {
+		return "intent://#Intent;package=" + u + ";end"
+	}
+	return u
+}
 
 // appLink checks the link a tile opens on phones instead of its website: any
 // app scheme (intent:, shortcuts:, homeassistant: …) or https, but nothing a
@@ -488,7 +506,7 @@ func appLink(u string) (string, error) {
 	scheme := strings.ToLower(strings.TrimSuffix(appSchemeRe.FindString(u), ":"))
 	switch scheme {
 	case "":
-		return "", errors.New("App-Link: bitte einen vollständigen Link angeben, z. B. intent://… oder shortcuts://…")
+		return "", errors.New("App-Link: bitte den Paketnamen der App (z. B. dev.jdtech.jellyfin) oder einen vollständigen Link angeben")
 	case "javascript", "data", "vbscript", "file", "blob", "about", "http":
 		return "", errors.New("App-Link: diese Art von Link ist nicht erlaubt")
 	}

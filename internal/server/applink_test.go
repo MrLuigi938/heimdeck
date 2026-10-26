@@ -18,11 +18,23 @@ func TestAppLink(t *testing.T) {
 		}
 	}
 
+	// The package name or the Play Store address is enough for Android.
+	for in, want := range map[string]string{
+		" dev.jdtech.jellyfin ": "intent://#Intent;package=dev.jdtech.jellyfin;end",
+		"https://play.google.com/store/apps/details?id=com.ubnt.easyunifi&hl=de": "intent://#Intent;package=com.ubnt.easyunifi;end",
+		"homeassistant://navigate": "homeassistant://navigate",
+		"jellyfin": "jellyfin",
+	} {
+		if got := androidApp(in); got != want {
+			t.Errorf("androidApp(%q) = %q, want %q", in, got, want)
+		}
+	}
+
 	// Stored with the tile and kept when the tile is edited.
 	s := testServer(t)
 	g, _ := s.store.CreateGroup("A", 0)
 	tile, err := s.buildTile(tileInput{Tile: store.Tile{GroupID: g.ID, Name: "UniFi", URL: "https://192.168.1.1", Integration: "link",
-		AppAndroid: " intent://#Intent;package=com.ubnt.easyunifi;end ", AppIOS: "shortcuts://run-shortcut?name=UniFi"}}, 0)
+		AppAndroid: " com.ubnt.easyunifi ", AppIOS: "shortcuts://run-shortcut?name=UniFi"}}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

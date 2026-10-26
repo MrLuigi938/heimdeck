@@ -535,8 +535,17 @@ export const en = {
     'On a phone, tapping the tile then opens the app instead of the website. On a computer nothing changes.',
   '{app}-App': '{app} app',
   'Kurzbefehl': 'Shortcut',
-  'Andere Apps: den Paketnamen aus der Play-Store-Adresse (hinter „id=“) einsetzen. Ist die App nicht installiert, öffnet sich die Webseite.':
-    'Other apps: put in the package name from the Play Store address (after “id=”). If the app is not installed, the website opens.',
+  'z. B. {pkg}': 'e.g. {pkg}',
+  'Testen': 'Test',
+  'Die App hat sich geöffnet.': 'The app opened.',
+  'Die App hat sich nicht geöffnet. Entweder ist sie nicht installiert, der Paketname stimmt nicht – oder die App lässt sich nicht von einer Webseite aus öffnen. Dann öffnet die Kachel weiter die Webseite.':
+    'The app did not open. Either it is not installed, the package name is wrong – or the app cannot be opened from a website. Then the tile keeps opening the website.',
+  'Den Paketnamen der App eintragen – er steht in der Play-Store-Adresse hinter „id=“ (die ganze Adresse einfügen geht auch).':
+    'Enter the app’s package name – it is in the Play Store address after “id=” (pasting the whole address works too).',
+  'Android lässt Webseiten nur Apps öffnen, die das erlauben – viele Apps tun das nicht. Dann öffnet die Kachel einfach weiter die Webseite; an Heimdeck liegt das nicht.':
+    'Android only lets websites open apps that allow it – many apps don’t. Then the tile simply keeps opening the website; that is not Heimdeck’s fault.',
+  'Mit „Testen“ siehst du sofort, ob es klappt.': 'With “Test” you see right away whether it works.',
+  'Ob es klappt, kannst du im Editor auf dem Android-Handy mit „Testen“ prüfen.': 'You can check whether it works with “Test” in the editor on the Android phone.',
   'Die meisten Apps lassen sich auf dem iPhone nur über einen Kurzbefehl öffnen: In der Kurzbefehle-App einen neuen Kurzbefehl mit der Aktion „App öffnen“ anlegen und ihn genau wie die Kachel nennen. Beim ersten Mal fragt iOS nach.':
     'On an iPhone most apps can only be opened through a shortcut: in the Shortcuts app, create a new shortcut with the action “Open App” and give it exactly the name of the tile. iOS asks the first time.',
 
