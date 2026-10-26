@@ -536,6 +536,12 @@ export const en = {
   'Gruppe auf diesem Dashboard': 'Group on this dashboard',
   'Hinspringen': 'Jump there',
   'Springen zu': 'Jump to',
+  'Zu einer Gruppe springen': 'Jump to a group',
+  'Ganz nach oben': 'Back to the top',
+  'Sprungleiste mit den Gruppen unter der Suche': 'Jump bar with the groups below the search',
+  'Ab drei Gruppen. Bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.': 'From three groups on. Stays at the top while you scroll and shows which group you are in.',
+  'Auf dem Handy: Knopf zum Springen unten rechts': 'On phones: jump button at the bottom right',
+  'Erscheint beim Herunterscrollen und öffnet die Liste der Gruppen. Springen geht auch immer über die Suche.': 'Shows up when you scroll down and opens the list of groups. You can always jump from the search too.',
 
   // users and sharing
   'Benutzerverwaltung': 'Users',
