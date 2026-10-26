@@ -4,7 +4,7 @@
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
   import SearchWindow from './SearchWindow.svelte';
-  import { tileHref, rewrite } from './network.svelte.js';
+  import { tileHref, rewrite, isAppLink } from './network.svelte.js';
   import { t } from './i18n.svelte.js';
 
   // Searches the own tiles instantly and all connected services (Jellyfin,
@@ -165,7 +165,7 @@
 
   function openUrl(url) {
     remember();
-    window.open(url, newTab ? '_blank' : '_self');
+    window.open(url, newTab && !isAppLink(url) ? '_blank' : '_self');
     reset();
   }
 
@@ -255,7 +255,7 @@
       {#if tileHits.length}
         <div class="section">{t('Kacheln')}</div>
         {#each tileHits as hit}
-          <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer" onclick={() => { remember(); setTimeout(reset); }}>
+          <a class="hit" href={tileHref(hit, local)} target={newTab && !isAppLink(tileHref(hit, local)) ? '_blank' : undefined} rel="noopener noreferrer" onclick={() => { remember(); setTimeout(reset); }}>
             <Icon icon={hit.icon} name={hit.name} favicon={faviconUrl(hit)} size={24} /> <span>{hit.name}</span>
           </a>
         {/each}
@@ -304,7 +304,7 @@
           <div class="col">
             <div class="col-head">{t('Kacheln')} <span class="count">{tileHits.length}</span></div>
             {#each tileHits as hit}
-              <a class="hit" href={tileHref(hit, local)} target={newTab ? '_blank' : undefined} rel="noopener noreferrer" onclick={() => { remember(); setTimeout(reset); }}>
+              <a class="hit" href={tileHref(hit, local)} target={newTab && !isAppLink(tileHref(hit, local)) ? '_blank' : undefined} rel="noopener noreferrer" onclick={() => { remember(); setTimeout(reset); }}>
                 <Icon icon={hit.icon} name={hit.name} favicon={faviconUrl(hit)} size={24} /> <span>{hit.name}</span>
               </a>
             {/each}

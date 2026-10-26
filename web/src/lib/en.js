@@ -529,6 +529,17 @@ export const en = {
   'Einzelne Datei': 'Single binary',
   'Kopieren nicht möglich – bitte von Hand markieren.': 'Copying is not possible – please select it by hand.',
 
+  // app links on phones
+  'Auf dem Handy die App öffnen': 'Open the app on phones',
+  'Auf dem Handy öffnet ein Tipp auf die Kachel dann die App statt der Webseite. Am Computer bleibt alles wie gehabt.':
+    'On a phone, tapping the tile then opens the app instead of the website. On a computer nothing changes.',
+  '{app}-App': '{app} app',
+  'Kurzbefehl': 'Shortcut',
+  'Andere Apps: den Paketnamen aus der Play-Store-Adresse (hinter „id=“) einsetzen. Ist die App nicht installiert, öffnet sich die Webseite.':
+    'Other apps: put in the package name from the Play Store address (after “id=”). If the app is not installed, the website opens.',
+  'Die meisten Apps lassen sich auf dem iPhone nur über einen Kurzbefehl öffnen: In der Kurzbefehle-App einen neuen Kurzbefehl mit der Aktion „App öffnen“ anlegen und ihn genau wie die Kachel nennen. Beim ersten Mal fragt iOS nach.':
+    'On an iPhone most apps can only be opened through a shortcut: in the Shortcuts app, create a new shortcut with the action “Open App” and give it exactly the name of the tile. iOS asks the first time.',
+
   // jumping to groups
   'Gruppen': 'Groups',
   '{n} Kacheln': '{n} tiles',

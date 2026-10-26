@@ -9,6 +9,7 @@
     tubesy: { repo: 'https://github.com/MrLuigi938/tubesy', note: 'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.' },
   };
   import Widget from './Widget.svelte';
+  import { APPS, androidLink, shortcutLink } from './apps.js';
   import { t } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
 
@@ -18,7 +19,7 @@
   // svelte-ignore state_referenced_locally
   let form = $state({
     id: 0, groupId: groups[0]?.id, name: '', url: '', externalUrl: '', apiUrl: '', icon: '', description: '',
-    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, monitorExternal: false, secretsSet: [], hide: [],
+    integration: '', config: {}, insecure: false, showWidget: true, monitor: true, monitorExternal: false, secretsSet: [], hide: [], appAndroid: '', appIos: '',
     ...structuredClone($state.snapshot(tile)),
   });
   form.config ??= {};
@@ -26,12 +27,13 @@
   let secrets = $state({});
   let step = $state(form.integration || form.id ? 'form' : 'pick');
   let filter = $state('');
-  let advanced = $state(!!(form.apiUrl || form.insecure));
+  let advanced = $state(!!(form.apiUrl || form.insecure || form.appAndroid || form.appIos));
   let testing = $state(false);
   let test = $state(null);
   let saving = $state(false);
 
   let def = $derived(integrations.find((d) => d.id === (form.integration || 'link')));
+  let app = $derived(APPS[form.integration]);
   let general = $derived(t('Allgemein'));
   let categories = $derived.by(() => {
     const f = filter.trim().toLowerCase();
@@ -427,6 +429,33 @@
             <span class="help">{t('Falls das Dashboard den Dienst anders erreicht als dein Browser – z. B. über den Containernamen im selben Docker-Netzwerk.')}</span>
           </label>
           <label class="check"><input type="checkbox" bind:checked={form.insecure} /> {t('Zertifikat nicht prüfen (selbstsignierte HTTPS-Zertifikate)')}</label>
+          <!-- A side option, folded away: on phones the tile can open the service's app. -->
+          <details class="setup app" open={!!(form.appAndroid || form.appIos)}>
+            <summary>📱 {t('Auf dem Handy die App öffnen')} <span class="muted">({t('optional')})</span></summary>
+            <span class="help">{t('Auf dem Handy öffnet ein Tipp auf die Kachel dann die App statt der Webseite. Am Computer bleibt alles wie gehabt.')}</span>
+            <label class="field">
+              <span>Android</span>
+              <div class="row">
+                <input bind:value={form.appAndroid} placeholder="intent://#Intent;package=…;end" spellcheck="false" autocomplete="off" />
+                {#if app?.android && form.appAndroid !== androidLink(app.android)}
+                  <button type="button" class="small" onclick={() => (form.appAndroid = androidLink(app.android))}>{t('{app}-App', { app: app.name })}</button>
+                {/if}
+              </div>
+              <span class="help">{t('Andere Apps: den Paketnamen aus der Play-Store-Adresse (hinter „id=“) einsetzen. Ist die App nicht installiert, öffnet sich die Webseite.')}</span>
+            </label>
+            <label class="field">
+              <span>iPhone / iPad</span>
+              <div class="row">
+                <input bind:value={form.appIos} placeholder="shortcuts://run-shortcut?name=…" spellcheck="false" autocomplete="off" />
+                {#if app?.ios && form.appIos !== app.ios}
+                  <button type="button" class="small" onclick={() => (form.appIos = app.ios)}>{t('{app}-App', { app: app.name })}</button>
+                {:else if form.name.trim() && form.appIos !== shortcutLink(form.name)}
+                  <button type="button" class="small" onclick={() => (form.appIos = shortcutLink(form.name))}>{t('Kurzbefehl')}</button>
+                {/if}
+              </div>
+              <span class="help">{t('Die meisten Apps lassen sich auf dem iPhone nur über einen Kurzbefehl öffnen: In der Kurzbefehle-App einen neuen Kurzbefehl mit der Aktion „App öffnen“ anlegen und ihn genau wie die Kachel nennen. Beim ersten Mal fragt iOS nach.')}</span>
+            </label>
+          </details>
         </div>
       {/if}
 

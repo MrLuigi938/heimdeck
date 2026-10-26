@@ -52,11 +52,33 @@ export function isLocal() {
   return detectLocal(network.localHosts);
 }
 
-// The address a tile should open right now.
-export function tileHref(tile, local) {
+// The website a tile opens: the public address when away, the local one at home.
+export function webHref(tile, local) {
   if (!local && tile.externalUrl) return tile.externalUrl;
   return tile.url || tile.externalUrl || '';
 }
+
+// Phones the dashboard runs on; iPads report themselves as a Mac with touch.
+const ua = navigator.userAgent;
+export const platform = /Android/i.test(ua) ? 'android' : /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios' : '';
+
+// The address a tile should open right now: on a phone its app, if the tile
+// has an app link for that phone, otherwise the website.
+export function tileHref(tile, local) {
+  const web = webHref(tile, local);
+  if (platform === 'android' && tile.appAndroid) return withFallback(tile.appAndroid, web);
+  if (platform === 'ios' && tile.appIos) return tile.appIos;
+  return web;
+}
+
+// An Android intent link falls back to the website when the app is not installed.
+function withFallback(link, web) {
+  if (!web || !/^intent:/i.test(link) || link.includes('S.browser_fallback_url=') || !/;end$/.test(link)) return link;
+  return link.replace(/;end$/, `;S.browser_fallback_url=${encodeURIComponent(web)};end`);
+}
+
+// App links open in the same tab: a new tab would stay empty behind the app.
+export const isAppLink = (href) => !!href && !/^https?:/i.test(href);
 
 // Widget and search links are built from the tile's local address by the
 // backend; when away, point them at the public address instead.

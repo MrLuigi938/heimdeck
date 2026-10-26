@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"slices"
 	"sort"
@@ -467,7 +468,34 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 		}
 	}
 	t.Hide = hide
-	return t, nil
+	var err error
+	if t.AppAndroid, err = appLink(t.AppAndroid); err == nil {
+		t.AppIOS, err = appLink(t.AppIOS)
+	}
+	return t, err
+}
+
+var appSchemeRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
+
+// appLink checks the link a tile opens on phones instead of its website: any
+// app scheme (intent:, shortcuts:, homeassistant: …) or https, but nothing a
+// browser would run as a script or read from the device.
+func appLink(u string) (string, error) {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return "", nil
+	}
+	scheme := strings.ToLower(strings.TrimSuffix(appSchemeRe.FindString(u), ":"))
+	switch scheme {
+	case "":
+		return "", errors.New("App-Link: bitte einen vollständigen Link angeben, z. B. intent://… oder shortcuts://…")
+	case "javascript", "data", "vbscript", "file", "blob", "about", "http":
+		return "", errors.New("App-Link: diese Art von Link ist nicht erlaubt")
+	}
+	if len(u) > 2000 {
+		return "", errors.New("App-Link ist zu lang")
+	}
+	return u, nil
 }
 
 func normalizeURL(u, scheme string) string {
@@ -1107,6 +1135,8 @@ type exportTile struct {
 	MonitorExt  bool              `json:"monitorExternal,omitempty"`
 	Grid        *store.GridPos    `json:"grid,omitempty"`
 	Hide        []string          `json:"hide,omitempty"`
+	AppAndroid  string            `json:"appAndroid,omitempty"`
+	AppIOS      string            `json:"appIos,omitempty"`
 }
 
 type exportData struct {
@@ -1159,7 +1189,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		for _, t := range tiles {
 			if t.GroupID == g.ID {
 				eg.Tiles = append(eg.Tiles, exportTile{Name: t.Name, URL: t.URL, ExternalURL: t.ExternalURL, APIURL: t.APIURL, Icon: t.Icon,
-					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor, MonitorExt: t.MonitorExt, Grid: t.Grid, Hide: t.Hide})
+					Description: t.Description, Integration: t.Integration, Config: t.Config, Insecure: t.Insecure, ShowWidget: t.ShowWidget, NoMonitor: !t.Monitor, MonitorExt: t.MonitorExt, Grid: t.Grid, Hide: t.Hide, AppAndroid: t.AppAndroid, AppIOS: t.AppIOS})
 			}
 		}
 		data.Groups = append(data.Groups, eg)
@@ -1240,7 +1270,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			t, err := s.buildTile(tileInput{Tile: store.Tile{
 				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
 				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget, Grid: et.Grid, Hide: et.Hide,
-				MonitorExt: et.MonitorExt,
+				MonitorExt: et.MonitorExt, AppAndroid: et.AppAndroid, AppIOS: et.AppIOS,
 			}, Monitor: &monitor}, me)
 			if err != nil {
 				continue

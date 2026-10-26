@@ -23,7 +23,7 @@
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Widget from './Widget.svelte';
-  import { tileHref, rewrite } from './network.svelte.js';
+  import { tileHref, rewrite, isAppLink } from './network.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
 
   // free: the tile sits in a free grid, whose size the user sets, so long content is not folded.
@@ -110,7 +110,7 @@
 
 {#if compact}
 <div class="tile card compact {compact}" class:editing={editMode} {...dragProps}>
-  <a class="square" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
+  <a class="square" href={editMode ? undefined : href || undefined} target={newTab && !isAppLink(href) ? '_blank' : undefined} rel="noopener noreferrer"
      title={tile.description ? `${tile.name} – ${tile.description}` : tile.name} aria-label={tile.name}
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
     <Icon icon={tile.icon} name={tile.name} favicon={faviconUrl(tile)} size={44} />
@@ -123,7 +123,7 @@
 </div>
 {:else}
 <div class="tile card" class:wide={!uniform && (live || (missing.length > 0 && def?.hasWidget && tile.showWidget))} class:uniform class:editing={editMode} {...dragProps}>
-  <a class="head" href={editMode ? undefined : href || undefined} target={newTab ? '_blank' : undefined} rel="noopener noreferrer"
+  <a class="head" href={editMode ? undefined : href || undefined} target={newTab && !isAppLink(href) ? '_blank' : undefined} rel="noopener noreferrer"
      onclick={(e) => { if (editMode) { e.preventDefault(); onEdit(); } }}>
     <Icon icon={tile.icon} name={tile.name} favicon={faviconUrl(tile)} size={live ? 34 : 40} />
     <div class="titles">
