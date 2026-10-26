@@ -50,41 +50,6 @@ func (s *Server) lockedGroups(r *http.Request) (map[int64]bool, error) {
 	return locked, nil
 }
 
-// accessibleTiles returns all tiles outside locked groups.
-func (s *Server) accessibleTiles(r *http.Request) ([]store.Tile, error) {
-	locked, err := s.lockedGroups(r)
-	if err != nil {
-		return nil, err
-	}
-	tiles, err := s.store.Tiles()
-	if err != nil {
-		return nil, err
-	}
-	out := tiles[:0]
-	for _, t := range tiles {
-		if !locked[t.GroupID] {
-			out = append(out, t)
-		}
-	}
-	return out, nil
-}
-
-// accessibleTile loads a tile and refuses it if its group is locked.
-func (s *Server) accessibleTile(r *http.Request, id int64) (store.Tile, int, error) {
-	t, err := s.store.Tile(id)
-	if err != nil {
-		return t, 404, err
-	}
-	locked, err := s.lockedGroups(r)
-	if err != nil {
-		return t, 500, err
-	}
-	if locked[t.GroupID] {
-		return t, 403, errLocked
-	}
-	return t, 200, nil
-}
-
 func (s *Server) groupUnlocked(r *http.Request, id int64) (bool, error) {
 	locked, err := s.lockedGroups(r)
 	return !locked[id], err
@@ -110,9 +75,9 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	g, err := s.store.Group(id)
+	g, code, err := s.ownGroup(r, id)
 	if err != nil {
-		writeErr(w, 404, err)
+		writeErr(w, code, err)
 		return
 	}
 	if ok, _ := s.groupUnlocked(r, id); !ok {
@@ -123,7 +88,7 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 		g.Name = name
 	}
 	if body.BoardID != 0 && body.BoardID != g.BoardID {
-		if _, err := s.store.Board(body.BoardID); err != nil {
+		if _, _, err := s.ownBoard(r, body.BoardID); err != nil {
 			writeErr(w, 400, errors.New("unbekanntes Dashboard"))
 			return
 		}
@@ -208,7 +173,7 @@ func (s *Server) handleUnlockGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	g, err := s.store.Group(id)
+	g, acc, err := s.seeGroup(r, id)
 	if err != nil {
 		writeErr(w, 404, err)
 		return
@@ -218,8 +183,8 @@ func (s *Server) handleUnlockGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The group's own password, or – if it is forgotten – the password of the
-	// Heimdeck account; unlocked, the group can be deleted or get a new password.
-	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil && !s.accountPassword(r, body.Password) {
+	// owner's account; unlocked, the group can be deleted or get a new password.
+	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil && !(acc.Own && s.accountPassword(r, body.Password)) {
 		slog.Warn("Entsperren einer geschützten Gruppe fehlgeschlagen", "gruppe", g.Name, "von", r.RemoteAddr)
 		time.Sleep(500 * time.Millisecond) // slow down guessing
 		writeErr(w, 403, errors.New("Falsches Passwort"))
@@ -253,6 +218,10 @@ func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
+	if _, code, err := s.ownGroup(r, id); err != nil {
+		writeErr(w, code, err)
+		return
+	}
 	if ok, _ := s.groupUnlocked(r, id); !ok {
 		writeErr(w, 403, errLocked)
 		return
@@ -275,10 +244,16 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	// Outage alerts (and so browser notifications) only go to the owner of a tile.
+	owners, _ := s.store.TileOwners()
+	me := uid(r)
 	out := map[int64]TileStatus{}
 	s.mu.Lock()
 	for _, t := range tiles {
 		if st, ok := s.latest[t.ID]; ok {
+			if owners[t.ID] != me {
+				st.Alert = ""
+			}
 			out[t.ID] = st
 		}
 	}
@@ -402,7 +377,7 @@ func (s *Server) handleCreateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
-	b := store.Board{Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon), Background: strings.TrimSpace(in.Background), Theme: strings.TrimSpace(in.Theme)}
+	b := store.Board{OwnerID: uid(r), Name: strings.TrimSpace(in.Name), Icon: strings.TrimSpace(in.Icon), Background: strings.TrimSpace(in.Background), Theme: strings.TrimSpace(in.Theme)}
 	if err := s.store.SaveBoard(&b); err != nil {
 		writeErr(w, 500, err)
 		return
@@ -421,9 +396,9 @@ func (s *Server) handleUpdateBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
-	b, err := s.store.Board(id)
+	b, code, err := s.ownBoard(r, id)
 	if err != nil {
-		writeErr(w, 404, err)
+		writeErr(w, code, err)
 		return
 	}
 	b.Name, b.Icon, b.Background, b.Theme = strings.TrimSpace(in.Name), strings.TrimSpace(in.Icon), strings.TrimSpace(in.Background), strings.TrimSpace(in.Theme)
@@ -440,7 +415,11 @@ func (s *Server) handleDeleteBoard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	boards, err := s.store.Boards()
+	if _, code, err := s.ownBoard(r, id); err != nil {
+		writeErr(w, code, err)
+		return
+	}
+	boards, err := s.store.BoardsOf(uid(r))
 	if err != nil {
 		writeErr(w, 500, err)
 		return

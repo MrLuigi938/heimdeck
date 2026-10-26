@@ -52,7 +52,8 @@ func TestOutageNotifications(t *testing.T) {
 
 	s := testServer(t)
 	sealed, _ := s.store.SealSecret([]byte(`{"discordWebhook":"` + hook.URL + `/discord","ntfyToken":"tk_1"}`))
-	s.store.SaveSettings(map[string]string{notifySecretsKey: sealed, "ntfyUrl": hook.URL + "/topic", "notifyAfter": "2", "language": "de"})
+	// The tile is not stored, so it has no owner (0): the settings of user 0 apply.
+	s.store.SaveUserSettings(0, map[string]string{notifySecretsKey: sealed, "ntfyUrl": hook.URL + "/topic", "notifyAfter": "2", "language": "de"})
 	tiles := []store.Tile{{ID: 1, Name: "Radarr", URL: "http://radarr:7878", ExternalURL: "https://radarr.example.de"}}
 
 	round := func(online, ext bool) map[int64]TileStatus {
@@ -142,7 +143,7 @@ func TestTelegram(t *testing.T) {
 	if rec := put(`{"telegramToken":"` + token + `"}`); rec.Code != 200 || strings.Contains(rec.Body.String(), token) || !strings.Contains(rec.Body.String(), `"telegram":true`) {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body.String())
 	}
-	if s.notifySecrets().TelegramToken != token {
+	if s.notifySecrets(0).TelegramToken != token {
 		t.Fatal("token not stored")
 	}
 }

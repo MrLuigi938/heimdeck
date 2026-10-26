@@ -35,9 +35,11 @@ type notifySecrets struct {
 
 const notifySecretsKey = "_notifySecrets"
 
-func (s *Server) notifySecrets() notifySecrets {
+// notifySecrets returns a user's own notification channels: everyone gets
+// the messages about the tiles on their own dashboards.
+func (s *Server) notifySecrets(user int64) notifySecrets {
 	var ns notifySecrets
-	settings, _ := s.store.Settings()
+	settings, _ := s.store.UserSettings(user)
 	if plain, err := s.store.OpenSecret(settings[notifySecretsKey]); err == nil && plain != nil {
 		json.Unmarshal(plain, &ns)
 	}
@@ -53,28 +55,56 @@ type outage struct {
 
 func outageKey(id int64, kind string) string { return strconv.FormatInt(id, 10) + ":" + kind }
 
-// trackOutages updates the failure counters after a full check round and
-// sends notifications for new outages and recoveries.
-func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, now time.Time) {
-	settings, _ := s.store.Settings()
+// notifyPrefs are a user's notification settings.
+type notifyPrefs struct {
+	settings           map[string]string
+	after              int
+	recovery, external bool
+	lang               string
+}
+
+func (s *Server) notifyPrefs(user int64) notifyPrefs {
+	settings := s.settingsFor(user)
 	after, err := strconv.Atoi(settings["notifyAfter"])
 	if err != nil || after < 1 {
 		after = 2
 	}
-	recovery := settings["notifyRecovery"] != "false"
-	external := settings["notifyExternal"] != "false"
-	lang := i18n.Normalize(settings["language"])
+	return notifyPrefs{settings: settings, after: after, recovery: settings["notifyRecovery"] != "false",
+		external: settings["notifyExternal"] != "false", lang: i18n.Normalize(settings["language"])}
+}
+
+// trackOutages updates the failure counters after a full check round and
+// sends notifications for new outages and recoveries – to the owner of the
+// tile, with their settings; people it is shared with get none.
+func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, now time.Time) {
+	owners, _ := s.store.TileOwners()
+	prefs := map[int64]notifyPrefs{}
+	prefsOf := func(user int64) notifyPrefs {
+		p, ok := prefs[user]
+		if !ok {
+			p = s.notifyPrefs(user)
+			prefs[user] = p
+		}
+		return p
+	}
 	names := map[int64]store.Tile{}
 	for _, t := range tiles {
 		names[t.ID] = t
+		prefsOf(owners[t.ID])
 	}
 
-	var msgs []notification
+	msgs := map[int64][]notification{}
 	s.mu.Lock()
 	seen := map[string]bool{}
 	for id, st := range latest {
+		owner := owners[id]
+		p := prefs[owner]
+		if p.settings == nil {
+			continue // a tile that was deleted during the check round
+		}
+		after, recovery, lang := p.after, p.recovery, p.lang
 		checks := map[string]bool{"int": st.Online}
-		if st.Ext != nil && external {
+		if st.Ext != nil && p.external {
 			checks["ext"] = st.Ext.Online
 		}
 		for kind, online := range checks {
@@ -91,7 +121,7 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 					slog.Info("Dienst wieder erreichbar", "kachel", t.Name, "adresse", kind, "ausfall", now.Sub(o.since).Round(time.Second))
 				}
 				if o.notified && recovery {
-					msgs = append(msgs, recoveredMsg(lang, t, kind, now.Sub(o.since)))
+					msgs[owner] = append(msgs[owner], recoveredMsg(lang, t, kind, now.Sub(o.since)))
 				}
 				*o = outage{}
 				continue
@@ -103,7 +133,7 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 			if o.fails >= after && !o.notified {
 				o.notified = true
 				slog.Warn("Dienst nicht erreichbar", "kachel", t.Name, "adresse", kind, "seit", o.since.Format("15:04:05"), "prüfungen", o.fails)
-				msgs = append(msgs, downMsg(lang, t, kind, o.since))
+				msgs[owner] = append(msgs[owner], downMsg(lang, t, kind, o.since))
 			}
 		}
 	}
@@ -126,8 +156,8 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 	}
 	s.mu.Unlock()
 
-	if len(msgs) > 0 {
-		go s.send(settings, msgs)
+	for owner, list := range msgs {
+		go s.send(owner, prefs[owner].settings, list)
 	}
 }
 
@@ -167,10 +197,10 @@ func recoveredMsg(lang string, t store.Tile, kind string, d time.Duration) notif
 		Body:  i18n.T(lang, "Ausfall nach %d Min. behoben", mins)}
 }
 
-// send delivers the messages to all configured channels.
-func (s *Server) send(settings map[string]string, msgs []notification) {
+// send delivers the messages to all channels the user set up.
+func (s *Server) send(user int64, settings map[string]string, msgs []notification) {
 	defer logging.Recover("Benachrichtigung")
-	sec := s.notifySecrets()
+	sec := s.notifySecrets(user)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	for _, m := range msgs {
@@ -317,7 +347,7 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	ns := s.notifySecrets()
+	ns := s.notifySecrets(uid(r))
 	if in.DiscordWebhook != nil {
 		v := strings.TrimSpace(*in.DiscordWebhook)
 		if v != "" {
@@ -342,7 +372,7 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 	plain, _ := json.Marshal(ns)
 	sealed, err := s.store.SealSecret(plain)
 	if err == nil {
-		err = s.store.SaveSettings(map[string]string{notifySecretsKey: sealed})
+		err = s.store.SaveUserSettings(uid(r), map[string]string{notifySecretsKey: sealed})
 	}
 	if err != nil {
 		writeErr(w, 500, err)
@@ -372,7 +402,7 @@ func (s *Server) handleTelegramChats(w http.ResponseWriter, r *http.Request) {
 	readJSON(r, &in)
 	token := strings.TrimSpace(in.Token)
 	if token == "" {
-		token = s.notifySecrets().TelegramToken
+		token = s.notifySecrets(uid(r)).TelegramToken
 	}
 	if !telegramTokenRe.MatchString(token) {
 		writeErr(w, 400, errors.New("Bitte zuerst den Bot-Token eintragen"))
@@ -461,8 +491,8 @@ func firstNonEmptyStr(vals ...string) string {
 
 // handleTestNotify sends a test message to every configured channel.
 func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {
-	settings, _ := s.store.Settings()
-	sec := s.notifySecrets()
+	settings := s.settingsFor(uid(r))
+	sec := s.notifySecrets(uid(r))
 	lang := langOf(r)
 	m := notification{Title: i18n.T(lang, "Testnachricht von Heimdeck"), Body: i18n.T(lang, "Benachrichtigungen kommen an.")}
 	ctx, cancel := timeout(r, 15*time.Second)

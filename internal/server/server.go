@@ -65,6 +65,7 @@ func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 		widgets: map[string]cached[*integrations.Widget]{}, fetching: map[string]chan struct{}{}, widgetGen: map[string]int{}, favicons: map[string]favicon{}, faviconFetch: map[string]chan struct{}{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now()}
 	integrations.Register(dockerTile{srv})
+	srv.migrateSettings()
 	return srv
 }
 
@@ -74,6 +75,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/setup", s.handleSetup)
 	mux.HandleFunc("POST /api/login", s.handleLogin)
 	mux.HandleFunc("POST /api/logout", s.handleLogout)
+	// Invitation links: the token in the address replaces the login.
+	mux.HandleFunc("GET /api/invite/{token}", s.handleInviteInfo)
+	mux.HandleFunc("POST /api/invite/{token}", s.handleJoin)
 	// Messages for webhook tiles; the key in the address replaces the login.
 	mux.HandleFunc("GET /hook/{key}", s.handleHook)
 	mux.HandleFunc("POST /hook/{key}", s.handleHook)
@@ -108,10 +112,22 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/status", s.handleStatus)
 	api.HandleFunc("GET /api/uptime", s.handleUptime)
 	api.HandleFunc("GET /api/search", s.handleSearch)
-	api.HandleFunc("GET /api/discover", s.handleDiscover)
+	api.HandleFunc("GET /api/discover", s.adminOnly(s.handleDiscover))
 	api.HandleFunc("GET /api/export", s.handleExport)
 	api.HandleFunc("POST /api/import", s.handleImport)
-	api.HandleFunc("GET /api/debug/goroutines", s.handleGoroutines)
+	api.HandleFunc("GET /api/debug/goroutines", s.adminOnly(s.handleGoroutines))
+	// Accounts (admin) and sharing dashboards (everyone).
+	api.HandleFunc("GET /api/users", s.adminOnly(s.handleUsers))
+	api.HandleFunc("POST /api/users", s.adminOnly(s.handleCreateUser))
+	api.HandleFunc("PUT /api/users/{id}", s.adminOnly(s.handleUpdateUser))
+	api.HandleFunc("DELETE /api/users/{id}", s.adminOnly(s.handleDeleteUser))
+	api.HandleFunc("POST /api/invites", s.adminOnly(s.handleCreateInvite))
+	api.HandleFunc("DELETE /api/invites/{id}", s.adminOnly(s.handleDeleteInvite))
+	api.HandleFunc("GET /api/people", s.handlePeople)
+	api.HandleFunc("GET /api/shares", s.handleShares)
+	api.HandleFunc("PUT /api/boards/{id}/shares/{user}", s.handleShareBoard)
+	api.HandleFunc("DELETE /api/boards/{id}/shares/{user}", s.handleUnshareBoard)
+	api.HandleFunc("POST /api/boards/{id}/accept", s.handleAcceptShare)
 	mux.Handle("/api/", s.auth.Require(api))
 
 	mux.Handle("/", s.spa())

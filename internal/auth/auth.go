@@ -26,6 +26,8 @@ const (
 var (
 	ErrInvalid = errors.New("Benutzername oder Passwort falsch")
 	ErrLocked  = errors.New("Zu viele Fehlversuche – bitte in ein paar Minuten erneut versuchen")
+	// ErrDisabled is only returned for the right password, so it does not help guessing.
+	ErrDisabled = errors.New("Dieses Konto ist gesperrt")
 )
 
 type Auth struct {
@@ -98,6 +100,9 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request, username, password 
 	a.mu.Lock()
 	delete(a.failures, ip)
 	a.mu.Unlock()
+	if u, err := a.store.User(id); err != nil || u.Disabled {
+		return ErrDisabled
+	}
 	return a.startSession(w, id)
 }
 
@@ -118,20 +123,29 @@ func (a *Auth) startSession(w http.ResponseWriter, userID int64) error {
 	return nil
 }
 
-// Setup creates the first (and only) user and logs them in.
-func (a *Auth) Setup(w http.ResponseWriter, username, password string) error {
+// Setup creates the first user, the admin, and logs them in.
+func (a *Auth) Setup(w http.ResponseWriter, username, password string) (int64, error) {
+	id, err := a.Register(w, username, password, store.RoleAdmin)
+	if err == nil {
+		err = a.store.AdoptBoards(id)
+	}
+	return id, err
+}
+
+// Register creates an account and, with a ResponseWriter, logs it in.
+func (a *Auth) Register(w http.ResponseWriter, username, password, role string) (int64, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if err := a.store.CreateUser(username, hash); err != nil {
-		return err
-	}
-	id, _, err := a.store.UserByName(username)
+	id, err := a.store.CreateUser(username, hash, role)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return a.startSession(w, id)
+	if w == nil {
+		return id, nil
+	}
+	return id, a.startSession(w, id)
 }
 
 func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +165,12 @@ func (a *Auth) UserID(r *http.Request) int64 {
 	if err != nil {
 		return 0
 	}
+	return id
+}
+
+// FromContext returns the user that Require let through.
+func FromContext(ctx context.Context) int64 {
+	id, _ := ctx.Value(ctxKey{}).(int64)
 	return id
 }
 

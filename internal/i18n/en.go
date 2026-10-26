@@ -704,4 +704,16 @@ var en = map[string]string{
 	"Kameras mit aktuellem Standbild, Kameras offline, Suche nach Kameras": "Cameras with a current snapshot, offline cameras, camera search",
 	"Kameras online": "Cameras online",
 	"Verbindet":      "Connecting",
+
+	// ---- users and sharing ----
+	"Dieses Dashboard ist nur zum Ansehen freigegeben":                             "This dashboard is shared with you for viewing only",
+	"Die Knöpfe dieses Dashboards sind für dich nicht freigegeben":                 "The buttons of this dashboard are not enabled for you",
+	"Das darf nur ein Admin":                                                       "Only an admin can do this",
+	"Dieser Benutzername ist schon vergeben":                                       "This username is already taken",
+	"Es muss mindestens ein aktiver Admin bleiben":                                 "At least one active admin has to remain",
+	"Das eigene Konto kann hier nicht gesperrt, herabgestuft oder gelöscht werden": "Your own account cannot be disabled, demoted or deleted here",
+	"Dieser Einladungslink ist ungültig oder abgelaufen":                           "This invitation link is invalid or has expired",
+	"Dieses Konto ist gesperrt":                                                    "This account is disabled",
+	"unbekannte Rolle":                                                             "unknown role",
+	"unbekannter Benutzer":                                                         "unknown user",
 }

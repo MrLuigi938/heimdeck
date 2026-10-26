@@ -37,8 +37,11 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	settings, _ := s.store.Settings()
 	out := map[string]any{"setup": !hasUser, "authenticated": false, "language": settings["language"]}
 	if id := s.auth.UserID(r); id != 0 {
-		name, _ := s.store.Username(id)
-		out["authenticated"], out["username"] = true, name
+		u, _ := s.store.User(id)
+		out["authenticated"], out["username"], out["role"] = true, u.Username, u.Role
+		if lang := s.settingsFor(id)["language"]; lang != "" {
+			out["language"] = lang
+		}
 	}
 	writeJSON(w, out)
 }
@@ -60,24 +63,25 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Username = strings.TrimSpace(c.Username)
-	if c.Username == "" || len(c.Password) < 8 {
-		writeErr(w, 400, errors.New("Benutzername angeben und Passwort mit mindestens 8 Zeichen wählen"))
+	if !validAccount(c.Username, c.Password) {
+		writeErr(w, 400, errBadAccount)
 		return
 	}
-	if err := s.auth.Setup(w, c.Username, c.Password); err != nil {
+	id, err := s.auth.Setup(w, c.Username, c.Password)
+	if err != nil {
 		writeErr(w, 500, err)
 		return
 	}
 	lang := i18n.Normalize(c.Language)
-	logErr("Sprache speichern", s.store.SaveSettings(map[string]string{"language": lang}))
-	s.seed(lang)
+	logErr("Sprache speichern", s.store.SaveSettings(map[string]string{"language": lang, settingsMoved: "1"}))
+	s.newAccount(id, lang)
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // seed creates starter groups so a fresh dashboard is not empty.
-func (s *Server) seed(lang string) {
+func (s *Server) seed(lang string, board int64) {
 	for _, name := range []string{"Medien", "Downloads", "System"} {
-		s.store.CreateGroup(i18n.T(lang, name), 0)
+		s.store.CreateGroup(i18n.T(lang, name), board)
 	}
 }
 
@@ -91,6 +95,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		code := 401
 		if errors.Is(err, auth.ErrLocked) {
 			code = 429
+		} else if errors.Is(err, auth.ErrDisabled) {
+			code = 403
 		} else if !errors.Is(err, auth.ErrInvalid) {
 			code = 500
 		}
@@ -169,14 +175,59 @@ type groupDTO struct {
 	Tiles  []tileDTO `json:"tiles"`
 }
 
+// boardDTO is a dashboard as the user sees it: their own, or one shared with
+// them (Owner set, read-only, buttons only with CanAct).
+type boardDTO struct {
+	store.Board
+	Shared bool   `json:"shared,omitempty"`
+	Owner  string `json:"owner,omitempty"`
+	CanAct bool   `json:"canAct"`
+}
+
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	settings, err := s.store.Settings()
+	me := uid(r)
+	user, err := s.store.User(me)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
 	}
-	settings = publicSettings(settings)
-	ns := s.notifySecrets()
+	admin := user.Role == store.RoleAdmin
+	settings := publicSettings(s.settingsFor(me))
+	ns := s.notifySecrets(me)
+	own, err := s.store.BoardsOf(me)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	if len(own) == 0 {
+		// e.g. an account whose last dashboard went with an import gone wrong
+		if _, err := s.firstBoard(me); err == nil {
+			own, _ = s.store.BoardsOf(me)
+		}
+	}
+	boards := []boardDTO{}
+	for _, b := range own {
+		boards = append(boards, boardDTO{Board: b, CanAct: true})
+	}
+	shares, err := s.store.SharesFor(me)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	requests := []store.Share{}
+	for _, sh := range shares {
+		if !sh.Accepted {
+			requests = append(requests, sh)
+			continue
+		}
+		if b, err := s.store.Board(sh.BoardID); err == nil {
+			boards = append(boards, boardDTO{Board: b, Shared: true, Owner: sh.Owner, CanAct: sh.Actions})
+		}
+	}
+	visible := map[int64]bool{}
+	for _, b := range boards {
+		visible[b.ID] = true
+	}
 	groups, err := s.store.Groups()
 	if err != nil {
 		writeErr(w, 500, err)
@@ -192,48 +243,55 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	boardOf := map[int64]int64{}
+	for _, g := range groups {
+		boardOf[g.ID] = g.BoardID
+	}
+	hasProxmox := false
 	byGroup := map[int64][]tileDTO{}
 	for _, t := range tiles {
+		if !visible[boardOf[t.GroupID]] {
+			continue
+		}
+		hasProxmox = hasProxmox || t.Integration == "proxmox"
 		if !locked[t.GroupID] {
 			byGroup[t.GroupID] = append(byGroup[t.GroupID], toDTO(t))
 		}
 	}
-	out := make([]groupDTO, 0, len(groups))
+	out := []groupDTO{}
 	for _, g := range groups {
+		if !visible[g.BoardID] {
+			continue
+		}
 		ts := byGroup[g.ID]
 		if ts == nil {
 			ts = []tileDTO{}
 		}
 		out = append(out, groupDTO{Group: g, Locked: locked[g.ID], Tiles: ts})
 	}
-	boards, err := s.store.Boards()
-	if err != nil {
-		writeErr(w, 500, err)
-		return
+	data := map[string]any{
+		"settings":      settings,
+		"boards":        boards,
+		"groups":        out,
+		"shareRequests": requests,
+		"integrations":  integrations.All(langOf(r)),
+		"docker":        admin && s.docker != nil,
+		"proxmox":       admin && hasProxmox,
+		"notify":        map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""},
+		"username":      user.Username,
+		"userId":        me,
+		"role":          user.Role,
+		"version":       s.version,
+		"system":        s.systemInfo(),
 	}
-	name, _ := s.store.Username(s.auth.UserID(r))
-	hasProxmox := false
-	if all, err := s.store.Tiles(); err == nil {
-		for _, t := range all {
-			hasProxmox = hasProxmox || t.Integration == "proxmox"
-		}
+	// Updates, the debug mode and Proxmox discovery concern the whole instance.
+	if admin {
+		data["update"] = s.newerRelease()
+		data["proxmoxHint"] = proxmoxHint()
+		data["debug"] = logging.Debug()
+		data["debugForced"] = logging.Forced() // HEIMDECK_DEBUG=true, the setting cannot turn it off
 	}
-	writeJSON(w, map[string]any{
-		"settings":     settings,
-		"boards":       boards,
-		"groups":       out,
-		"integrations": integrations.All(langOf(r)),
-		"docker":       s.docker != nil,
-		"proxmox":      hasProxmox,
-		"proxmoxHint":  proxmoxHint(),
-		"notify":       map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""},
-		"username":     name,
-		"version":      s.version,
-		"update":       s.newerRelease(),
-		"system":       s.systemInfo(),
-		"debug":        logging.Debug(),
-		"debugForced":  logging.Forced(), // HEIMDECK_DEBUG=true, the setting cannot turn it off
-	})
+	writeJSON(w, data)
 }
 
 // tileLayouts are the tile sizes a group (or the setting tileLayout) can have.
@@ -254,8 +312,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
+	admin := s.isAdmin(r)
 	for k := range m {
-		if !allowedSettings[k] {
+		if !allowedSettings[k] || (instanceSettings[k] && !admin) {
 			delete(m, k)
 		}
 	}
@@ -274,7 +333,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		m["searchUrl"] = u
 	}
-	if err := s.store.SaveSettings(m); err != nil {
+	if err := s.saveSettings(uid(r), admin, m); err != nil {
 		slog.Error("Einstellungen speichern", "fehler", err)
 		writeErr(w, 500, err)
 		return
@@ -305,6 +364,17 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Name fehlt"))
 		return
 	}
+	if body.BoardID == 0 {
+		id, err := s.firstBoard(uid(r))
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		body.BoardID = id
+	} else if _, code, err := s.ownBoard(r, body.BoardID); err != nil {
+		writeErr(w, code, err)
+		return
+	}
 	g, err := s.store.CreateGroup(strings.TrimSpace(body.Name), body.BoardID)
 	if err != nil {
 		slog.Error("Gruppe anlegen", "fehler", err)
@@ -325,8 +395,10 @@ type tileInput struct {
 }
 
 // buildTile merges the submitted form with the stored tile. Empty secret
-// fields keep the stored value, so keys never have to be sent back to the browser.
-func (s *Server) buildTile(in tileInput) (store.Tile, error) {
+// fields keep the stored value, so keys never have to be sent back to the
+// browser – but only for a tile on one of the owner's dashboards, so nobody
+// can borrow the keys of someone else's tile.
+func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 	t := in.Tile
 	t.Monitor = in.Monitor == nil || *in.Monitor
 	t.Name = strings.TrimSpace(t.Name)
@@ -345,11 +417,20 @@ func (s *Server) buildTile(in tileInput) (store.Tile, error) {
 	if !ok {
 		return t, fmt.Errorf("unbekannter Dienst-Typ: %s", t.Integration)
 	}
+	// The Docker tile reads the host's containers without any key: only for admins.
+	if t.Integration == "docker" {
+		if u, err := s.store.User(owner); err != nil || u.Role != store.RoleAdmin {
+			return t, errAdmin
+		}
+	}
 	if t.Config == nil {
 		t.Config = map[string]string{}
 	}
 	t.Secrets = map[string]string{}
 	if t.ID != 0 {
+		if b, err := s.store.TileBoard(t.ID); err != nil || b.OwnerID != owner {
+			return t, errNotFound
+		}
 		old, err := s.store.Tile(t.ID)
 		if err != nil {
 			return t, err
@@ -413,7 +494,13 @@ func (s *Server) handleSaveTile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		in.ID = 0
 	}
-	t, err := s.buildTile(in)
+	if in.ID != 0 {
+		if _, code, err := s.ownTile(r, in.ID); err != nil {
+			writeErr(w, code, err)
+			return
+		}
+	}
+	t, err := s.buildTile(in, uid(r))
 	if err != nil {
 		writeErr(w, 400, err)
 		return
@@ -422,11 +509,9 @@ func (s *Server) handleSaveTile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("Gruppe fehlt"))
 		return
 	}
-	if t.ID != 0 {
-		if _, code, err := s.accessibleTile(r, t.ID); err != nil {
-			writeErr(w, code, err)
-			return
-		}
+	if _, code, err := s.ownGroup(r, t.GroupID); err != nil {
+		writeErr(w, code, err)
+		return
 	}
 	if ok, _ := s.groupUnlocked(r, t.GroupID); !ok {
 		writeErr(w, 403, errLocked)
@@ -449,7 +534,7 @@ func (s *Server) handleDeleteTile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if _, code, err := s.accessibleTile(r, id); err != nil {
+	if _, code, err := s.ownTile(r, id); err != nil {
 		writeErr(w, code, err)
 		return
 	}
@@ -469,6 +554,24 @@ func (s *Server) handleLayout(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
+	// Only groups and tiles on the user's own dashboards can be moved.
+	owners, err := s.store.TileOwners()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	for _, g := range l {
+		if _, code, err := s.ownGroup(r, g.GroupID); err != nil {
+			writeErr(w, code, err)
+			return
+		}
+		for _, id := range g.Tiles {
+			if owners[id] != uid(r) {
+				writeErr(w, 404, errNotFound)
+				return
+			}
+		}
+	}
 	if err := s.store.SaveLayout(l); err != nil {
 		slog.Error("Anordnung speichern", "fehler", err)
 		writeErr(w, 500, err)
@@ -485,7 +588,7 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.buildTile(in)
+	t, err := s.buildTile(in, uid(r))
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -540,7 +643,7 @@ func (s *Server) handleChoices(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.buildTile(in.tileInput)
+	t, err := s.buildTile(in.tileInput, uid(r))
 	if err != nil {
 		writeErr(w, 400, err)
 		return
@@ -658,7 +761,7 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, code, err := s.accessibleTile(r, id)
+	t, acc, code, err := s.tileAccess(r, id)
 	if err != nil {
 		writeErr(w, code, err)
 		return
@@ -670,8 +773,36 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeJSON(w, map[string]any{"error": tr(r, err.Error())})
 	default:
-		writeJSON(w, map[string]any{"widget": hideParts(data, t.Hide, langOf(r))})
+		data = hideParts(data, t.Hide, langOf(r))
+		if !acc.Act {
+			data = withoutActions(data)
+		}
+		writeJSON(w, map[string]any{"widget": data})
 	}
+}
+
+// withoutActions drops the buttons for someone who may only look at a shared
+// dashboard. The widget is shared with the cache and stays unchanged.
+func withoutActions(w *integrations.Widget) *integrations.Widget {
+	if w == nil {
+		return nil
+	}
+	out := *w
+	out.Actions = nil
+	out.Items = stripItemActions(w.Items)
+	return &out
+}
+
+func stripItemActions(items []integrations.Item) []integrations.Item {
+	if items == nil {
+		return nil
+	}
+	out := make([]integrations.Item, len(items))
+	for i, it := range items {
+		it.Actions = nil
+		out[i] = it
+	}
+	return out
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -688,9 +819,13 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, code, err := s.accessibleTile(r, id)
+	t, acc, code, err := s.tileAccess(r, id)
 	if err != nil {
 		writeErr(w, code, err)
+		return
+	}
+	if !acc.Act {
+		writeErr(w, 403, errNoAct)
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -707,7 +842,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 502, err)
 		return
 	}
-	slog.Info("Aktion ausgeführt", "kachel", t.Name, "dienst", t.Integration, "aktion", body.Action, "dauer", time.Since(start).Round(time.Millisecond))
+	slog.Info("Aktion ausgeführt", "kachel", t.Name, "dienst", t.Integration, "aktion", body.Action, "benutzer", s.username(r), "dauer", time.Since(start).Round(time.Millisecond))
 	s.forget(id)
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -777,16 +912,21 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	boards, err := s.boardsFor(uid(r))
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	gb, err := s.groupBoards()
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
 	// Only search the dashboard that is currently open.
 	if board, _ := strconv.ParseInt(r.URL.Query().Get("board"), 10, 64); board != 0 {
-		groups, _ := s.store.Groups()
-		onBoard := map[int64]bool{}
-		for _, g := range groups {
-			onBoard[g.ID] = g.BoardID == board
-		}
 		filtered := tiles[:0]
 		for _, t := range tiles {
-			if onBoard[t.GroupID] {
+			if gb[t.GroupID] == board {
 				filtered = append(filtered, t)
 			}
 		}
@@ -814,6 +954,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
+			}
+			if !boards[gb[t.GroupID]].Act {
+				items = stripItemActions(items)
 			}
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}
 			if err != nil {
@@ -851,8 +994,15 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := timeout(r, 12*time.Second)
 	defer cancel()
-	tiles, _ := s.store.Tiles()
-	var pve []store.Tile
+	// The admin's own tiles: their Proxmox hosts and what already has a tile.
+	all, _ := s.store.Tiles()
+	owners, _ := s.store.TileOwners()
+	var tiles, pve []store.Tile
+	for _, t := range all {
+		if owners[t.ID] == uid(r) {
+			tiles = append(tiles, t)
+		}
+	}
 	for _, t := range tiles {
 		if integ, ok := integrations.Get(t.Integration); ok && t.Integration == "proxmox" && configured(integ, t) {
 			pve = append(pve, t)
@@ -975,9 +1125,15 @@ type exportGroup struct {
 }
 
 // handleExport writes groups, tiles and settings. API keys are left out on purpose.
+// Only the user's own dashboards are in it, and the instance settings only for an admin.
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
-	settings, _ := s.store.Settings()
-	settings = publicSettings(settings)
+	settings := publicSettings(s.settingsFor(uid(r)))
+	if !s.isAdmin(r) {
+		for k := range instanceSettings {
+			delete(settings, k)
+		}
+	}
+	delete(settings, settingsMoved)
 	groups, err := s.store.Groups()
 	if err != nil {
 		writeErr(w, 500, err)
@@ -985,7 +1141,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 	tiles, _ := s.store.Tiles()
 	locked, _ := s.lockedGroups(r)
-	boards, _ := s.store.Boards()
+	boards, _ := s.store.BoardsOf(uid(r))
 	boardNames := map[int64]string{}
 	for _, b := range boards {
 		boardNames[b.ID] = b.Name
@@ -993,7 +1149,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	data := exportData{Version: 1, Settings: settings}
 	for _, g := range groups {
 		// Locked groups stay out of the backup; protected ones are restored as hidden (no passwords in backups).
-		if locked[g.ID] {
+		if _, own := boardNames[g.BoardID]; !own || locked[g.ID] {
 			continue
 		}
 		eg := exportGroup{Name: g.Name, Board: boardNames[g.BoardID], Layout: g.Layout, Arrange: g.Arrange, Tiles: []exportTile{}}
@@ -1028,24 +1184,34 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("keine gültige Heimdeck-Sicherung oder Heimdall-Export"))
 		return
 	}
+	me := uid(r)
 	if len(data.Settings) > 0 {
+		admin := s.isAdmin(r)
 		for k := range data.Settings {
-			if !allowedSettings[k] {
+			if !allowedSettings[k] || (instanceSettings[k] && !admin) {
 				delete(data.Settings, k)
 			}
 		}
-		logErr("import settings", s.store.SaveSettings(data.Settings))
+		logErr("import settings", s.saveSettings(me, admin, data.Settings))
 	}
 	count := 0
-	boards, _ := s.store.Boards()
+	boards, _ := s.store.BoardsOf(me)
 	boardIDs := map[string]int64{}
 	for _, b := range boards {
 		boardIDs[b.Name] = b.ID
 	}
+	first, err := s.firstBoard(me)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
 	for _, eg := range data.Groups {
 		boardID := boardIDs[eg.Board]
+		if boardID == 0 && eg.Board == "" {
+			boardID = first
+		}
 		if eg.Board != "" && boardID == 0 {
-			b := store.Board{Name: eg.Board}
+			b := store.Board{OwnerID: me, Name: eg.Board}
 			if err := s.store.SaveBoard(&b); err == nil {
 				boardID = b.ID
 				boardIDs[eg.Board] = b.ID
@@ -1075,7 +1241,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 				GroupID: g.ID, Name: et.Name, URL: et.URL, ExternalURL: et.ExternalURL, APIURL: et.APIURL, Icon: et.Icon, Description: et.Description,
 				Integration: et.Integration, Config: et.Config, Insecure: et.Insecure, ShowWidget: et.ShowWidget, Grid: et.Grid, Hide: et.Hide,
 				MonitorExt: et.MonitorExt,
-			}, Monitor: &monitor})
+			}, Monitor: &monitor}, me)
 			if err != nil {
 				continue
 			}
@@ -1096,10 +1262,20 @@ func (s *Server) importHeimdall(w http.ResponseWriter, r *http.Request, body []b
 		return
 	}
 	boardID, _ := strconv.ParseInt(r.URL.Query().Get("board"), 10, 64)
+	if boardID == 0 {
+		boardID, err = s.firstBoard(uid(r))
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+	} else if _, code, err := s.ownBoard(r, boardID); err != nil {
+		writeErr(w, code, err)
+		return
+	}
 	existing := map[string]int64{}
 	if all, err := s.store.Groups(); err == nil {
 		for _, g := range all {
-			if boardID == 0 || g.BoardID == boardID {
+			if g.BoardID == boardID {
 				existing[strings.ToLower(g.Name)] = g.ID
 			}
 		}
@@ -1117,7 +1293,7 @@ func (s *Server) importHeimdall(w http.ResponseWriter, r *http.Request, body []b
 		}
 		for _, in := range groups[name] {
 			in.GroupID = gid
-			t, err := s.buildTile(in)
+			t, err := s.buildTile(in, uid(r))
 			if err != nil {
 				continue
 			}

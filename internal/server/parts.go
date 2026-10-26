@@ -67,13 +67,13 @@ func (s *Server) handleTileParts(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.buildTile(in)
+	t, err := s.buildTile(in, uid(r))
 	if err != nil {
 		writeErr(w, 400, err)
 		return
 	}
 	if t.ID != 0 {
-		if _, code, err := s.accessibleTile(r, t.ID); err != nil {
+		if _, code, err := s.ownTile(r, t.ID); err != nil {
 			writeErr(w, code, err)
 			return
 		}

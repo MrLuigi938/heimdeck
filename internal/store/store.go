@@ -56,9 +56,11 @@ func (p GridPos) Valid() bool {
 	return p.X >= 0 && p.Y >= 0 && p.Y < 1000 && p.W >= 1 && p.X+p.W <= GridCols && p.H >= 1 && p.H <= 100
 }
 
-// Board is a separate dashboard, e.g. "Privat" and "Arbeit".
+// Board is a separate dashboard, e.g. "Privat" and "Arbeit". It belongs to
+// one user; others only see it when it is shared with them and they accepted.
 type Board struct {
 	ID         int64  `json:"id"`
+	OwnerID    int64  `json:"ownerId"`
 	Name       string `json:"name"`
 	Icon       string `json:"icon"`
 	Background string `json:"background"` // empty = use the global background
@@ -140,6 +142,26 @@ CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS user_settings (
+	user_id INTEGER NOT NULL,
+	key TEXT NOT NULL,
+	value TEXT NOT NULL,
+	PRIMARY KEY (user_id, key)
+);
+CREATE TABLE IF NOT EXISTS shares (
+	board_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	accepted INTEGER NOT NULL DEFAULT 0,
+	actions INTEGER NOT NULL DEFAULT 0,
+	created INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (board_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS invites (
+	id INTEGER PRIMARY KEY,
+	token_hash TEXT NOT NULL UNIQUE,
+	created_by INTEGER NOT NULL,
+	expires INTEGER NOT NULL
+);
 `
 
 func Open(path string, box *secret.Box) (*Store, error) {
@@ -168,6 +190,10 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE tiles ADD COLUMN hide TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE boards ADD COLUMN theme TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE tiles ADD COLUMN monitor_ext INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`,
+		`ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN created INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE boards ADD COLUMN owner_id INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, err
@@ -176,6 +202,15 @@ func Open(path string, box *secret.Box) (*Store, error) {
 	// The arrangement "columns" (CSS columns) was replaced by the free grid.
 	if _, err := db.Exec(`UPDATE groups SET arrange = '' WHERE arrange = 'columns'`); err != nil {
 		return nil, err
+	}
+	// Before there were several users, the only one was the admin and owned everything.
+	for _, stmt := range []string{
+		`UPDATE users SET role = 'admin' WHERE id = (SELECT MIN(id) FROM users) AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin')`,
+		`UPDATE boards SET owner_id = (SELECT MIN(id) FROM users WHERE role = 'admin') WHERE owner_id = 0 AND EXISTS (SELECT 1 FROM users WHERE role = 'admin')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, err
+		}
 	}
 	st := &Store{db: db, box: box}
 	if err := st.ensureBoard(); err != nil {
@@ -224,9 +259,16 @@ func (s *Store) HasUser() (bool, error) {
 	return n > 0, err
 }
 
-func (s *Store) CreateUser(username, hash string) error {
-	_, err := s.db.Exec(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, username, hash)
-	return err
+// CreateUser adds an account; role is RoleAdmin or RoleUser.
+func (s *Store) CreateUser(username, hash, role string) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO users (username, password_hash, role, created) VALUES (?, ?, ?, ?)`, username, hash, role, time.Now().Unix())
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return 0, ErrNameTaken
+		}
+		return 0, err
+	}
+	return res.LastInsertId()
 }
 
 func (s *Store) UserByName(username string) (id int64, hash string, err error) {
@@ -242,8 +284,9 @@ func (s *Store) Username(id int64) (name string, err error) {
 	return
 }
 
+// FirstUsername returns the first admin, for resetting the password from the command line.
 func (s *Store) FirstUsername() (name string, err error) {
-	err = s.db.QueryRow(`SELECT username FROM users ORDER BY id LIMIT 1`).Scan(&name)
+	err = s.db.QueryRow(`SELECT username FROM users ORDER BY role = 'admin' DESC, id LIMIT 1`).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -258,7 +301,7 @@ func (s *Store) SetPassword(username, hash string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	_, err = s.db.Exec(`DELETE FROM sessions`)
+	_, err = s.db.Exec(`DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?)`, username)
 	return err
 }
 
@@ -269,7 +312,7 @@ func (s *Store) CreateSession(token string, userID int64, expires time.Time) err
 
 func (s *Store) SessionUser(token string) (int64, error) {
 	var id, exp int64
-	err := s.db.QueryRow(`SELECT user_id, expires FROM sessions WHERE token = ?`, token).Scan(&id, &exp)
+	err := s.db.QueryRow(`SELECT s.user_id, s.expires FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ? AND u.disabled = 0`, token).Scan(&id, &exp)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && exp < time.Now().Unix()) {
 		return 0, ErrNotFound
 	}
@@ -375,16 +418,34 @@ func (s *Store) UpdateGroup(g Group) error {
 
 // ---- boards ----
 
+const boardCols = `id, owner_id, name, icon, background, theme, position`
+
+func scanBoard(sc interface{ Scan(...any) error }) (Board, error) {
+	var b Board
+	err := sc.Scan(&b.ID, &b.OwnerID, &b.Name, &b.Icon, &b.Background, &b.Theme, &b.Position)
+	return b, err
+}
+
+// Boards returns the dashboards of all users.
 func (s *Store) Boards() ([]Board, error) {
-	rows, err := s.db.Query(`SELECT id, name, icon, background, theme, position FROM boards ORDER BY position, id`)
+	return s.queryBoards(`SELECT ` + boardCols + ` FROM boards ORDER BY position, id`)
+}
+
+// BoardsOf returns the dashboards a user owns.
+func (s *Store) BoardsOf(owner int64) ([]Board, error) {
+	return s.queryBoards(`SELECT `+boardCols+` FROM boards WHERE owner_id = ? ORDER BY position, id`, owner)
+}
+
+func (s *Store) queryBoards(q string, args ...any) ([]Board, error) {
+	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []Board{}
 	for rows.Next() {
-		var b Board
-		if err := rows.Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Theme, &b.Position); err != nil {
+		b, err := scanBoard(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, b)
@@ -393,8 +454,7 @@ func (s *Store) Boards() ([]Board, error) {
 }
 
 func (s *Store) Board(id int64) (Board, error) {
-	var b Board
-	err := s.db.QueryRow(`SELECT id, name, icon, background, theme, position FROM boards WHERE id = ?`, id).Scan(&b.ID, &b.Name, &b.Icon, &b.Background, &b.Theme, &b.Position)
+	b, err := scanBoard(s.db.QueryRow(`SELECT `+boardCols+` FROM boards WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -403,8 +463,8 @@ func (s *Store) Board(id int64) (Board, error) {
 
 func (s *Store) SaveBoard(b *Board) error {
 	if b.ID == 0 {
-		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM boards`).Scan(&b.Position)
-		res, err := s.db.Exec(`INSERT INTO boards (name, icon, background, theme, position) VALUES (?, ?, ?, ?, ?)`, b.Name, b.Icon, b.Background, b.Theme, b.Position)
+		s.db.QueryRow(`SELECT COALESCE(MAX(position)+1, 0) FROM boards WHERE owner_id = ?`, b.OwnerID).Scan(&b.Position)
+		res, err := s.db.Exec(`INSERT INTO boards (owner_id, name, icon, background, theme, position) VALUES (?, ?, ?, ?, ?, ?)`, b.OwnerID, b.Name, b.Icon, b.Background, b.Theme, b.Position)
 		if err != nil {
 			return err
 		}
@@ -426,6 +486,7 @@ func (s *Store) DeleteBoard(id int64) error {
 		`DELETE FROM status_log WHERE tile_id IN (SELECT t.id FROM tiles t JOIN groups g ON t.group_id = g.id WHERE g.board_id = ?)`,
 		`DELETE FROM tiles WHERE group_id IN (SELECT id FROM groups WHERE board_id = ?)`,
 		`DELETE FROM groups WHERE board_id = ?`,
+		`DELETE FROM shares WHERE board_id = ?`,
 		`DELETE FROM boards WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {
