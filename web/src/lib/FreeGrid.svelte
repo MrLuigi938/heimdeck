@@ -233,7 +233,7 @@
     <!-- Long lists fold here ("show more"), so a tile does not get endlessly tall. -->
     <div class="fcell {kind}" role="listitem">
       <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={kind === 'icon' ? 'icons' : ''}
-        onEdit={() => onEdit(tile)} />
+        onEdit={onEdit && (() => onEdit(tile))} />
     </div>
   {/each}
 </div>
@@ -251,7 +251,7 @@
       <div class="cell" role="listitem" use:overflowWatch class:moving={(dragging === tile.id && preview) || resizing?.it.id === tile.id} style:grid-area={area(it)}>
         <!-- One column wide is too narrow for name and live data: the tile becomes an icon. -->
         <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} compact={it.w === 1 ? 'icons' : ''} free
-          onEdit={() => onEdit(tile)} dragProps={arranging ? tileDragProps(tile) : {}} />
+          onEdit={onEdit && (() => onEdit(tile))} dragProps={arranging ? tileDragProps(tile) : {}} />
         {#if arranging}
           <button class="resize" title={t('Größe ändern')} aria-label={t('Größe ändern')}
             onpointerdown={(e) => startResize(e, it)} onpointermove={moveResize} onpointerup={endResize} onpointercancel={cancelResize}

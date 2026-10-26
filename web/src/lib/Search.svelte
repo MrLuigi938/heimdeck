@@ -14,7 +14,8 @@
   // shortcut is only shown in the placeholder; the dashboard handles the key and calls focus().
   // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
   // history: remember recent searches in this browser (setting "searchHistory").
-  let { tiles, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  // sections: the groups of the open dashboard ({id, name, count}); a hit jumps there with onJump.
+  let { tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
 
   // The search window opens right under the field when the field is in view
   // (anchored, you type in the field itself), otherwise in the middle of the
@@ -81,6 +82,18 @@
       ? []
       : tiles.filter((tile) => (tile.name + ' ' + (tile.description || '')).toLowerCase().includes(parsed.term.toLowerCase())).slice(0, 6),
   );
+
+  // Groups by name: "media" finds the group Media, Enter or a click scrolls to it.
+  let groupHits = $derived(
+    parsed.term.length === 0 || parsed.prefix || !onJump
+      ? []
+      : sections.filter((s) => s.name.toLowerCase().includes(parsed.term.toLowerCase())).slice(0, 4),
+  );
+  function jump(id) {
+    remember();
+    reset();
+    onJump?.(id);
+  }
 
   let tileById = $derived(Object.fromEntries(tiles.map((t) => [t.id, t])));
   let groups = $derived(results.filter((g) => inPrefix(tileById[g.tileId])));
@@ -175,6 +188,7 @@
       reset();
     } else if (e.key === 'Enter' && q.trim()) {
       if (tileHits.length) openUrl(tileHref(tileHits[0], local));
+      else if (groupHits.length) jump(groupHits[0].id);
       else webSearch();
     }
   }
@@ -246,6 +260,12 @@
           </a>
         {/each}
       {/if}
+      {#if groupHits.length}
+        <div class="section">{t('Gruppen')}</div>
+        {#each groupHits as s (s.id)}
+          <button class="hit" onclick={() => jump(s.id)}><span class="jump" aria-hidden="true">↓</span> <span>{s.name}</span><span class="count">{t('{n} Kacheln', { n: s.count })}</span></button>
+        {/each}
+      {/if}
 
       {#each groups as g}
         {@const tile = tileById[g.tileId]}
@@ -290,6 +310,14 @@
             {/each}
           </div>
         {/if}
+        {#if groupHits.length}
+          <div class="col">
+            <div class="col-head">{t('Gruppen')} <span class="count">{groupHits.length}</span></div>
+            {#each groupHits as s (s.id)}
+              <button class="hit" onclick={() => jump(s.id)}><span class="jump" aria-hidden="true">↓</span> <span>{s.name}</span><span class="count">{t('{n} Kacheln', { n: s.count })}</span></button>
+            {/each}
+          </div>
+        {/if}
         {#each groups.filter((g) => g.items?.length || g.error) as g (g.tileId)}
           {@const tile = tileById[g.tileId]}
           <div class="col">
@@ -319,8 +347,8 @@
 </div>
 
 {#if windowOpen}
-  <SearchWindow bind:this={win} bind:q {anchored} {input} {parsed} {tileHits} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
-    {onInput} {makeAction} {webSearch} {openUrl} onForget={forget} onClose={() => reset()} />
+  <SearchWindow bind:this={win} bind:q {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
+    {onInput} {makeAction} {webSearch} {openUrl} onJump={jump} onForget={forget} onClose={() => reset()} />
 {/if}
 
 <style>
@@ -355,4 +383,6 @@
   .grow { flex: 1; min-width: 0; }
   .none { font-size: 12.5px; color: var(--muted); padding: 8px 8px 2px; }
   .err { font-size: 12.5px; color: var(--bad); padding: 0 8px 6px; }
+  .jump { width: 24px; text-align: center; color: var(--accent); font-weight: 700; }
+  .hit .count { margin-left: auto; }
 </style>

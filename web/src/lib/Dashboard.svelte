@@ -1,5 +1,5 @@
 <script>
-  import { get, post, put, setDebug } from './api.js';
+  import { get, post, put, del, setDebug } from './api.js';
   import { toast } from './toast.svelte.js';
   import Tile from './Tile.svelte';
   import FreeGrid, { byPosition } from './FreeGrid.svelte';
@@ -84,17 +84,54 @@
   let defs = $derived(Object.fromEntries((data?.integrations || []).map((d) => [d.id, d])));
   let boards = $derived(data?.boards || []);
   let board = $derived(boards.find((b) => b.id === boardId) || boards[0]);
+  // A dashboard someone else shared: only to look at, buttons only if allowed.
+  let readOnly = $derived(!!board?.shared);
+  let admin = $derived(data?.role === 'admin');
+  $effect(() => {
+    if (readOnly) editMode = false;
+  });
+  let ownBoards = $derived(boards.filter((b) => !b.shared));
+  let sharedBoards = $derived(boards.filter((b) => b.shared));
   let boardGroups = $derived((data?.groups || []).filter((g) => g.boardId === board?.id));
   let allTiles = $derived(boardGroups.flatMap((g) => g.tiles));
   let newTab = $derived(settings.openInNewTab !== 'false');
   let hasSearchServices = $derived(allTiles.some((t) => defs[t.integration]?.hasSearch));
   // Groups a tile can be moved to; with several dashboards labelled "Dashboard › Group", current one first.
+  // Only groups on the user's own dashboards.
   let groupOptions = $derived.by(() => {
-    const open = (data?.groups || []).filter((g) => !g.locked);
+    const own = new Set(ownBoards.map((b) => b.id));
+    const open = (data?.groups || []).filter((g) => !g.locked && own.has(g.boardId));
     const name = (g) => t(boards.find((b) => b.id === g.boardId)?.name || '');
     const sorted = [...open.filter((g) => g.boardId === board?.id), ...open.filter((g) => g.boardId !== board?.id)];
-    return boards.length > 1 ? sorted.map((g) => ({ ...g, name: `${name(g)} › ${g.name}` })) : sorted;
+    return ownBoards.length > 1 ? sorted.map((g) => ({ ...g, name: `${name(g)} › ${g.name}` })) : sorted;
   });
+
+  // Dashboards offered by others, waiting for an answer.
+  async function answerShare(s, yes) {
+    try {
+      if (yes) await post(`/boards/${s.boardId}/accept`);
+      else await del(`/boards/${s.boardId}/shares/${s.userId}`);
+      await load();
+      if (yes) {
+        toast(t('„{board}“ ist jetzt in deiner Dashboard-Liste.', { board: t(s.boardName) }));
+        switchBoard(s.boardId);
+      }
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+  // The groups to jump to from the search: the ones shown, hidden ones only while they are shown.
+  let jumpTargets = $derived(
+    boardGroups.filter((g) => g.visibility !== 'hidden' || showHidden).map((g) => ({ id: g.id, name: g.name, count: g.tiles.length })),
+  );
+  let flashGroup = $state(0);
+  function jumpToGroup(id) {
+    const el = document.getElementById(`group-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    flashGroup = id;
+    setTimeout(() => flashGroup === id && (flashGroup = 0), 1600);
+  }
   let hasHidden = $derived(boardGroups.some((g) => g.visibility === 'hidden'));
   let hiddenCount = $derived(boardGroups.filter((g) => g.visibility === 'hidden').length);
   // A group can override the global tile size (setting tileLayout; older
@@ -246,7 +283,7 @@
     };
     ({
       search: () => searchBox?.focus(),
-      edit: () => (editMode = !editMode),
+      edit: () => !readOnly && (editMode = !editMode),
       settings: () => openSettings(),
       hidden: () => hasHidden && toggleHidden(),
       network: () => hasExternal && toggleNetwork(),
@@ -432,9 +469,15 @@
               </button>
               {#if boardMenu}
                 <div class="board-menu card" role="menu">
-                  {#each boards as b (b.id)}
+                  {#each ownBoards as b (b.id)}
                     <button role="menuitem" class:on={b.id === board?.id} onclick={() => switchBoard(b.id)}>{b.icon || '▦'} {t(b.name)}</button>
                   {/each}
+                  {#if sharedBoards.length}
+                    <div class="menu-label">{t('Mit dir geteilt')}</div>
+                    {#each sharedBoards as b (b.id)}
+                      <button role="menuitem" class:on={b.id === board?.id} onclick={() => switchBoard(b.id)}>{b.icon || '▦'} {t(b.name)} <span class="menu-owner">· {b.owner}</span></button>
+                    {/each}
+                  {/if}
                 </div>
               {/if}
             </div>
@@ -447,7 +490,7 @@
           </div>
         {/if}
       </div>
-      <Search bind:this={searchBox} tiles={allTiles} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+      <Search bind:this={searchBox} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
         shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}
@@ -461,12 +504,14 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
           </button>
         {/if}
-        {#if data.docker || data.proxmox}
+        {#if (data.docker || data.proxmox) && !readOnly}
           <button class="ghost icon" title={t('Dienste automatisch finden')} aria-label={t('Dienste automatisch finden')} onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'}</button>
         {/if}
-        <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-        </button>
+        {#if !readOnly}
+          <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+          </button>
+        {/if}
         <button class="ghost icon logout" class:armed={logoutArmed} onclick={logoutClick}
           title={logoutArmed ? t('Zum Abmelden nochmal klicken') : t('Abmelden')} aria-label={logoutArmed ? t('Zum Abmelden nochmal klicken') : t('Abmelden')}>
           {#if logoutArmed}
@@ -485,6 +530,23 @@
       {/if}
     </header>
 
+    {#each data.shareRequests || [] as s (s.boardId)}
+      <div class="share-ask card">
+        <span class="share-icon" aria-hidden="true">{s.boardIcon || '▦'}</span>
+        <span><b>{t('{name} möchte das Dashboard „{board}“ mit dir teilen.', { name: s.owner, board: t(s.boardName) })}</b>
+          <span class="muted">{s.actions ? t('Du könntest es ansehen und seine Knöpfe benutzen.') : t('Du könntest es ansehen, aber nichts verändern.')}</span></span>
+        <span class="spacer"></span>
+        <button class="small" onclick={() => answerShare(s, false)}>{t('Ablehnen')}</button>
+        <button class="small primary" onclick={() => answerShare(s, true)}>{t('Annehmen')}</button>
+      </div>
+    {/each}
+
+    {#if readOnly}
+      <div class="shared-note on-bg" title={t('Geteilte Dashboards kann nur ihr Besitzer ändern.')}>
+        👁 {t('Geteilt von {name}', { name: board.owner })} · {board.canAct ? t('ansehen und Knöpfe benutzen') : t('nur ansehen')}
+      </div>
+    {/if}
+
     {#if editMode}
       <div class="editbar card">
         <span>✎ {t('Bearbeitungsmodus: Kacheln per Drag & Drop verschieben, anklicken zum Bearbeiten.')}</span>
@@ -494,20 +556,22 @@
       </div>
     {/if}
 
-    {#if allTiles.length === 0}
+    {#if allTiles.length === 0 && readOnly}
+      <div class="empty card"><p class="muted">{t('Auf diesem geteilten Dashboard gibt es noch nichts zu sehen.')}</p></div>
+    {:else if allTiles.length === 0}
       <div class="empty card">
         <h2>{t("Los geht's")} 👋</h2>
         <p class="muted">{t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.')}</p>
         <div class="row center">
           {#if data.docker || data.proxmox}<button class="primary" onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'} {t('Dienste automatisch finden')}</button>{/if}
-          {#if !data.proxmox}<button class:primary={!!data.proxmoxHint && !data.docker} onclick={connectProxmox}>🖥️ {t('Proxmox verbinden')}</button>{/if}
+          {#if admin && !data.proxmox}<button class:primary={!!data.proxmoxHint && !data.docker} onclick={connectProxmox}>🖥️ {t('Proxmox verbinden')}</button>{/if}
           <button class:primary={!data.docker} onclick={() => (editing = { groupId: boardGroups.find((g) => !g.locked)?.id })} disabled={!boardGroups.some((g) => !g.locked)}>+ {t('Kachel hinzufügen')}</button>
           <label class="button">⇪ {t('Von Heimdall übernehmen')}<input type="file" accept="application/json,.json" onchange={async (e) => { if (await importFile(e.target.files[0], board?.id)) saved(); e.target.value = ''; }} hidden /></label>
         </div>
         <p class="help">{t('Heimdall: Einstellungen → Exportieren lädt eine HeimdallExport.json herunter. Bekannte Dienste werden samt API-Key als Live-Kachel übernommen, Tags werden zu Gruppen.')}</p>
         {#if data.proxmoxHint && !data.proxmox}
           <p class="help">{t('Heimdeck läuft auf Proxmox – verbinde es mit einem API-Token, dann werden deine VMs und Container als Dienste vorgeschlagen.')}</p>
-        {:else if !data.docker}
+        {:else if !data.docker && admin}
           <p class="help">{t('Tipp: Wenn du den Docker-Socket einbindest, erkennt Heimdeck deine Container automatisch (siehe docker-compose.yml). Mit Proxmox verbunden werden auch deine VMs und LXC-Container vorgeschlagen.')}</p>
         {/if}
         {#if !boardGroups.length}<button onclick={addGroup}>+ {t('Gruppe anlegen')}</button>{/if}
@@ -516,16 +580,16 @@
 
     {#each boardGroups as group, gi (group.id)}
       {#if group.locked}
-        <form class="locked card" onsubmit={(e) => unlock(e, group)}>
+        <form class="locked card" id="group-{group.id}" class:flash={flashGroup === group.id} onsubmit={(e) => unlock(e, group)}>
           <span class="lock-name">🔒 {group.name}</span>
           <span class="spacer"></span>
           <input type="password" placeholder={t('Passwort')} bind:value={unlockPw[group.id]} autocomplete="off" aria-label={t('Passwort für {name}', { name: group.name })}
-            title={t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')} />
+            title={readOnly ? '' : t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')} />
           <button class="small">{t('Entsperren')}</button>
           {#if editMode}<span class="help lock-hint">{t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')}</span>{/if}
         </form>
       {:else if group.visibility !== 'hidden' || showHidden || editMode}
-        <section class="group" aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
+        <section class="group" id="group-{group.id}" class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2 class="on-bg">{group.name}</h2>
             {#if group.visibility === 'hidden'}<span class="vis on-bg" title={t('Ausgeblendete Gruppe')}>👁 {t('ausgeblendet')}</span>{/if}
@@ -545,7 +609,7 @@
               <p class="empty-group on-bg">{t('Freies Raster: auf einem größeren Bildschirm anordnen.')}</p>
             {/if}
             <FreeGrid tiles={group.tiles} {defs} {status} {editMode} {newTab} {local} cols={narrow ? 4 : 12}
-              {dragging} {findTile} grab={() => grab} tileDragProps={freeDragProps} onEdit={(tile) => (editing = tile)}
+              {dragging} {findTile} grab={() => grab} tileDragProps={freeDragProps} onEdit={readOnly ? null : (tile) => (editing = tile)}
               onCommit={(grid, incomingId) => commitGrid(group, grid, incomingId)} />
             {#if editMode}
               <div class="free-add">
@@ -560,7 +624,7 @@
               {#each group.tiles as tile (tile.id)}
                 <div class="slot" class:drop={dropTarget === tile.id && dragging !== tile.id} class:dragging={dragging === tile.id}>
                   <Tile {tile} def={defs[tile.integration]} status={status[tile.id]} {editMode} {newTab} {local} uniform={isUniform(group)} compact={compactOf(group)}
-                    onEdit={() => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
+                    onEdit={readOnly ? null : () => (editing = tile)} dragProps={dragPropsFor(tile, group)} />
                 </div>
               {/each}
               {#if editMode}
@@ -597,7 +661,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
@@ -629,6 +693,13 @@
   .board-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 45; min-width: 180px; padding: 6px; display: grid; gap: 2px; background: var(--surface-solid); }
   .board-menu button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: var(--r-xs); }
   .board-menu button:hover, .board-menu button.on { background: var(--surface-2); }
+  .menu-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 8px 10px 2px; border-top: 1px solid var(--border); margin-top: 4px; }
+  .menu-owner { color: var(--muted); font-size: 12px; }
+  /* A dashboard offered by someone else, and the note on a shared one. */
+  .share-ask { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 14px; flex-wrap: wrap; border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .share-ask .muted { display: block; font-size: 12.5px; }
+  .share-icon { font-size: 20px; }
+  .shared-note { justify-self: start; font-size: 13px; color: var(--muted); padding: 5px 12px; border: 1px dashed var(--border-strong); border-radius: 999px; margin-top: -10px; }
   .empty-group { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .tools { display: flex; justify-content: flex-end; gap: 4px; }
   .tools .on { background: var(--accent); color: var(--on-accent, #fff); }
@@ -647,6 +718,12 @@
 
   .editbar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14px; flex-wrap: wrap; }
   .group { display: grid; gap: 12px; }
+  /* Jumped to from the search: a little room above, and the title lights up briefly. */
+  .group, .locked { scroll-margin-top: 16px; }
+  .group.flash .group-head h2 { color: var(--accent); transition: color .2s; }
+  .group.flash .group-head::before { content: ''; width: 4px; height: 18px; border-radius: 2px; background: var(--accent); animation: flash 1.6s ease-out; }
+  .locked.flash { border-color: var(--accent); }
+  @keyframes flash { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
   .group-head { display: flex; align-items: center; gap: 8px; min-height: 30px; }
   .group-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
   .group-tools { display: flex; gap: 2px; flex-wrap: wrap; }

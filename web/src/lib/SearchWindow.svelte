@@ -9,8 +9,8 @@
   // with the arrow keys and a preview of the selected hit with its buttons.
   // The search itself (typing, asking the services, opening) lives in Search.svelte.
   let {
-    q = $bindable(), parsed, tileHits, groups, loading, noHits, tileById, defs, local, newTab, recent, hasSearchServices,
-    onInput, makeAction, webSearch, openUrl, onClose, onForget = null,
+    q = $bindable(), parsed, tileHits, groupHits = [], sections = [], groups, loading, noHits, tileById, defs, local, newTab, recent, hasSearchServices,
+    onInput, makeAction, webSearch, openUrl, onClose, onForget = null, onJump = null,
     // anchored: opens right below the search field in the header, which stays the input.
     anchored = false, input = null,
   } = $props();
@@ -48,9 +48,10 @@
     if (anchored && win && !win.contains(e.target) && !input?.parentElement?.contains(e.target) && !e.target.closest?.('.backdrop:not(.anchored)')) onClose();
   }
 
-  // Every hit in one list: tiles first, then the services in the server's order.
+  // Every hit in one list: tiles first, then groups to jump to, then the services in the server's order.
   let entries = $derived([
     ...tileHits.map((tile) => ({ key: 't' + tile.id, kind: 'tile', cat: 'tiles', section: 'tiles', tile })),
+    ...groupHits.map((grp) => ({ key: 's' + grp.id, kind: 'group', cat: 'groups', section: 'groups', grp })),
     ...groups.flatMap((g) =>
       (g.items || []).map((item, i) => {
         const tile = tileById[g.tileId];
@@ -64,7 +65,8 @@
     for (const e of entries) count[e.cat] = (count[e.cat] || 0) + 1;
     const list = [{ id: 'all', label: t('Alle'), n: entries.length }];
     if (count.tiles) list.push({ id: 'tiles', label: t('Kacheln'), n: count.tiles });
-    for (const c of Object.keys(count).filter((c) => c !== 'tiles')) list.push({ id: c, label: c, n: count[c] });
+    if (count.groups) list.push({ id: 'groups', label: t('Gruppen'), n: count.groups });
+    for (const c of Object.keys(count).filter((c) => c !== 'tiles' && c !== 'groups')) list.push({ id: c, label: c, n: count[c] });
     return list;
   });
   let visible = $derived(cat === 'all' ? entries : entries.filter((e) => e.cat === cat));
@@ -80,12 +82,13 @@
     if (cat !== 'all' && !chips.some((c) => c.id === cat)) cat = 'all';
   });
 
-  const sectionName = (e) => (e.kind === 'tile' ? t('Kacheln') : e.group.name);
+  const sectionName = (e) => (e.kind === 'tile' ? t('Kacheln') : e.kind === 'group' ? t('Gruppen') : e.group.name);
   const link = (e, u) => rewrite(u, e.tile, local);
 
   function activate(e) {
     if (!e) return webSearch();
     if (e.kind === 'tile') openUrl(tileHref(e.tile, local));
+    else if (e.kind === 'group') onJump?.(e.grp.id);
     else if (e.item.url) openUrl(link(e, e.item.url));
     else sheet = true; // nothing to open: show what can be done with it
   }
@@ -196,6 +199,9 @@
               {#if e.kind === 'tile'}
                 <Icon icon={e.tile.icon} name={e.tile.name} favicon={faviconUrl(e.tile)} size={26} />
                 <span class="txt"><b>{e.tile.name}</b>{#if e.tile.description}<small>{e.tile.description}</small>{/if}</span>
+              {:else if e.kind === 'group'}
+                <span class="jump" aria-hidden="true">↓</span>
+                <span class="txt"><b>{e.grp.name}</b><small>{t('Zur Gruppe springen')} · {t('{n} Kacheln', { n: e.grp.count })}</small></span>
               {:else}
                 {#if e.item.image}<img class="thumb" src={link(e, e.item.image)} alt="" loading="lazy" onerror={(ev) => (ev.currentTarget.style.visibility = 'hidden')} />{/if}
                 <span class="txt"><b>{e.item.title}</b>{#if e.item.subtitle}<small>{e.item.subtitle}</small>{/if}</span>
@@ -221,6 +227,11 @@
               {#if current.tile.description}<p class="muted">{current.tile.description}</p>{/if}
               {#if host(tileHref(current.tile, local))}<p class="muted small">{host(tileHref(current.tile, local))}</p>{/if}
               <div class="p-actions"><button class="primary" onclick={() => activate(current)}>{t('Öffnen')}</button></div>
+            {:else if current.kind === 'group'}
+              <div class="p-icon jump big" aria-hidden="true">↓</div>
+              <h3>{current.grp.name}</h3>
+              <p class="muted">{t('Gruppe auf diesem Dashboard')} · {t('{n} Kacheln', { n: current.grp.count })}</p>
+              <div class="p-actions"><button class="primary" onclick={() => activate(current)}>{t('Hinspringen')}</button></div>
             {:else}
               {#if current.item.image}<img class="p-image" src={link(current, current.item.image)} alt="" onerror={(ev) => (ev.currentTarget.style.display = 'none')} />{/if}
               <h3>{current.item.title}</h3>
@@ -253,6 +264,15 @@
       </div>
     {:else}
       <div class="start">
+        {#if sections.length > 1}
+          <!-- Before typing: every group of the dashboard, one click away. -->
+          <div class="sec">{t('Springen zu')}</div>
+          <div class="recent">
+            {#each sections as s (s.id)}
+              <button class="chip" onclick={() => onJump?.(s.id)}>↓ {s.name}</button>
+            {/each}
+          </div>
+        {/if}
         {#if recent.length}
           <div class="sec">{t('Zuletzt gesucht')}</div>
           <div class="recent">
@@ -327,6 +347,8 @@
   .rchip .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
   .forget { border-radius: 0 999px 999px 0; padding: 4px 9px 4px 6px; font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
   .forget:hover { color: var(--bad); }
+  .jump { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; }
+  .jump.big { width: 64px; height: 64px; font-size: 30px; border-radius: var(--r-md); }
   .hint { display: grid; gap: 6px; padding: 8px 2px; }
   .hint p { margin: 0; }
   @keyframes fade { from { opacity: 0; } }

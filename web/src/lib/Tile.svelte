@@ -138,7 +138,7 @@
     {/if}
   </a>
 
-  {#if def?.hasWidget && tile.showWidget && missing.length > 0}
+  {#if def?.hasWidget && tile.showWidget && missing.length > 0 && onEdit}
     <button class="setup" onclick={onEdit}>🔑 {t('{fields} fehlt – jetzt einrichten', { fields: missing.map((f) => f.label).join(', ') })}</button>
   {:else if live}
     <div class="body">

@@ -9,13 +9,17 @@
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
   import { THEMES, SEASONS } from './themes.js';
+  import Users from './Users.svelte';
+  import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
-
-  // Editable copy of the dashboards list.
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
   // svelte-ignore state_referenced_locally
-  let boardRows = $state(boards.map((b) => ({ ...b, name: t(b.name) })));
+  const admin = role === 'admin';
+
+  // Editable copy of the user's own dashboards (shared ones are listed under "Shared with you").
+  // svelte-ignore state_referenced_locally
+  let boardRows = $state(boards.filter((b) => !b.shared).map((b) => ({ ...b, name: t(b.name) })));
   let newBoard = $state({ name: '', icon: '💼' });
 
   async function saveBoard(b) {
@@ -67,17 +71,19 @@
   const setFlag = (key) => (e) => saveSetting({ [key]: String(e.target.checked) });
 
   // Areas of the dialog. Phones first show the list, then one area with a back arrow.
+  // Areas marked admin hold settings for the whole Heimdeck.
   const SECTIONS = [
     { id: 'general', label: 'Allgemein', icon: '⚙️' },
     { id: 'look', label: 'Aussehen', icon: '🎨' },
     { id: 'boards', label: 'Dashboards', icon: '🗂️' },
     { id: 'search', label: 'Suche', icon: '🔍' },
-    { id: 'network', label: 'Netzwerk und Docker', icon: '🏠' },
+    { id: 'network', label: 'Netzwerk und Docker', icon: '🏠', admin: true },
     { id: 'notify', label: 'Benachrichtigungen', icon: '🔔' },
     { id: 'keys', label: 'Tastenkürzel', icon: '⌨️' },
+    { id: 'users', label: 'Benutzerverwaltung', icon: '👥', admin: true },
     { id: 'account', label: 'Konto und Sicherung', icon: '🔐' },
     { id: 'info', label: 'Info', icon: 'ℹ️' },
-  ];
+  ].filter((x) => admin || !x.admin);
   const phone = () => matchMedia('(max-width: 640px)').matches;
   // svelte-ignore state_referenced_locally
   let current = $state(section || (phone() ? '' : 'general'));
@@ -340,7 +346,9 @@
   }
 
   async function importBackup(e) {
-    if (await importFile(e.target.files[0], boardId)) onSaved();
+    // Into the open dashboard – or the first own one when a shared one is open.
+    const target = boardRows.some((b) => b.id === boardId) ? boardId : boardRows[0]?.id;
+    if (await importFile(e.target.files[0], target)) onSaved();
     e.target.value = '';
   }
 
@@ -521,7 +529,14 @@
           <input bind:value={newBoard.name} placeholder={t('z. B. Arbeit')} required />
           <div class="board-actions"><button class="small primary">+ {t('Dashboard anlegen')}</button></div>
         </form>
+        <Shares boards={boardRows} {onSaved} {onSwitchBoard} {onClose} />
       </section>
+
+      {#if admin}
+        <section hidden={current !== 'users'} bind:this={sectionEls.users}>
+          <Users />
+        </section>
+      {/if}
 
       <section hidden={current !== 'search'} bind:this={sectionEls.search}>
         <h3>{t('Suche')}</h3>
@@ -565,6 +580,7 @@
         <p class="help">{t('Die Suche oben findet deine Kacheln sofort und fragt im Hintergrund alle Dienste, die suchen können (z. B. Jellyfin, Paperless). Enter öffnet den ersten Treffer oder sucht im Web.')}</p>
       </section>
 
+      {#if admin}
       <section hidden={current !== 'network'} bind:this={sectionEls.network}>
         <h3>{t('Zuhause oder unterwegs')}</h3>
         <p class="help">
@@ -583,8 +599,9 @@
         <label class="check"><input type="checkbox" checked={s.dockerUpdates === 'true'} onchange={setFlag('dockerUpdates')} disabled={!docker} /> {t('Nach Container-Updates suchen')}</label>
         <p class="help indent">{t('Vergleicht alle 6 Stunden die Images deiner Container mit der Registry (Docker Hub, ghcr.io …). Es wird nichts heruntergeladen oder aktualisiert.')}</p>
         <label class="check"><input type="checkbox" checked={s.dockerControl === 'true'} onchange={setFlag('dockerControl')} disabled={!docker} /> {t('Container starten, stoppen und neu starten erlauben')}</label>
-        <p class="help indent">{t('Knöpfe auf der Docker-Kachel und in der Suche. Jeder, der im Dashboard angemeldet ist, kann dann deine Container steuern.')}</p>
+        <p class="help indent">{t('Knöpfe auf der Docker-Kachel und in der Suche. Jeder, der das Dashboard mit der Docker-Kachel sehen und dessen Knöpfe benutzen darf, kann dann deine Container steuern.')}</p>
       </section>
+      {/if}
 
       <section hidden={current !== 'notify'} bind:this={sectionEls.notify}>
         <h3>{t('Benachrichtigungen')}</h3>
@@ -694,7 +711,7 @@
       </section>
 
       <section hidden={current !== 'account'} bind:this={sectionEls.account}>
-        <h3>{t('Zugang')} ({username})</h3>
+        <h3>{t('Zugang')} ({username}{admin ? ' · ' + t('Admin') : ''})</h3>
         <div class="grid2">
           <input type="password" placeholder={t('Aktuelles Passwort')} bind:value={pw.current} autocomplete="current-password" />
           <input type="password" placeholder={t('Neues Passwort')} bind:value={pw.new} autocomplete="new-password" />
@@ -705,7 +722,7 @@
           <button disabled={!pw.current || pw.new.length < 8} onclick={changePassword}>{t('Passwort ändern')}</button>
         </div>
         <h3>{t('Sicherung')}</h3>
-        <p class="help">{t('Exportiert Gruppen, Kacheln und Einstellungen – API-Keys werden aus Sicherheitsgründen nicht mitgesichert.')}</p>
+        <p class="help">{t('Exportiert Gruppen, Kacheln und Einstellungen – API-Keys werden aus Sicherheitsgründen nicht mitgesichert.')} {t('Nur deine eigenen Dashboards, keine geteilten.')}</p>
         <p class="help">{t('Importieren nimmt auch einen Heimdall-Export (Heimdall → Einstellungen → Exportieren). Die Kacheln landen im geöffneten Dashboard, bekannte Dienste werden samt API-Key als Live-Kachel übernommen.')}</p>
         <div class="row">
           <button onclick={exportBackup}>{t('Exportieren')}</button>
@@ -736,8 +753,10 @@
             <p class="help ok-line">✓ {t('Du hast die neueste Version.')}{#if system.updateChecked} {t('Zuletzt geprüft: {date}', { date: fmtDate(system.updateChecked, true) })}{/if}</p>
           {/if}
         </div>
-        <label class="check"><input type="checkbox" checked={s.updateCheck !== 'false'} onchange={setFlag('updateCheck')} /> {t('Auf neue Heimdeck-Versionen hinweisen')}</label>
-        <p class="help indent">{t('Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.')}</p>
+        {#if admin}
+          <label class="check"><input type="checkbox" checked={s.updateCheck !== 'false'} onchange={setFlag('updateCheck')} /> {t('Auf neue Heimdeck-Versionen hinweisen')}</label>
+          <p class="help indent">{t('Der Server fragt zweimal am Tag bei GitHub nach der neuesten Version und zeigt sie unten in der Fußzeile an. Es wird nichts automatisch installiert.')}</p>
+        {/if}
 
         <h3>{t('Links')}</h3>
         <div class="row wrap">
@@ -758,11 +777,13 @@
         </dl>
         <div class="row"><button class="small" onclick={copyInfo}>📋 {t('Infos kopieren (für Fehlermeldungen)')}</button></div>
 
-        <h3>{t('Fehlersuche')}</h3>
-        <label class="check"><input type="checkbox" checked={debug} onchange={toggleDebug} disabled={debugForced} /> {t('Debug-Modus')}</label>
-        <p class="help indent">{t('Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.')}</p>
-        {#if debugForced}<p class="help indent">{t('Eingeschaltet über HEIMDECK_DEBUG=true – lässt sich hier nicht ausschalten.')}</p>{/if}
-        <p class="help indent">{t('Protokoll ansehen')}: <code>docker logs heimdeck</code> · {t('Installationsskript und Proxmox')}: <code>journalctl -u heimdeck</code></p>
+        {#if admin}
+          <h3>{t('Fehlersuche')}</h3>
+          <label class="check"><input type="checkbox" checked={debug} onchange={toggleDebug} disabled={debugForced} /> {t('Debug-Modus')}</label>
+          <p class="help indent">{t('Schreibt ins Protokoll, was Heimdeck gerade tut: jede Anfrage mit ihrer Dauer, das Abholen der Live-Daten und die Statusprüfungen. Im Browser erscheinen die Anfragen zusätzlich in der Konsole (F12). Nur zur Fehlersuche einschalten.')}</p>
+          {#if debugForced}<p class="help indent">{t('Eingeschaltet über HEIMDECK_DEBUG=true – lässt sich hier nicht ausschalten.')}</p>{/if}
+          <p class="help indent">{t('Protokoll ansehen')}: <code>docker logs heimdeck</code> · {t('Installationsskript und Proxmox')}: <code>journalctl -u heimdeck</code></p>
+        {/if}
       </section>
     </div>
   </div>

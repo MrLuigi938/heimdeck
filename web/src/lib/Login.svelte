@@ -1,25 +1,49 @@
 <script>
   import Credit from './Credit.svelte';
-  import { post } from './api.js';
+  import { get, post } from './api.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
 
-  let { setup = false, onDone } = $props();
+  // invite: the token of an invitation link – then the form creates an account.
+  let { setup = false, invite = '', onDone } = $props();
   let username = $state('');
   let password = $state('');
   let password2 = $state('');
   let error = $state('');
   let busy = $state(false);
+  // svelte-ignore state_referenced_locally
+  let inviteOk = $state(invite ? null : false); // null: still checking
+  // svelte-ignore state_referenced_locally
+  let newAccount = $derived(setup || (invite && inviteOk));
+
+  // svelte-ignore state_referenced_locally
+  if (invite) {
+    get(`/invite/${encodeURIComponent(invite)}`)
+      .then((res) => {
+        inviteOk = res.valid;
+        if (res.valid && res.language) setLang(res.language);
+      })
+      .catch(() => (inviteOk = false));
+  }
+
+  // Without the invitation in the address, a reload shows the normal login.
+  function dropInvite() {
+    const url = new URL(location.href);
+    url.searchParams.delete('invite');
+    history.replaceState(null, '', url);
+  }
 
   async function submit(e) {
     e.preventDefault();
     error = '';
-    if (setup && password !== password2) {
+    if (newAccount && password !== password2) {
       error = t('Die Passwörter stimmen nicht überein');
       return;
     }
     busy = true;
     try {
-      await post(setup ? '/setup' : '/login', { username, password, language: i18n.lang });
+      const path = setup ? '/setup' : newAccount ? `/invite/${encodeURIComponent(invite)}` : '/login';
+      await post(path, { username, password, language: i18n.lang });
+      if (invite) dropInvite();
       onDone();
     } catch (err) {
       error = err.message;
@@ -41,6 +65,12 @@
     </div>
     {#if setup}
       <p class="muted">{t('Willkommen! Lege zuerst deinen Zugang an. Damit ist dein Dashboard vor fremden Blicken geschützt.')}</p>
+    {:else if invite && inviteOk === null}
+      <p class="muted">{t('Einladung wird geprüft …')}</p>
+    {:else if invite && inviteOk}
+      <p class="muted">{t('Du wurdest zu Heimdeck eingeladen! Wähle deinen Benutzernamen und ein Passwort – danach baust du dir dein eigenes Dashboard.')}</p>
+    {:else if invite}
+      <p class="bad">{t('Dieser Einladungslink ist ungültig oder abgelaufen')}. {t('Bitte frag nach einem neuen – oder melde dich an, falls du schon einen Zugang hast.')}</p>
     {/if}
     <label class="field">
       <span>{t('Benutzername')}</span>
@@ -49,16 +79,16 @@
     </label>
     <label class="field">
       <span>{t('Passwort')}</span>
-      <input type="password" bind:value={password} autocomplete={setup ? 'new-password' : 'current-password'} required minlength={setup ? 8 : undefined} />
+      <input type="password" bind:value={password} autocomplete={newAccount ? 'new-password' : 'current-password'} required minlength={newAccount ? 8 : undefined} />
     </label>
-    {#if setup}
+    {#if newAccount}
       <label class="field">
         <span>{t('Passwort wiederholen')}</span>
         <input type="password" bind:value={password2} autocomplete="new-password" required />
       </label>
     {/if}
     {#if error}<p class="bad">{error}</p>{/if}
-    <button class="primary" disabled={busy}>{setup ? t('Zugang anlegen') : t('Anmelden')}</button>
+    <button class="primary" disabled={busy || inviteOk === null}>{newAccount ? t('Zugang anlegen') : t('Anmelden')}</button>
   </form>
   <Credit />
 </div>

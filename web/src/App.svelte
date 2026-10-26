@@ -7,6 +7,8 @@
   import { t, setLang } from './lib/i18n.svelte.js';
 
   let state = $state(null);
+  // An invitation link: /?invite=<token>
+  const invite = new URLSearchParams(location.search).get('invite') || '';
 
   async function load() {
     try {
@@ -27,7 +29,7 @@
 {:else if state.error}
   <div class="center bad">{t('Server nicht erreichbar')}: {state.error}</div>
 {:else if state.setup || !state.authenticated}
-  <Login setup={state.setup} onDone={load} />
+  <Login setup={state.setup} invite={state.setup ? '' : invite} onDone={load} />
 {:else}
   <Dashboard />
 {/if}
