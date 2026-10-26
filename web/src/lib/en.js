@@ -539,7 +539,8 @@ export const en = {
   'Zu einer Gruppe springen': 'Jump to a group',
   'Ganz nach oben': 'Back to the top',
   'Sprungleiste mit den Gruppen unter der Suche': 'Jump bar with the groups below the search',
-  'Ab drei Gruppen. Bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.': 'From three groups on. Stays at the top while you scroll and shows which group you are in.',
+  'Zu jeder Gruppe springen geht immer über die Suche („Springen zu“). Die Leiste zeigt die Gruppen zusätzlich dauerhaft an – ab drei Gruppen, nicht auf dem Handy. Sie bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.':
+    'You can always jump to a group from the search (“Jump to”). The bar shows the groups all the time as well – from three groups on, not on phones. It stays at the top while you scroll and shows which group you are in.',
   'Auf dem Handy: Knopf zum Springen unten rechts': 'On phones: jump button at the bottom right',
   'Erscheint beim Herunterscrollen und öffnet die Liste der Gruppen. Springen geht auch immer über die Suche.': 'Shows up when you scroll down and opens the list of groups. You can always jump from the search too.',
 

@@ -394,8 +394,8 @@
         <label class="check"><input type="checkbox" checked={s.showGreeting !== 'false'} onchange={setFlag('showGreeting')} /> {t('Begrüßung, Datum und Uhrzeit anzeigen')}</label>
         <label class="check"><input type="checkbox" checked={s.openInNewTab !== 'false'} onchange={setFlag('openInNewTab')} /> {t('Links in neuem Tab öffnen')}</label>
         <label class="check"><input type="checkbox" checked={s.showUptime !== 'false'} onchange={setFlag('showUptime')} /> {t('Verfügbarkeits-Übersicht unten anzeigen')}</label>
-        <label class="check"><input type="checkbox" checked={s.jumpBar !== 'false'} onchange={setFlag('jumpBar')} /> {t('Sprungleiste mit den Gruppen unter der Suche')}</label>
-        <p class="help indent">{t('Ab drei Gruppen. Bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.')}</p>
+        <label class="check"><input type="checkbox" checked={s.jumpBar === 'true'} onchange={setFlag('jumpBar')} /> {t('Sprungleiste mit den Gruppen unter der Suche')}</label>
+        <p class="help indent">{t('Zu jeder Gruppe springen geht immer über die Suche („Springen zu“). Die Leiste zeigt die Gruppen zusätzlich dauerhaft an – ab drei Gruppen, nicht auf dem Handy. Sie bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.')}</p>
         <label class="check"><input type="checkbox" checked={s.jumpButton !== 'false'} onchange={setFlag('jumpButton')} /> {t('Auf dem Handy: Knopf zum Springen unten rechts')}</label>
         <p class="help indent">{t('Erscheint beim Herunterscrollen und öffnet die Liste der Gruppen. Springen geht auch immer über die Suche.')}</p>
       </section>

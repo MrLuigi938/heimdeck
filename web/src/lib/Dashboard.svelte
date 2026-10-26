@@ -124,9 +124,12 @@
   let jumpTargets = $derived(
     boardGroups.filter((g) => g.visibility !== 'hidden' || showHidden).map((g) => ({ id: g.id, name: g.name, count: g.tiles.length })),
   );
-  // Jump bar under the search (setting jumpBar, from three groups on) and, on
-  // phones, a round button that opens the groups as a sheet (setting jumpButton).
-  let showJumpBar = $derived(settings.jumpBar !== 'false' && jumpTargets.length >= 3);
+  // Jumping to a group works from the search ("Jump to"). On top, optionally:
+  // a bar under the search on larger screens (setting jumpBar, off by default,
+  // from three groups on) and on phones a round button that opens the groups
+  // as a sheet (setting jumpButton, on by default).
+  let showJumpBar = $derived(settings.jumpBar === 'true' && !narrow && jumpTargets.length >= 3);
+  let jumpBarHeight = $state(0);
   let showJumpButton = $derived(settings.jumpButton !== 'false' && jumpTargets.length >= 2);
   let activeGroup = $state(0);
   let scrolledDown = $state(false);
@@ -141,8 +144,8 @@
     barStuck = !!jumpBarEl && scrollY > 0 && jumpBarEl.getBoundingClientRect().top <= 1;
     // Right after a jump the chosen group stays marked, even if the page cannot scroll that far.
     if (Date.now() < jumpLock) return;
-    // Groups jumped to land 70px from the top (scroll-margin-top), safely above this edge.
-    const edge = Math.max(jumpBarEl?.getBoundingClientRect().bottom || 0, 0) + 56;
+    // Groups jumped to land 16px below the bar (scroll-margin-top), safely above this edge.
+    const edge = Math.max(jumpBarEl?.getBoundingClientRect().bottom || 0, 0) + 48;
     let current = 0;
     for (const g of jumpTargets) {
       const el = document.getElementById(`group-${g.id}`);
@@ -160,16 +163,6 @@
   $effect(() => {
     jumpTargets;
     trackGroup();
-  });
-  // The active chip stays in view when the bar scrolls sideways.
-  $effect(() => {
-    if (!activeGroup || !jumpBarEl) return;
-    const chip = jumpBarEl.querySelector(`[data-group="${activeGroup}"]`);
-    if (chip) {
-      const bar = jumpBarEl.querySelector('.jump-chips');
-      const left = chip.offsetLeft - bar.clientWidth / 2 + chip.clientWidth / 2;
-      bar.scrollTo({ left, behavior: 'smooth' });
-    }
   });
   let flashGroup = $state(0);
   function jumpToGroup(id) {
@@ -507,7 +500,7 @@
 <svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} onkeydown={onShortcut} onscroll={onPageScroll} onresize={onPageScroll} />
 
 {#if data}
-  <div class="page">
+  <div class="page" style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
     <header class="top">
       <div class="brand on-bg">
         <div class="title-row">
@@ -581,7 +574,7 @@
     </header>
 
     {#if showJumpBar}
-      <nav class="jumpbar" class:stuck={barStuck} bind:this={jumpBarEl} aria-label={t('Zu einer Gruppe springen')}>
+      <nav class="jumpbar" class:stuck={barStuck} bind:this={jumpBarEl} bind:clientHeight={jumpBarHeight} aria-label={t('Zu einer Gruppe springen')}>
         <div class="jump-chips">
           {#each jumpTargets as g (g.id)}
             <button class="jump-chip" class:on={activeGroup === g.id} data-group={g.id} aria-current={activeGroup === g.id ? 'location' : undefined} onclick={() => jumpToGroup(g.id)}>{g.name}</button>
@@ -799,15 +792,14 @@
   .group { display: grid; gap: 12px; }
   /* Jumped to from the search: a little room above, and the title lights up briefly. */
   .group, .locked { scroll-margin-top: 16px; }
-  /* With the jump bar the groups land below it. */
-  .page:has(.jumpbar) :is(.group, .locked) { scroll-margin-top: 70px; }
-  /* Jump bar: sticks to the top while scrolling, the group you are in is marked. */
-  /* min-width: 0 keeps the long chip row from widening the page; it scrolls sideways instead. */
+  /* With the jump bar the groups land just below it, however many rows it has. */
+  .page:has(.jumpbar) :is(.group, .locked) { scroll-margin-top: calc(var(--jump-h, 50px) + 16px); }
+  /* Jump bar: sticks to the top while scrolling, the group you are in is marked.
+     Many groups wrap into more rows instead of being cut off. */
   .jumpbar { position: sticky; top: 0; z-index: 25; margin: -14px -8px -10px; padding: 8px; min-width: 0; }
   .jumpbar::before { content: ''; position: absolute; inset: 0; border-radius: var(--radius); background: color-mix(in srgb, var(--surface-solid) 82%, transparent); backdrop-filter: blur(12px); opacity: 0; transition: opacity .2s; pointer-events: none; }
   .jumpbar.stuck::before { opacity: 1; }
-  .jump-chips { position: relative; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
-  .jump-chips::-webkit-scrollbar { display: none; }
+  .jump-chips { position: relative; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   .jump-chip { flex: none; padding: 5px 13px; font-size: 13px; border-radius: 999px; background: var(--surface); backdrop-filter: blur(10px); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
   .jump-chip:hover { color: var(--text); border-color: var(--border-strong); }
   .jump-chip.on { background: color-mix(in srgb, var(--accent) 20%, var(--surface-solid)); border-color: var(--accent); color: var(--text); font-weight: 500; }
@@ -884,11 +876,7 @@
     .locked .spacer { display: none; }
     .locked input { width: 100%; }
     .page { padding: 16px 16px 60px; gap: 22px; }
-    /* Phones: the bar scrolls away with the header; the round button takes over. */
-    .jumpbar { position: relative; margin: -10px -16px -8px; padding: 0 16px; }
-    .jumpbar.stuck::before { opacity: 0; }
-    .jump-chips { justify-content: flex-start; }
-    .page:has(.jumpbar) :is(.group, .locked) { scroll-margin-top: 12px; }
+    /* Phones have no jump bar; the round button takes over. */
     .jump-fab {
       display: grid; place-items: center; position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 50;
       width: 48px; height: 48px; padding: 0; border-radius: 50%; background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff);
