@@ -36,7 +36,7 @@ func TestProxmox(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := stats(w)
-	if s["CPU"] != "25 %" || s["RAM"] != "25 %" || s["Gäste aktiv"] != "2/3" || s["Speicher"] != "50 %" || s["Laufzeit"] != "4 Tage" {
+	if s["CPU"] != "25 %" || s["RAM"] != "25 %" || s["VMs und Container an"] != "2/3" || s["Speicher"] != "50 %" || s["Laufzeit"] != "4 Tage" {
 		t.Fatalf("stats %v", s)
 	}
 	// running guests first (busiest on top), then the stopped one; local-lvm is nearly full

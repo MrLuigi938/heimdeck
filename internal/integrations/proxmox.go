@@ -156,7 +156,7 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if maxDisk > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Speicher"), Value: fmt.Sprintf("%.0f %%", disk/maxDisk*100), Tone: toneIf(disk/maxDisk > 0.9, "warn")})
 	}
-	w.Stats = append(w.Stats, Stat{Label: in.T("Gäste aktiv"), Value: fmt.Sprintf("%d/%d", running, guests)})
+	w.Stats = append(w.Stats, Stat{Label: in.T("VMs und Container an"), Value: fmt.Sprintf("%d/%d", running, guests)})
 	if len(nodes) == 1 && nodes[0].Uptime > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Laufzeit"), Value: uptimeText(in, nodes[0].Uptime)})
 	}
@@ -237,14 +237,16 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			w.Items = append(w.Items, it)
 		}
 	} else {
-		// One node: the guests that work hardest, then the stopped ones.
-		w.ItemsTitle = in.T("Gäste")
+		// One node: all VMs and containers – the ones that work hardest first,
+		// then the stopped ones. The tile shows a few and folds the rest away.
+		w.ItemsTitle = in.T("VMs und Container")
 		sort.Slice(runningGuests, func(i, j int) bool {
 			a, b := runningGuests[i], runningGuests[j]
 			return a.CPU*a.MaxCPU+a.Mem/1e10 > b.CPU*b.MaxCPU+b.Mem/1e10
 		})
 		sort.Slice(stopped, func(i, j int) bool { return stopped[i].VMID < stopped[j].VMID })
-		for _, r := range append(runningGuests[:min(5, len(runningGuests))], stopped[:min(3, len(stopped))]...) {
+		all := append(runningGuests, stopped...)
+		for _, r := range all[:min(200, len(all))] {
 			w.Items = append(w.Items, p.guestItem(in, r))
 		}
 	}

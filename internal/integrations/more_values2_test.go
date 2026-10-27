@@ -82,7 +82,7 @@ func TestProxmoxTasksAndUpdates(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := stats(w)
-	if s["VMs"] != "1" || s["Container"] != "1" || s["Updates"] != "2" || s["Version"] != "9.0.3" || s["Fehlgeschlagene Aufgaben (24 h)"] != "1" || len(w.Alerts) != 1 {
+	if s["VMs"] != "1" || s["Container"] != "1" || s["Updates"] != "2" || s["Version"] != "9.0.3" || s["Fehlgeschlagene Aufgaben (24 h)"] != "1" || len(w.Alerts) != 1 || len(w.Items) != 2 {
 		t.Fatalf("%v %v", s, w.Alerts)
 	}
 }

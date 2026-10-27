@@ -378,7 +378,7 @@ var en = map[string]string{
 	"Nodes online":         "Nodes online",
 	"CPU":                  "CPU",
 	"RAM":                  "RAM",
-	"Gäste aktiv":          "Guests running",
+	"VMs und Container an": "VMs and containers running",
 	"Nodes":                "Nodes",
 	"Herunterfahren":       "Shut down",
 	"Starten":              "Start",
@@ -593,7 +593,7 @@ var en = map[string]string{
 	"Der API-Token sieht keine Nodes und keine Gäste – beim Anlegen war vermutlich „Privilegtrennung“ an. Den Token ohne Privilegtrennung neu anlegen oder dem Token selbst die Rolle PVEAuditor auf „/“ geben.":                                                                                "The API token sees no nodes and no guests – \"Privilege Separation\" was probably on when it was created. Create the token again without privilege separation or give the token itself the role PVEAuditor on \"/\".",
 	"Der API-Token sieht die Nodes nicht – für CPU und RAM die Rolle PVEAuditor auf „/“ vergeben.":                                                                                                                                                                                              "The API token does not see the nodes – for CPU and RAM grant the role PVEAuditor on \"/\".",
 	"Speicher „%s“ ist zu %.0f %% voll": "Storage \"%s\" is %.0f %% full",
-	"Gäste":                             "Guests",
+	"VMs und Container":                 "VMs and containers",
 
 	// more live data (1.2)
 	"Wer gerade was schaut (mit Transkodierung), neu Hinzugefügtes, Größe der Bibliothek, Updates, Suche":                                                              "Who is watching what (with transcoding), recently added, library size, updates, search",
