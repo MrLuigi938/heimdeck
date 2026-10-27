@@ -257,7 +257,7 @@
     // A dashboard can have its own background; otherwise the global one is used.
     const background = board?.background || settings.background;
     if (background) {
-      document.body.style.setProperty('--bg-image', `url("${background.replace(/"/g, '%22')}")`);
+      document.body.style.setProperty('--bg-image', `url("${background.replace(/"/g, '%22').replace(/[\\\r\n]/g, '')}")`);
       document.body.classList.add('has-bg');
     } else {
       document.body.style.removeProperty('--bg-image');
@@ -614,7 +614,7 @@
     {:else if allTiles.length === 0}
       <div class="empty card">
         <h2>{t("Los geht's")} 👋</h2>
-        <p class="muted">{t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.')}</p>
+        <p class="muted">{admin ? t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.') : t('Dein Dashboard ist noch leer. Füge deine Dienste als Kacheln hinzu.')}</p>
         <div class="row center">
           {#if data.docker || data.proxmox}<button class="primary" onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'} {t('Dienste automatisch finden')}</button>{/if}
           {#if admin && !data.proxmox}<button class:primary={!!data.proxmoxHint && !data.docker} onclick={connectProxmox}>🖥️ {t('Proxmox verbinden')}</button>{/if}
@@ -867,6 +867,7 @@
        block: 2 + 2 for four icons, 3 + 2 or 3 + 3 when there are more. */
     .tools { display: grid; grid-template-columns: repeat(2, 38px); justify-content: center; align-content: center; align-self: stretch; gap: 2px; }
     .tools:has(> :nth-child(5)) { grid-template-columns: repeat(3, 38px); }
+    .tools:has(> :nth-child(3)):not(:has(> :nth-child(4))) { grid-template-columns: repeat(3, 38px); } /* three icons in one row, not 2 + 1 */
     .tools :global(button) { width: 38px; height: 38px; padding: 0; justify-content: center; }
     /* No room for the question in the icon block: a check mark asks instead. */
     .logout.armed { width: 38px; padding: 0; }

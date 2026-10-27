@@ -9,6 +9,7 @@
   let users = $state([]);
   let invites = $state([]);
   let me = $state(0);
+  let main = $state(0); // the main admin: only they can change their own account
   let loaded = $state(false);
   let adding = $state(false);
   let form = $state({ username: '', password: '', role: 'user' });
@@ -20,6 +21,7 @@
       users = res.users;
       invites = res.invites;
       me = res.me;
+      main = res.main;
       loaded = true;
     } catch (e) {
       toast(e.message, 'bad');
@@ -111,14 +113,15 @@
         <span class="avatar" aria-hidden="true">{u.username.slice(0, 1).toUpperCase()}</span>
         <div class="who">
           <b>{u.username}</b>
+          {#if u.id === main}<span class="tag main" title={t('Das Konto aus der Einrichtung. Rolle, Passwort und Sperre kann nur der Hauptadmin selbst ändern.')}>{t('Hauptadmin')}</span>{/if}
           {#if u.id === me}<span class="tag">{t('du')}</span>{/if}
           {#if u.disabled}<span class="tag bad">{t('gesperrt')}</span>{/if}
         </div>
-        <select value={u.role} onchange={(e) => change(u, { role: e.target.value })} disabled={u.id === me} aria-label={t('Rolle von {name}', { name: u.username })}>
+        <select value={u.role} onchange={(e) => change(u, { role: e.target.value })} disabled={u.id === me || u.id === main} aria-label={t('Rolle von {name}', { name: u.username })}>
           <option value="user">{t('Benutzer')}</option>
           <option value="admin">{t('Admin')}</option>
         </select>
-        {#if u.id !== me}
+        {#if u.id !== me && u.id !== main}
           <div class="acts">
             <button class="small" onclick={() => resetPassword(u)}>{t('Passwort')}</button>
             <button class="small" onclick={() => change(u, { disabled: !u.disabled })}>{u.disabled ? t('Entsperren') : t('Sperren')}</button>
@@ -180,6 +183,7 @@
   .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
   .tag.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .tag.main { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .user select { font-size: 13px; padding: 4px 8px; }
   .acts { display: flex; gap: 4px; }
   .small { font-size: 12px; }

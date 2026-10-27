@@ -16,11 +16,26 @@ import (
 // does not see the dashboards of the others either.
 
 var (
-	errNotFound = errors.New("nicht gefunden")
-	errReadOnly = errors.New("Dieses Dashboard ist nur zum Ansehen freigegeben")
-	errNoAct    = errors.New("Die Knöpfe dieses Dashboards sind für dich nicht freigegeben")
-	errAdmin    = errors.New("Das darf nur ein Admin")
+	errNotFound    = errors.New("nicht gefunden")
+	errReadOnly    = errors.New("Dieses Dashboard ist nur zum Ansehen freigegeben")
+	errNoAct       = errors.New("Die Knöpfe dieses Dashboards sind für dich nicht freigegeben")
+	errAdmin       = errors.New("Das darf nur ein Admin")
+	errDockerOwner = errors.New("Die Docker-Kachel funktioniert nur, wenn sie einem Admin gehört")
 )
+
+// dockerAllowed: the Docker tile reaches the host's containers without a key,
+// so it only works while its owner is an admin – also after a demotion.
+func (s *Server) dockerAllowed(t store.Tile) bool {
+	if t.Integration != "docker" {
+		return true
+	}
+	b, err := s.store.TileBoard(t.ID)
+	if err != nil {
+		return false
+	}
+	u, err := s.store.User(b.OwnerID)
+	return err == nil && u.Role == store.RoleAdmin
+}
 
 // uid returns the logged-in user of an /api request.
 func uid(r *http.Request) int64 { return auth.FromContext(r.Context()) }

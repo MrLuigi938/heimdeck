@@ -51,6 +51,7 @@ export const en = {
     'Edit mode: drag & drop tiles to move them, click to edit.',
   'Gruppe': 'Group',
   "Los geht's": "Let's go",
+  'Dein Dashboard ist noch leer. Füge deine Dienste als Kacheln hinzu.': 'Your dashboard is still empty. Add your services as tiles.',
   'Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.':
     'Your dashboard is still empty. Add your services – fastest automatically via Docker.',
   'Kachel hinzufügen': 'Add tile',
@@ -570,6 +571,8 @@ export const en = {
   'Admin': 'Admin',
   'du': 'you',
   'gesperrt': 'disabled',
+  'Hauptadmin': 'Main admin',
+  'Das Konto aus der Einrichtung. Rolle, Passwort und Sperre kann nur der Hauptadmin selbst ändern.': 'The account from the setup. Only the main admin can change its role, password and lock.',
   'Rolle': 'Role',
   'Rolle von {name}': 'Role of {name}',
   'Sperren': 'Disable',

@@ -34,7 +34,7 @@
   let loaded = $state(false);
 
   let missing = $derived(
-    (def?.fields || []).filter((f) => f.required && (f.secret ? !tile.secretsSet.includes(f.key) : !tile.config?.[f.key])),
+    tile.shared ? [] : (def?.fields || []).filter((f) => f.required && (f.secret ? !tile.secretsSet.includes(f.key) : !tile.config?.[f.key])),
   );
   // Compact tiles (icon only) never load live data.
   let live = $derived(!compact && def?.hasWidget && tile.showWidget && missing.length === 0);

@@ -23,7 +23,7 @@ func TestAppLink(t *testing.T) {
 		" dev.jdtech.jellyfin ": "intent://#Intent;package=dev.jdtech.jellyfin;end",
 		"https://play.google.com/store/apps/details?id=com.ubnt.easyunifi&hl=de": "intent://#Intent;package=com.ubnt.easyunifi;end",
 		"homeassistant://navigate": "homeassistant://navigate",
-		"jellyfin": "jellyfin",
+		"jellyfin":                 "jellyfin",
 	} {
 		if got := androidApp(in); got != want {
 			t.Errorf("androidApp(%q) = %q, want %q", in, got, want)

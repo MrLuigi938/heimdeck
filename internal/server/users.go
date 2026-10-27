@@ -24,7 +24,25 @@ var (
 	errLastAdmin  = errors.New("Es muss mindestens ein aktiver Admin bleiben")
 	errSelf       = errors.New("Das eigene Konto kann hier nicht gesperrt, herabgestuft oder gelöscht werden")
 	errInvite     = errors.New("Dieser Einladungslink ist ungültig oder abgelaufen")
+	errMainAdmin  = errors.New("Das Konto des Hauptadmins kann nur der Hauptadmin selbst ändern")
 )
+
+// mainAdmin is the account made when Heimdeck was set up (or the one from
+// before there were several users): other admins cannot demote, disable,
+// delete it or reset its password. It is the oldest admin – which stays the
+// setup account, because nobody else can take its role away.
+func (s *Server) mainAdmin() int64 {
+	users, err := s.store.Users()
+	if err != nil {
+		return 0
+	}
+	for _, u := range users {
+		if u.Role == store.RoleAdmin {
+			return u.ID
+		}
+	}
+	return 0
+}
 
 func validAccount(name, password string) bool {
 	return name != "" && len(name) <= 64 && len(password) >= 8
@@ -48,7 +66,7 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	writeJSON(w, map[string]any{"users": users, "invites": invites, "me": uid(r)})
+	writeJSON(w, map[string]any{"users": users, "invites": invites, "me": uid(r), "main": s.mainAdmin()})
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +127,10 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, errNotFound)
 		return
 	}
+	if id == s.mainAdmin() && id != uid(r) {
+		writeErr(w, 403, errMainAdmin)
+		return
+	}
 	wasAdmin := u.Role == store.RoleAdmin && !u.Disabled
 	if body.Role != nil {
 		if *body.Role != store.RoleAdmin && *body.Role != store.RoleUser {
@@ -162,6 +184,10 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	u, err := s.store.User(id)
 	if err != nil {
 		writeErr(w, 404, errNotFound)
+		return
+	}
+	if id == s.mainAdmin() {
+		writeErr(w, 403, errMainAdmin)
 		return
 	}
 	if u.Role == store.RoleAdmin && !u.Disabled && s.store.AdminCount() <= 1 {

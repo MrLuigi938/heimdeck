@@ -158,6 +158,17 @@ func (httptestDiscard) WriteHeader(int)             {}
 type tileDTO struct {
 	store.Tile
 	SecretsSet []string `json:"secretsSet"`
+	// Shared: the tile is on a dashboard someone shared with the user. Its
+	// settings stay with the owner (they can hold e.g. a webhook key).
+	Shared bool `json:"shared,omitempty"`
+}
+
+// sharedDTO is a tile as the people it is shared with see it: what the tile
+// shows and links to, without its settings.
+func sharedDTO(t store.Tile) tileDTO {
+	d := toDTO(t)
+	d.Config, d.Hide, d.Shared = map[string]string{}, nil, true
+	return d
 }
 
 func toDTO(t store.Tile) tileDTO {
@@ -207,8 +218,10 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	boards := []boardDTO{}
+	ownBoards := map[int64]bool{}
 	for _, b := range own {
 		boards = append(boards, boardDTO{Board: b, CanAct: true})
+		ownBoards[b.ID] = true
 	}
 	shares, err := s.store.SharesFor(me)
 	if err != nil {
@@ -256,7 +269,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		hasProxmox = hasProxmox || t.Integration == "proxmox"
 		if !locked[t.GroupID] {
-			byGroup[t.GroupID] = append(byGroup[t.GroupID], toDTO(t))
+			d := toDTO(t)
+			if !ownBoards[boardOf[t.GroupID]] {
+				d = sharedDTO(t)
+			}
+			byGroup[t.GroupID] = append(byGroup[t.GroupID], d)
 		}
 	}
 	out := []groupDTO{}
@@ -307,6 +324,24 @@ var allowedSettings = map[string]bool{
 	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true,
 }
 
+// checkSettings checks the addresses among the settings – from the settings
+// page or from a backup – and tidies them up.
+func checkSettings(m map[string]string) error {
+	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {
+		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" || len(strings.Trim(p.Path, "/")) == 0 {
+			return errors.New("ntfy: bitte die vollständige Themen-Adresse angeben, z. B. https://ntfy.sh/mein-thema")
+		}
+		m["ntfyUrl"] = u
+	}
+	if u := strings.TrimSpace(m["searchUrl"]); u != "" || m["searchEngine"] == "custom" {
+		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
+			return errors.New("Websuche: bitte eine vollständige Adresse angeben, z. B. https://searx.example.com/search?q={q}")
+		}
+		m["searchUrl"] = u
+	}
+	return nil
+}
+
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	var m map[string]string
 	if err := readJSON(r, &m); err != nil {
@@ -319,20 +354,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 			delete(m, k)
 		}
 	}
-	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {
-		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" || len(strings.Trim(p.Path, "/")) == 0 {
-			writeErr(w, 400, errors.New("ntfy: bitte die vollständige Themen-Adresse angeben, z. B. https://ntfy.sh/mein-thema"))
-			return
-		}
-		m["ntfyUrl"] = u
-	}
-	if m["searchEngine"] == "custom" {
-		u := strings.TrimSpace(m["searchUrl"])
-		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
-			writeErr(w, 400, errors.New("Websuche: bitte eine vollständige Adresse angeben, z. B. https://searx.example.com/search?q={q}"))
-			return
-		}
-		m["searchUrl"] = u
+	if err := checkSettings(m); err != nil {
+		writeErr(w, 400, err)
+		return
 	}
 	if err := s.saveSettings(uid(r), admin, m); err != nil {
 		slog.Error("Einstellungen speichern", "fehler", err)
@@ -669,6 +693,7 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	var widget *integrations.Widget
 	if err == nil {
 		widget, err = integ.Fetch(ctx, inst)
+		widget = safeWidget(widget)
 	}
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
@@ -798,7 +823,11 @@ func (s *Server) safeFetch(ctx context.Context, t store.Tile, lang string) (w *i
 	if !ok {
 		return nil, errors.New("unbekannter Dienst-Typ")
 	}
-	return integ.Fetch(ctx, s.instance(t, lang))
+	if !s.dockerAllowed(t) {
+		return nil, errDockerOwner
+	}
+	w, err = integ.Fetch(ctx, s.instance(t, lang))
+	return safeWidget(w), err
 }
 
 func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
@@ -872,6 +901,10 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 	if !acc.Act {
 		writeErr(w, 403, errNoAct)
+		return
+	}
+	if !s.dockerAllowed(t) {
+		writeErr(w, 403, errDockerOwner)
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -989,7 +1022,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		searcher, ok := integ.(integrations.Searcher)
-		if !ok || !configured(integ, t) {
+		if !ok || !configured(integ, t) || !s.dockerAllowed(t) {
 			continue
 		}
 		wg.Add(1)
@@ -998,6 +1031,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer logging.Recover("Suche", "kachel", t.ID, "dienst", t.Integration)
 			start := time.Now()
 			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
+			items = safeItems(items)
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
 			}
@@ -1239,6 +1273,13 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			if !allowedSettings[k] || (instanceSettings[k] && !admin) {
 				delete(data.Settings, k)
 			}
+		}
+		// Addresses that do not check out are left out, the rest is restored.
+		if checkSettings(data.Settings) != nil {
+			for _, k := range []string{"ntfyUrl", "searchUrl", "searchEngine"} {
+				delete(data.Settings, k)
+			}
+			checkSettings(data.Settings)
 		}
 		logErr("import settings", s.saveSettings(me, admin, data.Settings))
 	}
