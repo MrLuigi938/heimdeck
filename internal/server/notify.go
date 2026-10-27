@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/i18n"
+	"github.com/heimdeck/heimdeck/internal/integrations"
 	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
@@ -201,7 +202,7 @@ func recoveredMsg(lang string, t store.Tile, kind string, d time.Duration) notif
 func (s *Server) send(user int64, settings map[string]string, msgs []notification) {
 	defer logging.Recover("Benachrichtigung")
 	sec := s.notifySecrets(user)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(s.notifyContext(user), 20*time.Second)
 	defer cancel()
 	for _, m := range msgs {
 		var sent []string
@@ -254,6 +255,24 @@ func sendTelegram(ctx context.Context, token, chat string, m notification) error
 
 var notifyClient = &http.Client{Timeout: 10 * time.Second}
 
+// External accounts send their notifications only to internet addresses
+// (their ntfy server cannot be one in the home network).
+var externalNotifyClient = integrations.NewClientFor(false, true)
+
+type publicOnlyKey struct{}
+
+// notifyContext marks the sending for an external account.
+func (s *Server) notifyContext(user int64) context.Context {
+	return context.WithValue(context.Background(), publicOnlyKey{}, s.external(user))
+}
+
+func notifyClientFor(ctx context.Context) *http.Client {
+	if ext, _ := ctx.Value(publicOnlyKey{}).(bool); ext {
+		return externalNotifyClient
+	}
+	return notifyClient
+}
+
 func post(ctx context.Context, u string, body []byte, headers map[string]string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
@@ -262,7 +281,7 @@ func post(ctx context.Context, u string, body []byte, headers map[string]string)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := notifyClient.Do(req)
+	resp, err := notifyClientFor(ctx).Do(req)
 	if err != nil {
 		return err
 	}
@@ -495,7 +514,7 @@ func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {
 	sec := s.notifySecrets(uid(r))
 	lang := langOf(r)
 	m := notification{Title: i18n.T(lang, "Testnachricht von Heimdeck"), Body: i18n.T(lang, "Benachrichtigungen kommen an.")}
-	ctx, cancel := timeout(r, 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), publicOnlyKey{}, s.external(uid(r))), 15*time.Second)
 	defer cancel()
 	var errs []string
 	sent := 0
