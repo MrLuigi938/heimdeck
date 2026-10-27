@@ -13,7 +13,7 @@
   import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
   // svelte-ignore state_referenced_locally
   const admin = role === 'admin';
 
@@ -322,6 +322,17 @@
     if (!ok) {
       e.target.checked = browserNotify.on;
       toast(t('Der Browser hat Benachrichtigungen nicht erlaubt'), 'bad');
+    }
+  }
+
+  async function unlinkSso() {
+    if (!(await confirmDialog(t('Verknüpfung mit {name} lösen? Danach meldest du dich wieder mit deinem Passwort an.', { name: sso.label })))) return;
+    try {
+      await del('/account/sso');
+      sso = { ...sso, linked: false };
+      toast(t('Verknüpfung gelöst'));
+    } catch (e) {
+      toast(e.message, 'bad');
     }
   }
 
@@ -725,6 +736,18 @@
           <span class="spacer"></span>
           <button disabled={!pw.current || pw.new.length < 8} onclick={changePassword}>{t('Passwort ändern')}</button>
         </div>
+        {#if sso}
+          <h3>🔑 {t('Anmeldung mit {name}', { name: sso.label })}</h3>
+          {#if sso.linked}
+            <p class="help">✓ {t('Dein Konto ist mit {name} verknüpft – du kannst dich dort anmelden.', { name: sso.label })}</p>
+            {#if !sso.passwordOff}
+              <div class="row"><span class="spacer"></span><button class="small" onclick={unlinkSso}>{t('Verknüpfung lösen')}</button></div>
+            {/if}
+          {:else}
+            <p class="help">{t('Verknüpfe dein Konto mit {name}, dann meldest du dich dort an statt mit Passwort.', { name: sso.label })}</p>
+            <div class="row"><span class="spacer"></span><a class="button small primary" href="/api/oidc/login?link=1">{t('Mit {name} verknüpfen', { name: sso.label })}</a></div>
+          {/if}
+        {/if}
         <h3>{t('Sicherung')}</h3>
         <p class="help">{t('Exportiert Gruppen, Kacheln und Einstellungen – API-Keys werden aus Sicherheitsgründen nicht mitgesichert.')} {t('Nur deine eigenen Dashboards, keine geteilten.')}</p>
         <p class="help">{t('Importieren nimmt auch einen Heimdall-Export (Heimdall → Einstellungen → Exportieren). Die Kacheln landen im geöffneten Dashboard, bekannte Dienste werden samt API-Key als Live-Kachel übernommen.')}</p>

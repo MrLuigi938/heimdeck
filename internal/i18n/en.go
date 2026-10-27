@@ -895,4 +895,14 @@ var en = map[string]string{
 	"Im Docker-Container sind CPU, Arbeitsspeicher, Datenträger-Geschwindigkeit und Temperatur die des Hosts. Das Netzwerk ist das des Containers – für das des Hosts den Container mit network_mode: host starten.": "In a Docker container, CPU, memory, disk speed and temperature are the host's. The network is the container's – for the host's, start the container with network_mode: host.",
 	"Weitere Laufwerke (z. B. /mnt/media) erst in den Container einbinden, z. B. „- /mnt/media:/mnt/media:ro“ in der docker-compose.yml, und dann unten eintragen.":                                                  "Mount more drives (e.g. /mnt/media) into the container first, e.g. “- /mnt/media:/mnt/media:ro” in docker-compose.yml, then enter them below.",
 	"In einem Proxmox-LXC-Container zeigt die Kachel die Werte des Containers, nicht des ganzen Servers – dafür die Proxmox-Kachel nehmen.":                                                                          "In a Proxmox LXC container the tile shows the container's values, not the whole server's – use the Proxmox tile for that.",
+	// login with SSO (1.4)
+	"SSO: bitte vollständige Adressen mit http:// oder https:// angeben": "SSO: please enter complete addresses with http:// or https://",
+	"SSO: Issuer-Adresse, Client-ID und Client-Secret werden gebraucht":  "SSO: the issuer address, client ID and client secret are needed",
+	"SSO: %s":                     "SSO: %s",
+	"Anbieter nicht gefunden: %w": "Provider not found: %w",
+	"der Anbieter meldet sich als %q statt %q – stimmt die Issuer-Adresse?":                       "the provider calls itself %q instead of %q – is the issuer address right?",
+	"die Anbieter-Konfiguration ist unvollständig":                                                "the provider's configuration is incomplete",
+	"Die Anmeldung läuft über SSO – bitte den Knopf darunter nehmen":                              "Login works through SSO – please use the button below",
+	"Ohne SSO könntest du dich nicht mehr anmelden – die Anmeldung mit Passwort ist abgeschaltet": "Without SSO you could no longer log in – the password login is turned off",
+	"Diese Anmeldung ist schon mit einem anderen Konto verknüpft":                                 "This login is already linked to another account",
 }

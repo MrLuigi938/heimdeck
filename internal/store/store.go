@@ -200,6 +200,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		`ALTER TABLE users ADD COLUMN created INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE users ADD COLUMN external INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE invites ADD COLUMN external INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN sso_subject TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE boards ADD COLUMN owner_id INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE tiles ADD COLUMN app_android TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE tiles ADD COLUMN app_ios TEXT NOT NULL DEFAULT ''`,

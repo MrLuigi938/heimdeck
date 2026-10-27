@@ -25,13 +25,15 @@ type User struct {
 	// External: someone from outside the home. Heimdeck does not reach into
 	// the home network for their tiles (no LAN addresses, no localhost).
 	External bool `json:"external"`
+	// SSO: the account is linked to a login at the identity provider.
+	SSO bool `json:"sso"`
 }
 
-const userCols = `id, username, role, disabled, created, external`
+const userCols = `id, username, role, disabled, created, external, sso_subject != ''`
 
 func scanUser(sc interface{ Scan(...any) error }) (User, error) {
 	var u User
-	err := sc.Scan(&u.ID, &u.Username, &u.Role, &u.Disabled, &u.Created, &u.External)
+	err := sc.Scan(&u.ID, &u.Username, &u.Role, &u.Disabled, &u.Created, &u.External, &u.SSO)
 	return u, err
 }
 
@@ -327,3 +329,26 @@ func (s *Store) DeleteInvite(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM invites WHERE id = ?`, id)
 	return err
 }
+
+// UserBySubject finds the account linked to a login at the identity provider.
+func (s *Store) UserBySubject(subject string) (User, error) {
+	u, err := scanUser(s.db.QueryRow(`SELECT `+userCols+` FROM users WHERE sso_subject = ? AND sso_subject != ''`, subject))
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return u, err
+}
+
+// SetSubject links an account to a login at the identity provider ("" unlinks).
+// A login can belong to one account only.
+func (s *Store) SetSubject(id int64, subject string) error {
+	if subject != "" {
+		if other, err := s.UserBySubject(subject); err == nil && other.ID != id {
+			return ErrSubjectTaken
+		}
+	}
+	_, err := s.db.Exec(`UPDATE users SET sso_subject = ? WHERE id = ?`, subject, id)
+	return err
+}
+
+var ErrSubjectTaken = errors.New("Diese Anmeldung ist schon mit einem anderen Konto verknüpft")

@@ -5,6 +5,7 @@
   import { toast } from './toast.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
   import { confirmDialog, promptDialog } from './dialog.svelte.js';
+  import Sso from './Sso.svelte';
 
   let users = $state([]);
   let invites = $state([]);
@@ -117,6 +118,7 @@
           {#if u.id === main}<span class="tag main" title={t('Das Konto aus der Einrichtung. Rolle, Passwort und Sperre kann nur der Hauptadmin selbst ändern.')}>{t('Hauptadmin')}</span>{/if}
           {#if u.id === me}<span class="tag">{t('du')}</span>{/if}
           {#if u.disabled}<span class="tag bad">{t('gesperrt')}</span>{/if}
+          {#if u.sso}<span class="tag" title={t('Meldet sich über SSO an')}>🔑 SSO</span>{/if}
           {#if u.external}<span class="tag ext" title={t('Kein Zugriff aufs Heimnetz: Kacheln dieses Kontos erreichen nur Adressen im Internet.')}>🌐 {t('extern')}</span>{/if}
         </div>
         <select value={u.role} onchange={(e) => change(u, { role: e.target.value })} disabled={u.id === me || u.id === main} aria-label={t('Rolle von {name}', { name: u.username })}>
@@ -182,6 +184,7 @@
       </div>
     {/each}
   {/if}
+  <Sso />
 {/if}
 
 <style>

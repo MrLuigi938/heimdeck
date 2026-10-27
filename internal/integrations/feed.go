@@ -133,6 +133,12 @@ func (feed) read(ctx context.Context, in *Instance, u string) ([]feedEntry, erro
 		if source == "" {
 			source = plain(doc.ATitle)
 		}
+		// "tagesschau.de - die erste Adresse für Nachrichten" → "tagesschau.de"
+		for _, sep := range []string{" - ", " – ", " | ", " · "} {
+			if before, _, ok := strings.Cut(source, sep); ok && len(before) >= 3 {
+				source = before
+			}
+		}
 		var out []feedEntry
 		for _, it := range append(doc.Items, doc.RDF...) {
 			link := strings.TrimSpace(it.Link)

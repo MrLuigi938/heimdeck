@@ -37,6 +37,10 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 	}
 	settings, _ := s.store.Settings()
 	out := map[string]any{"setup": !hasUser, "authenticated": false, "language": settings["language"]}
+	if c := s.ssoConfig(); c.ready() {
+		out["sso"] = c.label() // the login page offers the provider
+		out["ssoOnly"] = c.PasswordOff
+	}
 	if id := s.auth.UserID(r); id != 0 {
 		u, _ := s.store.User(id)
 		out["authenticated"], out["username"], out["role"] = true, u.Username, u.Role
@@ -90,6 +94,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var c credentials
 	if err := readJSON(r, &c); err != nil {
 		writeErr(w, 400, err)
+		return
+	}
+	if !s.passwordAllowed(strings.TrimSpace(c.Username)) {
+		writeErr(w, 403, errors.New("Die Anmeldung läuft über SSO – bitte den Knopf darunter nehmen"))
 		return
 	}
 	if err := s.auth.Login(w, r, strings.TrimSpace(c.Username), c.Password); err != nil {
@@ -298,6 +306,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"notify":        map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""},
 		"username":      user.Username,
 		"userId":        me,
+		"sso":           s.ssoInfo(user),
 		"role":          user.Role,
 		"version":       s.version,
 		"system":        s.systemInfo(),

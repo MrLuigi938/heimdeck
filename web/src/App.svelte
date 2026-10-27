@@ -5,6 +5,17 @@
   import Toasts from './lib/Toasts.svelte';
   import Dialogs from './lib/Dialogs.svelte';
   import { t, setLang } from './lib/i18n.svelte.js';
+  import { toast } from './lib/toast.svelte.js';
+
+  // Back from linking the account with the login provider: /?sso=linked
+  {
+    const url = new URL(location.href);
+    if (url.searchParams.get('sso') === 'linked') {
+      url.searchParams.delete('sso');
+      history.replaceState(null, '', url);
+      setTimeout(() => toast(t('Dein Konto ist jetzt mit der SSO-Anmeldung verknüpft.')), 500);
+    }
+  }
 
   let state = $state(null);
   // An invitation link: /?invite=<token>
@@ -29,7 +40,7 @@
 {:else if state.error}
   <div class="center bad">{t('Server nicht erreichbar')}: {state.error}</div>
 {:else if state.setup || !state.authenticated}
-  <Login setup={state.setup} invite={state.setup ? '' : invite} onDone={load} />
+  <Login setup={state.setup} invite={state.setup ? '' : invite} sso={state.sso || ''} ssoOnly={!!state.ssoOnly} onDone={load} />
 {:else}
   <Dashboard />
 {/if}

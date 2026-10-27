@@ -78,6 +78,8 @@ func (s *Server) Handler() http.Handler {
 	// Invitation links: the token in the address replaces the login.
 	mux.HandleFunc("GET /api/invite/{token}", s.handleInviteInfo)
 	mux.HandleFunc("POST /api/invite/{token}", s.handleJoin)
+	mux.HandleFunc("GET /api/oidc/login", s.handleSSOLogin)
+	mux.HandleFunc("GET /api/oidc/callback", s.handleSSOCallback)
 	// Messages for webhook tiles; the key in the address replaces the login.
 	mux.HandleFunc("GET /hook/{key}", s.handleHook)
 	mux.HandleFunc("POST /hook/{key}", s.handleHook)
@@ -123,6 +125,9 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("DELETE /api/users/{id}", s.adminOnly(s.handleDeleteUser))
 	api.HandleFunc("POST /api/invites", s.adminOnly(s.handleCreateInvite))
 	api.HandleFunc("DELETE /api/invites/{id}", s.adminOnly(s.handleDeleteInvite))
+	api.HandleFunc("GET /api/sso", s.adminOnly(s.handleGetSSO))
+	api.HandleFunc("PUT /api/sso", s.adminOnly(s.handleSaveSSO))
+	api.HandleFunc("DELETE /api/account/sso", s.handleUnlinkSSO)
 	api.HandleFunc("GET /api/people", s.handlePeople)
 	api.HandleFunc("GET /api/shares", s.handleShares)
 	api.HandleFunc("PUT /api/boards/{id}/shares/{user}", s.handleShareBoard)

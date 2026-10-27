@@ -106,6 +106,15 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request, username, password 
 	return a.startSession(w, id)
 }
 
+// LoginUser starts a session for an account whose identity was checked
+// elsewhere (the login with an identity provider).
+func (a *Auth) LoginUser(w http.ResponseWriter, userID int64) error {
+	if u, err := a.store.User(userID); err != nil || u.Disabled {
+		return ErrDisabled
+	}
+	return a.startSession(w, userID)
+}
+
 func (a *Auth) startSession(w http.ResponseWriter, userID int64) error {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
