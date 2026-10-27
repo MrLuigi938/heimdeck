@@ -85,6 +85,10 @@ type Instance struct {
 	Client    *http.Client
 	Lang      string // "de" or "en", for texts shown to the user
 	TileID    int64
+	// PublicOnly: the tile belongs to an external account and the client
+	// only reaches internet addresses. Part of every cache key, so such a
+	// tile never gets what another tile fetched from the home network.
+	PublicOnly bool
 }
 
 func (i *Instance) V(key string) string { return strings.TrimSpace(i.Values[key]) }

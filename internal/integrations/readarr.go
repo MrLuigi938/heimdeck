@@ -150,7 +150,7 @@ type readarrLibrary struct {
 var readarrLibraries sync.Map
 
 func (r readarr) library(ctx context.Context, in *Instance) (readarrLibrary, bool) {
-	if v, ok := readarrLibraries.Load(in.BaseURL); ok && time.Since(v.(readarrLibrary).at) < 10*time.Minute {
+	if v, ok := readarrLibraries.Load(in.cacheKey(in.BaseURL)); ok && time.Since(v.(readarrLibrary).at) < 10*time.Minute {
 		return v.(readarrLibrary), true
 	}
 	var authors []struct {
@@ -167,7 +167,7 @@ func (r readarr) library(ctx context.Context, in *Instance) (readarrLibrary, boo
 		lib.books += a.Statistics.BookFileCount
 		lib.size += a.Statistics.SizeOnDisk
 	}
-	readarrLibraries.Store(in.BaseURL, lib)
+	readarrLibraries.Store(in.cacheKey(in.BaseURL), lib)
 	return lib, true
 }
 

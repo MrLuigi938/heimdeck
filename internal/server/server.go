@@ -273,7 +273,8 @@ func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 	if base == "" {
 		base = t.URL
 	}
-	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClientFor(t.Insecure, s.external(s.tileOwner(t))), Lang: lang, TileID: t.ID}
+	ext := s.external(s.tileOwner(t))
+	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClientFor(t.Insecure, ext), Lang: lang, TileID: t.ID, PublicOnly: ext}
 }
 
 // instanceFor is instance for a tile that is being edited in a request: an
@@ -282,7 +283,7 @@ func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 func (s *Server) instanceFor(r *http.Request, t store.Tile) *integrations.Instance {
 	in := s.instance(t, langOf(r))
 	if s.external(uid(r)) {
-		in.Client = integrations.NewClientFor(t.Insecure, true)
+		in.Client, in.PublicOnly = integrations.NewClientFor(t.Insecure, true), true
 	}
 	return in
 }

@@ -191,7 +191,7 @@ type arrLibrary struct {
 var arrLibraries sync.Map
 
 func (a *arr) library(ctx context.Context, in *Instance) (arrLibrary, bool) {
-	key := a.def.ID + "\x00" + in.BaseURL
+	key := in.cacheKey(a.def.ID + "\x00" + in.BaseURL)
 	if v, ok := arrLibraries.Load(key); ok && time.Since(v.(arrLibrary).at) < 10*time.Minute {
 		return v.(arrLibrary), true
 	}

@@ -167,7 +167,7 @@ type lidarrLibrary struct {
 var lidarrLibraries sync.Map
 
 func (l lidarr) library(ctx context.Context, in *Instance) (lidarrLibrary, bool) {
-	if v, ok := lidarrLibraries.Load(in.BaseURL); ok && time.Since(v.(lidarrLibrary).at) < 10*time.Minute {
+	if v, ok := lidarrLibraries.Load(in.cacheKey(in.BaseURL)); ok && time.Since(v.(lidarrLibrary).at) < 10*time.Minute {
 		return v.(lidarrLibrary), true
 	}
 	var artists []lidarrArtist
@@ -180,7 +180,7 @@ func (l lidarr) library(ctx context.Context, in *Instance) (lidarrLibrary, bool)
 		lib.tracks += a.Statistics.TrackFileCount
 		lib.size += a.Statistics.SizeOnDisk
 	}
-	lidarrLibraries.Store(in.BaseURL, lib)
+	lidarrLibraries.Store(in.cacheKey(in.BaseURL), lib)
 	return lib, true
 }
 
