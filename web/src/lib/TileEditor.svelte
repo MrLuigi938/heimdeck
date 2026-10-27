@@ -113,6 +113,16 @@
   // Hidden parts the service does not deliver right now (e.g. an empty list) stay listed.
   let hiddenElsewhere = $derived(parts ? form.hide.filter((k) => !parts.some((p) => p.key === k)) : []);
   let displayFields = $derived((def?.fields || []).filter((f) => f.display));
+  // Display options: sections to show (checkboxes, e.g. FRITZ!Box) and
+  // choices like how many entries or days (selects, e.g. RSS, calendar).
+  let displaySections = $derived(displayFields.filter((f) => f.type === 'checkbox'));
+  let displayChoices = $derived(displayFields.filter((f) => f.type === 'select'));
+  // Empty or old values (a former checkbox stored "true") start at the default.
+  $effect(() => {
+    for (const f of displayChoices) {
+      if (f.options?.length && !f.options.includes(form.config[f.key])) form.config[f.key] = f.options[0];
+    }
+  });
 
   // Pick list for fields like Home Assistant entities: search and tick instead of typing IDs.
   let picking = $state('');
@@ -394,9 +404,21 @@
               {t('Live-Daten auswählen')}
               {#if form.hide.length}<span class="muted">· {t('{n} ausgeblendet', { n: form.hide.length })}</span>{/if}
             </summary>
-            {#if displayFields.length}
+            {#if displayChoices.length}
+              <div class="part-group">{t('Anzeige')}</div>
+              {#each displayChoices as f}
+                <label class="field choice-field">
+                  <span>{f.label}</span>
+                  <select bind:value={form.config[f.key]}>
+                    {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
+                  </select>
+                  {#if f.help}<span class="help">{f.help}</span>{/if}
+                </label>
+              {/each}
+            {/if}
+            {#if displaySections.length}
               <div class="part-group">{t('Bereiche')}</div>
-              {#each displayFields as f}
+              {#each displaySections as f}
                 <label class="check">
                   <input type="checkbox" checked={form.config[f.key] === 'true'} onchange={(e) => (form.config[f.key] = e.currentTarget.checked ? 'true' : '')} />
                   {f.label}
@@ -572,6 +594,7 @@
   .choices { max-height: 280px; overflow: auto; display: grid; gap: 2px; }
   .parts { display: grid; gap: 8px; }
   .parts[open] summary { margin-bottom: 4px; }
+  .choice-field { max-width: 260px; }
   .part-group { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }
   .part { display: flex; align-items: center; gap: 8px; }
   .part .section { font-style: italic; }

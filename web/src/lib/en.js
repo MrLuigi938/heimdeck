@@ -349,6 +349,7 @@ export const en = {
   'Live-Daten auswählen': 'Choose live data',
   '{n} ausgeblendet': '{n} hidden',
   'Bereiche': 'Sections',
+  'Anzeige': 'Display',
   'Ohne Haken zeigt die Kachel alle Bereiche.': 'Without a tick the tile shows all sections.',
   'Werte': 'Values',
   'Neu laden': 'Reload',
