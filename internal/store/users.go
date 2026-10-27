@@ -22,13 +22,16 @@ type User struct {
 	Role     string `json:"role"`
 	Disabled bool   `json:"disabled"`
 	Created  int64  `json:"created"` // unix seconds, 0 for accounts from before 1.4
+	// External: someone from outside the home. Heimdeck does not reach into
+	// the home network for their tiles (no LAN addresses, no localhost).
+	External bool `json:"external"`
 }
 
-const userCols = `id, username, role, disabled, created`
+const userCols = `id, username, role, disabled, created, external`
 
 func scanUser(sc interface{ Scan(...any) error }) (User, error) {
 	var u User
-	err := sc.Scan(&u.ID, &u.Username, &u.Role, &u.Disabled, &u.Created)
+	err := sc.Scan(&u.ID, &u.Username, &u.Role, &u.Disabled, &u.Created, &u.External)
 	return u, err
 }
 
@@ -57,9 +60,9 @@ func (s *Store) User(id int64) (User, error) {
 	return u, err
 }
 
-// UpdateUser changes the role and the disabled flag; a disabled account is logged out.
+// UpdateUser changes the role and the disabled and external flags; a disabled account is logged out.
 func (s *Store) UpdateUser(u User) error {
-	if _, err := s.db.Exec(`UPDATE users SET role = ?, disabled = ? WHERE id = ?`, u.Role, u.Disabled, u.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE users SET role = ?, disabled = ?, external = ? WHERE id = ?`, u.Role, u.Disabled, u.External, u.ID); err != nil {
 		return err
 	}
 	if u.Disabled {
@@ -277,11 +280,12 @@ type Invite struct {
 	ID        int64  `json:"id"`
 	CreatedBy string `json:"createdBy"`
 	Expires   int64  `json:"expires"`
+	External  bool   `json:"external"` // the account made with it is external
 }
 
-func (s *Store) CreateInvite(tokenHash string, by int64, expires time.Time) (int64, error) {
+func (s *Store) CreateInvite(tokenHash string, by int64, expires time.Time, external bool) (int64, error) {
 	s.db.Exec(`DELETE FROM invites WHERE expires < ?`, time.Now().Unix())
-	res, err := s.db.Exec(`INSERT INTO invites (token_hash, created_by, expires) VALUES (?, ?, ?)`, tokenHash, by, expires.Unix())
+	res, err := s.db.Exec(`INSERT INTO invites (token_hash, created_by, expires, external) VALUES (?, ?, ?, ?)`, tokenHash, by, expires.Unix(), external)
 	if err != nil {
 		return 0, err
 	}
@@ -289,7 +293,7 @@ func (s *Store) CreateInvite(tokenHash string, by int64, expires time.Time) (int
 }
 
 func (s *Store) Invites() ([]Invite, error) {
-	rows, err := s.db.Query(`SELECT i.id, COALESCE(u.username, ''), i.expires FROM invites i LEFT JOIN users u ON u.id = i.created_by WHERE i.expires >= ? ORDER BY i.id`, time.Now().Unix())
+	rows, err := s.db.Query(`SELECT i.id, COALESCE(u.username, ''), i.expires, i.external FROM invites i LEFT JOIN users u ON u.id = i.created_by WHERE i.expires >= ? ORDER BY i.id`, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +301,7 @@ func (s *Store) Invites() ([]Invite, error) {
 	out := []Invite{}
 	for rows.Next() {
 		var in Invite
-		if err := rows.Scan(&in.ID, &in.CreatedBy, &in.Expires); err != nil {
+		if err := rows.Scan(&in.ID, &in.CreatedBy, &in.Expires, &in.External); err != nil {
 			return nil, err
 		}
 		out = append(out, in)
@@ -313,13 +317,10 @@ func (s *Store) InviteValid(tokenHash string) bool {
 }
 
 // UseInvite removes the invitation; false if it was not valid (any more).
-func (s *Store) UseInvite(tokenHash string) bool {
-	res, err := s.db.Exec(`DELETE FROM invites WHERE token_hash = ? AND expires >= ?`, tokenHash, time.Now().Unix())
-	if err != nil {
-		return false
-	}
-	n, _ := res.RowsAffected()
-	return n > 0
+// It also tells whether the account made with it is external.
+func (s *Store) UseInvite(tokenHash string) (ok, external bool) {
+	err := s.db.QueryRow(`DELETE FROM invites WHERE token_hash = ? AND expires >= ? RETURNING external`, tokenHash, time.Now().Unix()).Scan(&external)
+	return err == nil, external
 }
 
 func (s *Store) DeleteInvite(id int64) error {

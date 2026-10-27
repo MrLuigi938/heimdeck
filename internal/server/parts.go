@@ -77,6 +77,10 @@ func (s *Server) handleTileParts(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, code, err)
 			return
 		}
+	} else if _, code, err := s.ownGroup(r, t.GroupID); err != nil {
+		// a new tile is fetched with its owner's rights (external or not), so it must be the user's group
+		writeErr(w, code, err)
+		return
 	}
 	integ, _ := integrations.Get(t.Integration)
 	if !integ.Def().HasWidget {

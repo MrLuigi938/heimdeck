@@ -38,13 +38,13 @@ func TestFetchFavicon(t *testing.T) {
 	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) { w.Write(png) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
-	f, err := fetchFavicon(context.Background(), srv.URL, false)
+	f, err := fetchFavicon(context.Background(), srv.URL, false, false)
 	if err != nil || f.ctype != "image/png" {
 		t.Fatalf("%v %q", err, f.ctype)
 	}
 	none := httptest.NewServer(http.NotFoundHandler())
 	defer none.Close()
-	if _, err := fetchFavicon(context.Background(), none.URL, false); err == nil {
+	if _, err := fetchFavicon(context.Background(), none.URL, false, false); err == nil {
 		t.Fatal("found an icon where there is none")
 	}
 }

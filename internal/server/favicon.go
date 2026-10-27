@@ -117,8 +117,8 @@ func imageType(header string, b []byte) string {
 	return ""
 }
 
-func fetchFavicon(ctx context.Context, base string, insecure bool) (favicon, error) {
-	client := integrations.NewClient(insecure)
+func fetchFavicon(ctx context.Context, base string, insecure, external bool) (favicon, error) {
+	client := integrations.NewClientFor(insecure, external)
 	baseURL, err := url.Parse(base)
 	if err != nil || baseURL.Host == "" {
 		return favicon{}, errors.New("no address")
@@ -163,7 +163,13 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 	if base == "" {
 		base = t.URL
 	}
+	// Icons of external accounts' tiles are fetched and cached on their own,
+	// without the home network.
+	external := s.external(s.tileOwner(t))
 	key := base
+	if external {
+		key = "ext:" + base
+	}
 	s.mu.Lock()
 	f, ok := s.favicons[key]
 	st, checked := s.latest[t.ID]
@@ -180,7 +186,7 @@ func (s *Server) handleFavicon(w http.ResponseWriter, r *http.Request) {
 				func() {
 					defer logging.Recover("Favicon", "adresse", base)
 					var err error
-					if f, err = fetchFavicon(ctx, base, t.Insecure); err != nil {
+					if f, err = fetchFavicon(ctx, base, t.Insecure, external); err != nil {
 						slog.Debug("Favicon nicht gefunden", "kachel", t.Name, "fehler", logging.Redact(err.Error()))
 					}
 				}()

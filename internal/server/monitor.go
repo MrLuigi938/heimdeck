@@ -95,6 +95,13 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 	var logged []store.Check
 	latest := map[int64]TileStatus{}
 	settings, _ := s.store.Settings()
+	owners, _ := s.store.TileOwners()
+	external := map[int64]bool{}
+	if users, err := s.store.Users(); err == nil {
+		for _, u := range users {
+			external[u.ID] = u.External
+		}
+	}
 	for _, t := range tiles {
 		if only != nil && t.ID != *only {
 			continue
@@ -110,11 +117,12 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 		go func(t store.Tile) {
 			defer wg.Done()
 			st := TileStatus{}
-			in := pingTwice(ctx, internal, t.Insecure)
+			ext := external[owners[t.ID]] // external accounts: no home network addresses
+			in := pingTwice(ctx, internal, t.Insecure, ext)
 			st.Online, st.MS = in.Online, in.MS
 			checks := []store.Check{{TileID: t.ID, Kind: "int", Online: in.Online, MS: in.MS}}
-			if ext := strings.TrimSpace(t.ExternalURL); ext != "" && ext != internal && checksExternal(t, settings) {
-				e := pingTwice(ctx, ext, t.Insecure)
+			if pub := strings.TrimSpace(t.ExternalURL); pub != "" && pub != internal && checksExternal(t, settings) {
+				e := pingTwice(ctx, pub, t.Insecure, ext)
 				st.Ext = &e
 				checks = append(checks, store.Check{TileID: t.ID, Kind: "ext", Online: e.Online, MS: e.MS})
 			}
@@ -149,8 +157,8 @@ func (s *Server) runChecks(ctx context.Context, only *int64) {
 
 // pingTwice retries a failed check once, so a single dropped request does
 // not show up as an outage.
-func pingTwice(ctx context.Context, target string, insecure bool) Check {
-	c := ping(ctx, target, insecure)
+func pingTwice(ctx context.Context, target string, insecure, external bool) Check {
+	c := ping(ctx, target, insecure, external)
 	if c.Online {
 		return c
 	}
@@ -159,19 +167,19 @@ func pingTwice(ctx context.Context, target string, insecure bool) Check {
 		return c
 	case <-time.After(retryDelay):
 	}
-	return ping(ctx, target, insecure)
+	return ping(ctx, target, insecure, external)
 }
 
 // ping treats any HTTP response below 500 as "online"; network errors and
 // server errors count as down.
-func ping(ctx context.Context, target string, insecure bool) Check {
+func ping(ctx context.Context, target string, insecure, external bool) Check {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return Check{}
 	}
-	client := integrations.NewClient(insecure)
+	client := integrations.NewClientFor(insecure, external)
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	start := time.Now()
 	resp, err := client.Do(req)

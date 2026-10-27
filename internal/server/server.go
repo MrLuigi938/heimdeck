@@ -273,7 +273,40 @@ func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 	if base == "" {
 		base = t.URL
 	}
-	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClient(t.Insecure), Lang: lang, TileID: t.ID}
+	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClientFor(t.Insecure, s.external(s.tileOwner(t))), Lang: lang, TileID: t.ID}
+}
+
+// instanceFor is instance for a tile that is being edited in a request: an
+// external account stays out of the home network even with a tile that is
+// not saved yet.
+func (s *Server) instanceFor(r *http.Request, t store.Tile) *integrations.Instance {
+	in := s.instance(t, langOf(r))
+	if s.external(uid(r)) {
+		in.Client = integrations.NewClientFor(t.Insecure, true)
+	}
+	return in
+}
+
+// tileOwner returns the owner of a tile, or of the group a new tile goes into.
+func (s *Server) tileOwner(t store.Tile) int64 {
+	if t.ID != 0 {
+		if b, err := s.store.TileBoard(t.ID); err == nil {
+			return b.OwnerID
+		}
+	}
+	if g, err := s.store.Group(t.GroupID); err == nil {
+		if b, err := s.store.Board(g.BoardID); err == nil {
+			return b.OwnerID
+		}
+	}
+	return 0
+}
+
+// external reports whether a user is marked as external: their tiles do not
+// reach into the home network.
+func (s *Server) external(user int64) bool {
+	u, err := s.store.User(user)
+	return err == nil && u.External
 }
 
 func (s *Server) forget(id int64) {

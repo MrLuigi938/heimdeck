@@ -676,10 +676,10 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
-	inst := s.instance(t, langOf(r))
+	inst := s.instanceFor(r, t)
 	start := time.Now()
 	if !integ.Def().HasWidget {
-		st := ping(ctx, inst.BaseURL, t.Insecure)
+		st := ping(ctx, inst.BaseURL, t.Insecure, s.external(uid(r)) || s.external(s.tileOwner(t)))
 		if !st.Online {
 			writeJSON(w, map[string]any{"ok": false, "error": "Dienst nicht erreichbar"})
 			return
@@ -731,7 +731,7 @@ func (s *Server) handleChoices(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
-	list, err := chooser.Choices(ctx, s.instance(t, langOf(r)), in.Field, strings.TrimSpace(in.Query))
+	list, err := chooser.Choices(ctx, s.instanceFor(r, t), in.Field, strings.TrimSpace(in.Query))
 	if err != nil {
 		writeErr(w, 502, err)
 		return

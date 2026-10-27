@@ -20,11 +20,12 @@ import (
 const inviteTTL = 7 * 24 * time.Hour
 
 var (
-	errBadAccount = errors.New("Benutzername angeben und Passwort mit mindestens 8 Zeichen wählen")
-	errLastAdmin  = errors.New("Es muss mindestens ein aktiver Admin bleiben")
-	errSelf       = errors.New("Das eigene Konto kann hier nicht gesperrt, herabgestuft oder gelöscht werden")
-	errInvite     = errors.New("Dieser Einladungslink ist ungültig oder abgelaufen")
-	errMainAdmin  = errors.New("Das Konto des Hauptadmins kann nur der Hauptadmin selbst ändern")
+	errBadAccount    = errors.New("Benutzername angeben und Passwort mit mindestens 8 Zeichen wählen")
+	errLastAdmin     = errors.New("Es muss mindestens ein aktiver Admin bleiben")
+	errSelf          = errors.New("Das eigene Konto kann hier nicht gesperrt, herabgestuft oder gelöscht werden")
+	errInvite        = errors.New("Dieser Einladungslink ist ungültig oder abgelaufen")
+	errMainAdmin     = errors.New("Das Konto des Hauptadmins kann nur der Hauptadmin selbst ändern")
+	errExternalAdmin = errors.New("Ein Admin kann nicht extern sein – erst zum Benutzer machen")
 )
 
 // mainAdmin is the account made when Heimdeck was set up (or the one from
@@ -74,6 +75,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 		Role     string `json:"role"`
+		External bool   `json:"external"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, 400, err)
@@ -96,9 +98,13 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, code, err)
 		return
 	}
-	s.newAccount(id, langOf(r))
-	slog.Info("Benutzer angelegt", "benutzer", body.Username, "rolle", body.Role, "von", s.username(r))
 	u, _ := s.store.User(id)
+	if body.External && body.Role == store.RoleUser {
+		u.External = true
+		logErr("Extern markieren", s.store.UpdateUser(u))
+	}
+	s.newAccount(id, langOf(r))
+	slog.Info("Benutzer angelegt", "benutzer", body.Username, "rolle", body.Role, "extern", u.External, "von", s.username(r))
 	writeJSON(w, u)
 }
 
@@ -116,6 +122,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Role     *string `json:"role"`
 		Disabled *bool   `json:"disabled"`
+		External *bool   `json:"external"`
 		Password string  `json:"password"`
 	}
 	if err := readJSON(r, &body); err != nil {
@@ -142,6 +149,17 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	if body.Disabled != nil {
 		u.Disabled = *body.Disabled
 	}
+	if body.External != nil {
+		u.External = *body.External
+	}
+	// Admins manage the whole instance; an external account is always a normal user.
+	if u.Role == store.RoleAdmin && u.External {
+		if body.External != nil && *body.External {
+			writeErr(w, 400, errExternalAdmin)
+			return
+		}
+		u.External = false
+	}
 	stillAdmin := u.Role == store.RoleAdmin && !u.Disabled
 	if id == uid(r) && !stillAdmin {
 		writeErr(w, 400, errSelf)
@@ -167,7 +185,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	slog.Info("Benutzer geändert", "benutzer", u.Username, "rolle", u.Role, "gesperrt", u.Disabled, "von", s.username(r))
+	slog.Info("Benutzer geändert", "benutzer", u.Username, "rolle", u.Role, "gesperrt", u.Disabled, "extern", u.External, "von", s.username(r))
+	s.forgetUser(u.ID) // live data and status were fetched with the old rights
 	writeJSON(w, u)
 }
 
@@ -205,6 +224,10 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 // ---- invitations ----
 
 func (s *Server) handleCreateInvite(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		External bool `json:"external"`
+	}
+	readJSON(r, &body) // an empty request is a normal invitation
 	buf := make([]byte, 24)
 	if _, err := rand.Read(buf); err != nil {
 		writeErr(w, 500, err)
@@ -212,7 +235,7 @@ func (s *Server) handleCreateInvite(w http.ResponseWriter, r *http.Request) {
 	}
 	token := hex.EncodeToString(buf)
 	expires := time.Now().Add(inviteTTL)
-	id, err := s.store.CreateInvite(hashToken(token), uid(r), expires)
+	id, err := s.store.CreateInvite(hashToken(token), uid(r), expires, body.External)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -261,7 +284,8 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 409, store.ErrNameTaken)
 		return
 	}
-	if !s.store.UseInvite(hashToken(r.PathValue("token"))) {
+	ok, external := s.store.UseInvite(hashToken(r.PathValue("token")))
+	if !ok {
 		time.Sleep(200 * time.Millisecond)
 		writeErr(w, 403, errInvite)
 		return
@@ -270,6 +294,11 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, 500, err)
 		return
+	}
+	if external {
+		u, _ := s.store.User(id)
+		u.External = true
+		logErr("Extern markieren", s.store.UpdateUser(u))
 	}
 	s.newAccount(id, i18n.Normalize(c.Language))
 	slog.Info("Konto über Einladung angelegt", "benutzer", c.Username, "von", r.RemoteAddr)
@@ -397,4 +426,18 @@ func (s *Server) handleAcceptShare(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("Freigabe angenommen", "dashboard", id, "von", s.username(r))
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// forgetUser drops the cached live data and status of a user's tiles, e.g.
+// after the account was marked as external.
+func (s *Server) forgetUser(user int64) {
+	owners, err := s.store.TileOwners()
+	if err != nil {
+		return
+	}
+	for id, owner := range owners {
+		if owner == user {
+			s.forget(id)
+		}
+	}
 }

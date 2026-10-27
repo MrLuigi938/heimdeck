@@ -459,6 +459,8 @@ func (notJSON) Is(target error) bool { return target == ErrNotJSON }
 func friendlyNetErr(lang string, err error) error {
 	s := err.Error()
 	switch {
+	case errors.Is(err, ErrHomeNetwork):
+		return errors.New(i18n.T(lang, ErrHomeNetwork.Error()))
 	case strings.Contains(s, "connection refused"):
 		return errors.New(i18n.T(lang, "Verbindung abgelehnt – läuft der Dienst und stimmt der Port?"))
 	case strings.Contains(s, "no such host"):

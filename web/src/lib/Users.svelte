@@ -12,7 +12,8 @@
   let main = $state(0); // the main admin: only they can change their own account
   let loaded = $state(false);
   let adding = $state(false);
-  let form = $state({ username: '', password: '', role: 'user' });
+  let form = $state({ username: '', password: '', role: 'user', external: false });
+  let inviteExternal = $state(false); // the next invitation makes an external account
   let link = $state(''); // the invitation link just created – shown only once
 
   async function load() {
@@ -36,7 +37,7 @@
     try {
       const u = await post('/users', $state.snapshot(form));
       toast(t('„{name}“ angelegt – Benutzername und Passwort jetzt weitergeben.', { name: u.username }));
-      form = { username: '', password: '', role: 'user' };
+      form = { username: '', password: '', role: 'user', external: false };
       adding = false;
       load();
     } catch (err) {
@@ -78,7 +79,7 @@
 
   async function invite() {
     try {
-      const res = await post('/invites');
+      const res = await post('/invites', { external: inviteExternal });
       link = `${location.origin}/?invite=${res.token}`;
       load();
     } catch (err) {
@@ -116,6 +117,7 @@
           {#if u.id === main}<span class="tag main" title={t('Das Konto aus der Einrichtung. Rolle, Passwort und Sperre kann nur der Hauptadmin selbst ändern.')}>{t('Hauptadmin')}</span>{/if}
           {#if u.id === me}<span class="tag">{t('du')}</span>{/if}
           {#if u.disabled}<span class="tag bad">{t('gesperrt')}</span>{/if}
+          {#if u.external}<span class="tag ext" title={t('Kein Zugriff aufs Heimnetz: Kacheln dieses Kontos erreichen nur Adressen im Internet.')}>🌐 {t('extern')}</span>{/if}
         </div>
         <select value={u.role} onchange={(e) => change(u, { role: e.target.value })} disabled={u.id === me || u.id === main} aria-label={t('Rolle von {name}', { name: u.username })}>
           <option value="user">{t('Benutzer')}</option>
@@ -123,6 +125,9 @@
         </select>
         {#if u.id !== me && u.id !== main}
           <div class="acts">
+            {#if u.role === 'user'}
+              <button class="small" class:on={u.external} aria-pressed={u.external} title={t('Kein Zugriff aufs Heimnetz: Kacheln dieses Kontos erreichen nur Adressen im Internet.')} onclick={() => change(u, { external: !u.external })}>🌐 {t('Extern')}</button>
+            {/if}
             <button class="small" onclick={() => resetPassword(u)}>{t('Passwort')}</button>
             <button class="small" onclick={() => change(u, { disabled: !u.disabled })}>{u.disabled ? t('Entsperren') : t('Sperren')}</button>
             <button class="small danger" onclick={() => remove(u)}>{t('Löschen')}</button>
@@ -132,10 +137,12 @@
     {/each}
   </div>
   <p class="help">{t('Admins verwalten die Benutzer und die Einstellungen für alle: Netzwerk, Docker, Proxmox-Suche, Updates und den Debug-Modus.')}</p>
+  <p class="help">🌐 {t('Extern: für Leute außerhalb deines Zuhauses. Ihre Kacheln erreichen nur Adressen im Internet – nichts im Heimnetz, auch nicht über die eigene API. Was du mit ihnen teilst, sehen sie trotzdem.')}</p>
 
   <div class="row wrap">
     <button class="primary" onclick={invite}>🔗 {t('Einladungslink erstellen')}</button>
     <button onclick={() => (adding = !adding)} aria-expanded={adding}>+ {t('Benutzer selbst anlegen')}</button>
+    <label class="check"><input type="checkbox" bind:checked={inviteExternal} /> 🌐 {t('Einladung für ein externes Konto')}</label>
   </div>
 
   {#if link}
@@ -159,6 +166,9 @@
           <option value="admin">{t('Admin')}</option>
         </select>
       </div>
+      {#if form.role === 'user'}
+        <label class="check"><input type="checkbox" bind:checked={form.external} /> 🌐 {t('Extern – kein Zugriff aufs Heimnetz')}</label>
+      {/if}
       <div class="row"><span class="spacer"></span><button class="small" type="button" onclick={() => (adding = false)}>{t('Abbrechen')}</button><button class="small primary">{t('Anlegen')}</button></div>
     </form>
   {/if}
@@ -167,7 +177,7 @@
     <h3>{t('Offene Einladungen')}</h3>
     {#each invites as i (i.id)}
       <div class="invite">
-        <span>🔗 {t('gültig bis {date}', { date: fmt(i.expires) })}{#if i.createdBy} · {t('von {name}', { name: i.createdBy })}{/if}</span>
+        <span>🔗 {t('gültig bis {date}', { date: fmt(i.expires) })}{#if i.createdBy} · {t('von {name}', { name: i.createdBy })}{/if}{#if i.external} · 🌐 {t('extern')}{/if}</span>
         <button class="small" onclick={() => dropInvite(i)}>{t('Zurückziehen')}</button>
       </div>
     {/each}
@@ -183,6 +193,8 @@
   .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
   .tag.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .tag.ext { color: var(--warn, #d9a400); border-color: color-mix(in srgb, var(--warn, #d9a400) 45%, transparent); }
+  button.on { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
   .tag.main { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .user select { font-size: 13px; padding: 4px 8px; }
   .acts { display: flex; gap: 4px; }

@@ -2,7 +2,12 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/heimdeck/heimdeck/internal/integrations"
@@ -148,5 +153,70 @@ func TestDockerTileNeedsAdminOwner(t *testing.T) {
 	s.store.UpdateUser(u)
 	if s.dockerAllowed(tile) {
 		t.Fatal("Docker tile still works after the owner was demoted")
+	}
+}
+
+// Tiles of an external account cannot reach the home network – neither for
+// live data nor for the online check – while others still can.
+func TestExternalAccountsStayOutOfTheHomeNetwork(t *testing.T) {
+	lan := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"secret":"router-config"}`))
+	}))
+	defer lan.Close()
+	st, base := multiUserServer(t)
+	luis := newTestClient(t, base)
+	luis.call("POST", "/api/setup", map[string]string{"username": "luis", "password": "admin-pw-123", "language": "de"})
+	_, created := luis.call("POST", "/api/users", map[string]any{"username": "gast", "password": "gast-pw-123", "external": true})
+	if created["external"] != true {
+		t.Fatalf("not external: %v", created)
+	}
+	if code, _ := luis.call("PUT", fmt.Sprintf("/api/users/%v", created["id"]), map[string]any{"role": "admin", "external": true}); code != 400 {
+		t.Fatalf("external admin accepted: %d", code)
+	}
+	tile := map[string]any{"name": "Router", "url": lan.URL, "integration": "customapi", "config": map[string]string{"stats": "Geheim = secret"}}
+
+	_, own := luis.call("POST", "/api/tiles/test", tile)
+	if own["ok"] != true {
+		t.Fatalf("admin cannot reach the LAN: %v", own)
+	}
+	gast := newTestClient(t, base)
+	gast.call("POST", "/api/login", map[string]string{"username": "gast", "password": "gast-pw-123"})
+	_, res := gast.call("POST", "/api/tiles/test", tile)
+	if res["ok"] == true || !strings.Contains(fmt.Sprint(res["error"]), "Heimnetz") {
+		t.Fatalf("external account reached the LAN: %v", res)
+	}
+	// Someone else's group does not help either.
+	_, g := luis.call("POST", "/api/groups", map[string]any{"name": "Admin"})
+	tile["groupId"] = g["id"]
+	if _, res := gast.call("POST", "/api/tiles/test", tile); res["ok"] == true {
+		t.Fatalf("external account reached the LAN through another group: %v", res)
+	}
+	if code, _ := gast.call("POST", "/api/tiles/parts", tile); code == 200 {
+		t.Fatal("parts of a tile in someone else's group")
+	}
+
+	// A saved tile of the external account is checked without the LAN.
+	users, _ := st.Users()
+	s := New(st, nil, nil, nil)
+	boards, _ := st.BoardsOf(users[1].ID)
+	gg, _ := st.CreateGroup("Gast", boards[0].ID)
+	saved := store.Tile{GroupID: gg.ID, Name: "Router", URL: lan.URL, Integration: "link", Monitor: true}
+	st.SaveTile(&saved)
+	s.runChecks(context.Background(), nil)
+	if s.latest[saved.ID].Online {
+		t.Fatal("external account's tile pinged the LAN")
+	}
+}
+
+func TestPublicIP(t *testing.T) {
+	for ip, want := range map[string]bool{
+		"8.8.8.8": true, "2606:4700::1111": true,
+		"127.0.0.1": false, "10.0.0.5": false, "192.168.1.1": false, "172.20.0.2": false, "169.254.169.254": false,
+		"100.100.1.1": false, "0.0.0.0": false, "::1": false, "fd00::1": false, "fe80::1": false, "::ffff:192.168.1.1": false,
+	} {
+		if got := integrations.PublicIP(net.ParseIP(ip)); got != want {
+			t.Errorf("PublicIP(%s) = %v", ip, got)
+		}
 	}
 }
