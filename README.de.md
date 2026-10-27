@@ -24,13 +24,15 @@
 - **Alles in der Oberfläche** – keine YAML-Dateien. Kacheln hinzufügen, verschieben und bearbeiten per Klick und Drag & Drop – oder frei auf einem Raster platzieren und in der Größe ändern.
 - **Findet deine Dienste** – liest deine Docker-Container und (wenn verbunden) deine Proxmox-VMs und LXC-Container aus und schlägt Kacheln mit Icon, Adresse und Dienst-Typ vor.
 - **Live-Daten** – Download-Warteschlangen, laufende Streams, offene Anfragen, gestörte Indexer, Energiefluss, Anruflisten und mehr für mehr als 40 Dienste. Pro Kachel wählbar, welche Werte sie zeigt.
+- **Wetter, Kalender, Nachrichten und Systemlast** – Info-Kacheln ohne eigenen Dienst: die Vorhersage für deinen Ort, deine iCal-Kalender zusammen mit den nächsten Folgen und Filmen aus Sonarr und Radarr, RSS-Feeds und die Auslastung des Heimdeck-Rechners.
 - **Aktionen** – Jellyseerr-Anfragen genehmigen, SABnzbd oder AdGuard pausieren, Lademodus in evcc wechseln, Smart-Home-Geräte in Home Assistant, ioBroker, Shelly oder der FRITZ!Box schalten, WLED-Presets wechseln, UniFi-Geräte neu starten, Webhooks aufrufen …
 - **Eine Suche** (Taste `/`) – Kacheln, Medienbibliotheken, Dokumente, Fotos, Spiele, Dateien, Smart-Home-Geräte, DNS-Abfragen und mehr in einem Suchfeld: als großes Fenster mit Filtern, Vorschau und Tastatursteuerung, als Spalte pro Dienst oder als kompakte Liste. Dazu weitere Tastenkürzel, alle änderbar.
 - **Themes** – 21 Stück: klassische Paletten, verspielte wie Neon City, Luna 2001, Studio oder Flüssigglas und Festtags-Themes für Silvester, Ostern, Halloween, Advent und Weihnachten, die sich zu ihren Tagen selbst einschalten – mit Feuerwerk, Schnee oder Fledermäusen hinter den Kacheln. Dazu Ecken, Glas- oder massive Kacheln, Schrift und Abstände; pro Dashboard ein eigenes Theme.
 - **Verfügbarkeit und Benachrichtigungen** – jeder Dienst wird jede Minute geprüft, mit Verlauf über 24 Stunden oder 3 Tage. Ausfälle werden per Discord, ntfy, Telegram oder Browser gemeldet.
 - **Zuhause oder unterwegs** – jede Kachel kann eine lokale und eine öffentliche Adresse haben; Heimdeck nimmt automatisch die richtige.
 - **Eigene API und Webhooks** – jede JSON-Schnittstelle wird zur Live-Kachel mit Werten, Liste und Knöpfen, oder Skripte schicken Meldungen an eine Kachel.
-- **Mehrere Dashboards**, ausgeblendete oder per Passwort geschützte Gruppen, Hintergrundbild pro Dashboard.
+- **Für den ganzen Haushalt** – jede Person bekommt ein eigenes Konto mit eigenen Dashboards (per Einladungslink oder von dir angelegt), Dashboards lassen sich zum Ansehen teilen, und externe Konten bleiben aus deinem Heimnetz draußen. Anmeldung per **SSO** über Authentik, Authelia, Keycloak oder jeden anderen OpenID-Connect-Anbieter.
+- **Mehrere Dashboards**, ausgeblendete oder per Passwort geschützte Gruppen, Hintergrundbild pro Dashboard, Sprung zu jeder Gruppe und Kacheln, die auf dem Handy die App des Dienstes öffnen.
 - **Umstieg von Heimdall** – Heimdall-Export importieren; bekannte Dienste werden zu Live-Kacheln.
 - **Deutsch und Englisch**, sicher von Haus aus (Passwörter mit bcrypt, API-Keys mit AES-256 verschlüsselt und nie im Browser), mit Debug-Modus, wenn etwas nicht klappt.
 - **Ein kleines Image** für amd64 und arm64 (Raspberry Pi, NAS).

@@ -3,6 +3,7 @@
 [← Back to the README](../README.md) · [Deutsch](de/dienste.md)
 
 - [All integrations](#all-integrations)
+- [Info tiles: weather, calendar, RSS, system](#info-tiles-weather-calendar-rss-system)
 - [Connecting Proxmox](#connecting-proxmox)
 - [Docker tile](#docker-tile)
 - [Custom API tile](#custom-api-tile)
@@ -65,9 +66,25 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | **Other** | | | |
 | Custom API | any values, list and buttons from a JSON response | ✓ if configured | custom buttons |
 | Webhook | messages other services post to the tile's own address (JSON, form, text, Uptime Kuma) | | buttons that call webhooks (Shelly, Home Assistant, Node-RED, IFTTT …) |
+| Weather | current weather and a 3–7 day forecast for any place (Open-Meteo, no key), storm and UV hints | | |
+| Calendar | upcoming events from iCal links (Nextcloud, Google, Outlook, Proton …), repeating ones too, plus new episodes and films from your Sonarr and Radarr tiles | | |
+| RSS feed | newest entries of RSS/Atom feeds (news, blogs, release notes, YouTube channels) | | |
+| System (admins) | CPU, memory, load, temperature, network and disk throughput, uptime, disk space of the Heimdeck host (Linux) | | |
 | JDownloader, Zoraxy, Portainer, … | online status | | |
 
 Missing a service? Use the [custom API tile](#custom-api-tile) or [open an issue](https://github.com/MrLuigi938/heimdeck/issues).
+
+## Info tiles: weather, calendar, RSS, system
+
+![Weather, calendar and RSS tiles](images/info-tiles.webp)
+<sub>Demo data</sub>
+
+These tiles need no service of their own:
+
+- **Weather**: enter a place (`Berlin`, `Springfield, Illinois`) or coordinates (`52.52, 13.40`). Data from [Open-Meteo](https://open-meteo.com), fetched at most every 10 minutes.
+- **Calendar**: one iCal address per line, optionally named (`Family = https://…`; `webcal://` works too). Private calendar links are stored encrypted. Tick *Show new episodes and films from Sonarr and Radarr* to add the releases of your own Sonarr and Radarr tiles. A calendar shared "busy only" shows its events as *Busy* with a hint to share it with all details. Calendars are read at most every 15 minutes.
+- **RSS feed**: one feed per line; several feeds are mixed by date.
+- **System** (admins only): the load of the machine Heimdeck runs on. In a Docker container CPU, memory, disk speed and temperature are the host's, the network is the container's (use `network_mode: host` for the host's); mount more drives into the container and list them on the tile. In a Proxmox LXC it shows the container – use the Proxmox tile for the whole server.
 
 ## Connecting ioBroker
 
@@ -84,7 +101,7 @@ Home Assistant entities are chosen the same way. Below the selection every entry
 1. In Proxmox: Datacenter → Permissions → **API Tokens** → add a token (e.g. `root@pam`, name `heimdeck`) and **untick “Privilege Separation”** – otherwise the token has no rights of its own and the tile stays empty. With privilege separation, give the token itself the role **PVEAuditor** on `/` (Datacenter → Permissions → Add → API Token Permission), plus **PVEVMUser** to start and stop guests.
 2. In Heimdeck: start page → **Connect Proxmox** (or add a Proxmox tile) and enter the token as `user@pam!name=secret`.
 
-After that, 🔍 finds the services running in your VMs and containers: by name or tags (e.g. `jellyfin`, `adguard`, `paperless-ngx` – the containers of the Proxmox community scripts are named like this), with the guest's IP address and the usual port. VMs need the QEMU guest agent for this.
+After that, 🔍 finds the services running in your VMs and containers: by name or tags (e.g. `jellyfin`, `adguard`, `paperless-ngx` – the containers of the Proxmox community scripts are named like this), with the IP address of the VM or container and the usual port. VMs need the QEMU guest agent for this.
 
 ## Docker tile
 

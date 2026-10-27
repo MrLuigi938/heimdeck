@@ -4,6 +4,9 @@
 
 - [Moving from Heimdall](#moving-from-heimdall)
 - [Dashboards and groups](#dashboards-and-groups)
+- [Several users](#several-users)
+- [Jumping to a group](#jumping-to-a-group)
+- [Opening the app on phones](#opening-the-app-on-phones)
 - [Home or away](#home-or-away)
 - [Search](#search)
 - [Notifications](#notifications)
@@ -28,6 +31,55 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 - **Online status**: by default only the local address of a tile is checked. Turn on *Check the public address too* in the tile editor, or for all tiles under *Settings → Network and Docker*.
 - **Link-only tiles**: every tile can be a plain link and still shows whether the service is reachable. The status check can be turned off per tile.
 - **Choosing live data**: in the tile editor, open **Choose live data** below “Show live data on the tile”. Heimdeck asks the service once and lists every value it delivers plus the list, notes and buttons – untick what you don't need. Values a later version adds show up on their own; for the FRITZ!Box you also choose which sections are loaded at all.
+
+## Several users
+
+![User management with invitations, external accounts and SSO](images/users.webp)
+<sub>Demo data</sub>
+
+Everyone gets their own account with their own dashboards, settings and notifications. Nobody sees the dashboards of the others – not even the admin – unless they are shared.
+
+- **Adding people** (*Settings → Users*, admins only): **Create invitation link** gives a link that works once and for 7 days; the person chooses their own name and password. Or add the account yourself with **Add a user yourself**.
+- **Roles**: *Admin* manages the users and the settings for everyone (network, Docker, Proxmox discovery, updates, debug mode); *User* has their own dashboards and settings. Only admins can add Docker and System tiles.
+- **Main admin**: the account from the setup (or the one from before 1.4). Only it can change its own role, password and lock – other admins cannot demote, disable, delete it or reset its password.
+- **External accounts** (🌐 *External*, also with the invitation): for people outside your home. Their tiles only reach addresses on the internet – no addresses in the home network, no `localhost`, not even through a custom API tile; status checks, icons and notifications follow the same rule. Dashboards you share with them still work.
+- **Disabled accounts** can no longer log in; their dashboards stay.
+
+### Sharing dashboards
+
+*Settings → Dashboards → Share with …*: the other person sees a request on their dashboard and has to **accept** it. The dashboard then shows up in their dashboard menu under *Shared with you*.
+
+- Shared dashboards are **view only**: nothing can be moved, edited or deleted, and the settings of the tiles (keys, addresses for the backend) are never sent.
+- **Buttons** (switching lights, pausing downloads …) are off and can be allowed per share.
+- Outage alerts only go to the owner of a tile.
+- Either side can end a share at any time.
+
+### Login with SSO (OpenID Connect)
+
+![Login page with the SSO button](images/login-sso.webp)
+
+Admins set it up under *Settings → Users → Login with SSO*. It works with Authentik, Authelia, Keycloak, Pocket ID, Zitadel and other OpenID Connect providers.
+
+1. At the provider, create an application / OAuth2-OpenID provider for Heimdeck: client type *confidential*, the **redirect URI** Heimdeck shows (e.g. `https://heimdeck.example.com/api/oidc/callback`), scopes `openid profile email` (plus `groups` where the provider has it).
+2. In Heimdeck enter the **issuer address**, **client ID** and **client secret**, a name for the button, tick *Turn on login with SSO* and save – Heimdeck checks right away that it reaches the provider.
+3. Options: create **new accounts** on the first login, let **only one group** in, and an **admin group** whose members are admins (the main admin always stays admin).
+4. Existing accounts are never matched by name: everyone links their account once under *Account and backup → Link with …*.
+5. With **Log in only through SSO**, only the main admin can still use a password – as a way back in if the provider is down.
+
+**Authentik**: Applications → *Create with provider* → OAuth2/OpenID Provider. Choose a **signing key** (e.g. *authentik Self-signed Certificate*) – without one Authentik signs with the client secret, which Heimdeck does not accept. The issuer is shown in the provider as *OpenID Configuration Issuer*, e.g. `https://auth.example.com/application/o/heimdeck/`. Groups come with the `profile` scope. Keep *Subject mode* on *hashed user ID*.
+
+If the login fails, the login page says why in short and Heimdeck's log has the details (e.g. a wrong redirect URI, no signing key, clocks out of sync).
+
+## Jumping to a group
+
+On long dashboards: type the name of a group into the search and press Enter, or open the search window – *Jump to* lists all groups. On phones a round button at the bottom right opens the list of groups (*Settings → General* turns it off). An optional **jump bar** below the search (*Settings → General*, off by default) stays at the top while scrolling and marks the group you are in.
+
+## Opening the app on phones
+
+In the tile editor under *More options → Open the app on phones*, a tile can open the service's app instead of the website:
+
+- **Android**: enter the app's package name – it is in the Play Store address after `id=` (pasting the whole address works too). Suggestions for known apps appear while typing; *Test* on the phone shows right away whether it works. Android only lets websites open apps that allow it – many apps don't, then the tile simply keeps opening the website.
+- **iPhone / iPad**: an app's own link (e.g. `homeassistant://`), or a Shortcut: create one with the action *Open App* in the Shortcuts app, give it exactly the tile's name and use *Shortcut* in the editor.
 
 ## Themes
 
@@ -111,6 +163,8 @@ Use a name from [dashboardicons.com](https://dashboardicons.com) (e.g. `jellyfin
 - For a full backup including keys, back up the data folder (`./data` with Docker, `/var/lib/heimdeck` with the install script). It contains the database and the encryption key – keep it safe.
 
 ## Forgot your password?
+
+Resets the password of the main admin (the account from the setup):
 
 ```sh
 # Docker

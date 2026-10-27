@@ -3,6 +3,7 @@
 [← Zurück zur Übersicht](../../README.de.md) · [English](../services.md)
 
 - [Alle Integrationen](#alle-integrationen)
+- [Info-Kacheln: Wetter, Kalender, RSS, System](#info-kacheln-wetter-kalender-rss-system)
 - [Proxmox verbinden](#proxmox-verbinden)
 - [Docker-Kachel](#docker-kachel)
 - [Eigene API](#eigene-api)
@@ -65,11 +66,27 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | **Sonstige** | | | |
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
 | Webhook | Meldungen, die andere Dienste an die eigene Adresse der Kachel schicken (JSON, Formular, Text, Uptime Kuma) | | Knöpfe, die Webhooks aufrufen (Shelly, Home Assistant, Node-RED, IFTTT …) |
+| Wetter | aktuelles Wetter und 3–7 Tage Vorhersage für jeden Ort (Open-Meteo, ohne Key), Hinweise zu Sturm und UV | | |
+| Kalender | anstehende Termine aus iCal-Links (Nextcloud, Google, Outlook, Proton …), auch wiederkehrende, dazu neue Folgen und Filme aus deinen Sonarr- und Radarr-Kacheln | | |
+| RSS-Feed | neueste Einträge von RSS-/Atom-Feeds (Nachrichten, Blogs, Release Notes, YouTube-Kanäle) | | |
+| System (Admins) | CPU, Arbeitsspeicher, Last, Temperatur, Netzwerk und Lese-/Schreibtempo, Laufzeit, Speicherplatz des Heimdeck-Rechners (Linux) | | |
 | JDownloader, Zoraxy, Portainer, … | Online-Status | | |
 
 Jede Kachel kann außerdem „Nur Link“ sein und zeigt trotzdem an, ob der Dienst erreichbar ist.
 
 Dein Dienst fehlt? Nimm die Kachel [Eigene API](#eigene-api) oder [eröffne ein Issue](https://github.com/MrLuigi938/heimdeck/issues).
+
+## Info-Kacheln: Wetter, Kalender, RSS, System
+
+![Wetter-, Kalender- und RSS-Kachel](../images/info-tiles.webp)
+<sub>Demodaten</sub>
+
+Diese Kacheln brauchen keinen eigenen Dienst:
+
+- **Wetter**: einen Ort (`Berlin`, `Freiburg im Breisgau`) oder Koordinaten (`52.52, 13.40`) eintragen. Die Daten kommen von [Open-Meteo](https://open-meteo.com), höchstens alle 10 Minuten abgefragt.
+- **Kalender**: eine iCal-Adresse pro Zeile, optional mit Namen (`Familie = https://…`; `webcal://` geht auch). Private Kalender-Links werden verschlüsselt gespeichert. Mit *Neue Folgen und Filme aus Sonarr und Radarr zeigen* kommen die Neuerscheinungen deiner eigenen Sonarr- und Radarr-Kacheln dazu. Ein Kalender, der nur mit „beschäftigt“ geteilt ist, zeigt seine Termine als *Beschäftigt* mit einem Hinweis, ihn mit allen Details zu teilen. Kalender werden höchstens alle 15 Minuten gelesen.
+- **RSS-Feed**: ein Feed pro Zeile; mehrere Feeds werden nach Datum gemischt.
+- **System** (nur Admins): die Auslastung des Rechners, auf dem Heimdeck läuft. Im Docker-Container sind CPU, Arbeitsspeicher, Datenträger-Tempo und Temperatur die des Hosts, das Netzwerk das des Containers (für das des Hosts `network_mode: host`); weitere Laufwerke in den Container einbinden und auf der Kachel eintragen. Im Proxmox-LXC zeigt sie den Container – für den ganzen Server die Proxmox-Kachel nehmen.
 
 ## ioBroker verbinden
 

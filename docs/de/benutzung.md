@@ -4,6 +4,9 @@
 
 - [Umstieg von Heimdall](#umstieg-von-heimdall)
 - [Dashboards und Gruppen](#dashboards-und-gruppen)
+- [Mehrere Benutzer](#mehrere-benutzer)
+- [Zu einer Gruppe springen](#zu-einer-gruppe-springen)
+- [Auf dem Handy die App öffnen](#auf-dem-handy-die-app-öffnen)
 - [Zuhause oder unterwegs](#zuhause-oder-unterwegs)
 - [Suche](#suche)
 - [Benachrichtigungen](#benachrichtigungen)
@@ -28,6 +31,55 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
 - **Online-Status**: Standardmäßig wird nur die lokale Adresse einer Kachel geprüft. *Auch die öffentliche Adresse prüfen* im Kachel-Editor schaltet das pro Kachel ein, unter *Einstellungen → Netzwerk und Docker* für alle.
 - **Nur-Link-Kacheln**: Jede Kachel kann ein einfacher Link sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
 - **Live-Daten auswählen**: Im Kachel-Editor unter „Live-Daten auf der Kachel anzeigen“ **Live-Daten auswählen** aufklappen. Heimdeck fragt den Dienst einmal ab und listet jeden Wert, den er liefert, dazu Liste, Hinweise und Knöpfe – einfach abhaken, was du nicht brauchst. Werte, die eine spätere Version ergänzt, erscheinen von selbst; bei der FRITZ!Box wählst du dort außerdem, welche Bereiche überhaupt geladen werden.
+
+## Mehrere Benutzer
+
+![Benutzerverwaltung mit Einladungen, externen Konten und SSO](../images/users.webp)
+<sub>Demodaten</sub>
+
+Jede Person bekommt ein eigenes Konto mit eigenen Dashboards, Einstellungen und Benachrichtigungen. Die Dashboards der anderen sieht niemand – auch der Admin nicht –, außer sie werden geteilt.
+
+- **Leute hinzufügen** (*Einstellungen → Benutzerverwaltung*, nur Admins): **Einladungslink erstellen** gibt einen Link, der einmal und 7 Tage lang gilt; die Person wählt Namen und Passwort selbst. Oder das Konto mit **Benutzer selbst anlegen** selbst einrichten.
+- **Rollen**: *Admin* verwaltet die Benutzer und die Einstellungen für alle (Netzwerk, Docker, Proxmox-Suche, Updates, Debug-Modus); *Benutzer* hat eigene Dashboards und Einstellungen. Docker- und System-Kacheln können nur Admins anlegen.
+- **Hauptadmin**: das Konto aus der Einrichtung (bzw. das von vor 1.4). Rolle, Passwort und Sperre kann nur er selbst ändern – andere Admins können ihn weder herabstufen, sperren, löschen noch sein Passwort zurücksetzen.
+- **Externe Konten** (🌐 *Extern*, auch gleich mit der Einladung): für Leute außerhalb deines Zuhauses. Ihre Kacheln erreichen nur Adressen im Internet – keine Adressen im Heimnetz, kein `localhost`, auch nicht über die eigene API; Online-Prüfung, Icons und Benachrichtigungen halten sich genauso daran. Was du mit ihnen teilst, funktioniert trotzdem.
+- **Gesperrte Konten** können sich nicht mehr anmelden; ihre Dashboards bleiben erhalten.
+
+### Dashboards teilen
+
+*Einstellungen → Dashboards → Teilen mit …*: Die andere Person sieht eine Anfrage auf ihrem Dashboard und muss sie **annehmen**. Danach steht das Dashboard in ihrem Dashboard-Menü unter *Mit dir geteilt*.
+
+- Geteilte Dashboards sind **nur zum Ansehen**: nichts lässt sich verschieben, bearbeiten oder löschen, und die Einstellungen der Kacheln (Schlüssel, Adressen fürs Backend) werden nie mitgeschickt.
+- **Knöpfe** (Licht schalten, Downloads pausieren …) sind aus und lassen sich pro Freigabe erlauben.
+- Ausfall-Meldungen gehen nur an den Besitzer einer Kachel.
+- Beide Seiten können eine Freigabe jederzeit beenden.
+
+### Anmeldung mit SSO (OpenID Connect)
+
+![Anmeldeseite mit SSO-Knopf](../images/login-sso.webp)
+
+Admins richten das unter *Einstellungen → Benutzerverwaltung → Anmeldung mit SSO* ein. Es funktioniert mit Authentik, Authelia, Keycloak, Pocket ID, Zitadel und anderen OpenID-Connect-Anbietern.
+
+1. Beim Anbieter eine Anwendung bzw. einen OAuth2/OpenID-Provider für Heimdeck anlegen: Client-Typ *confidential*, als **Redirect URI** die Adresse, die Heimdeck anzeigt (z. B. `https://heimdeck.example.com/api/oidc/callback`), Scopes `openid profile email` (dazu `groups`, wo der Anbieter das kennt).
+2. In Heimdeck **Issuer-Adresse**, **Client-ID** und **Client-Secret** sowie einen Namen für den Knopf eintragen, *Anmeldung mit SSO einschalten* anhaken und speichern – Heimdeck prüft sofort, ob der Anbieter erreichbar ist.
+3. Optionen: **neue Konten** beim ersten Anmelden anlegen, **nur eine Gruppe** hereinlassen und eine **Admin-Gruppe**, deren Mitglieder Admins sind (der Hauptadmin bleibt immer Admin).
+4. Bestehende Konten werden nie über den Namen zugeordnet: Jede Person verknüpft ihr Konto einmal unter *Konto und Sicherung → Mit … verknüpfen*.
+5. Mit **Anmeldung nur noch über SSO** kann sich nur noch der Hauptadmin mit Passwort anmelden – als Notzugang, falls der Anbieter einmal nicht erreichbar ist.
+
+**Authentik**: Applications → *Create with provider* → OAuth2/OpenID Provider. Unbedingt einen **Signing Key** wählen (z. B. *authentik Self-signed Certificate*) – ohne signiert Authentik mit dem Client-Secret, und das nimmt Heimdeck nicht an. Der Issuer steht im Provider als *OpenID Configuration Issuer*, z. B. `https://auth.example.com/application/o/heimdeck/`. Die Gruppen kommen mit dem Scope `profile` mit. *Subject mode* auf *hashed user ID* lassen.
+
+Klappt die Anmeldung nicht, sagt die Anmeldeseite kurz warum, und das Protokoll von Heimdeck hat die Details (z. B. falsche Redirect URI, kein Signing Key, abweichende Uhrzeit).
+
+## Zu einer Gruppe springen
+
+Auf langen Dashboards: den Namen einer Gruppe in die Suche tippen und Enter drücken, oder das Suchfenster öffnen – *Springen zu* listet alle Gruppen. Auf dem Handy öffnet ein runder Knopf unten rechts die Liste der Gruppen (unter *Einstellungen → Allgemein* abschaltbar). Eine **Sprungleiste** unter der Suche (*Einstellungen → Allgemein*, standardmäßig aus) bleibt beim Scrollen oben stehen und zeigt, in welcher Gruppe du gerade bist.
+
+## Auf dem Handy die App öffnen
+
+Im Kachel-Editor unter *Weitere Optionen → Auf dem Handy die App öffnen* kann eine Kachel die App des Dienstes statt der Webseite öffnen:
+
+- **Android**: den Paketnamen der App eintragen – er steht in der Play-Store-Adresse hinter `id=` (die ganze Adresse einfügen geht auch). Beim Tippen erscheinen Vorschläge für bekannte Apps; *Testen* auf dem Handy zeigt sofort, ob es klappt. Android lässt Webseiten nur Apps öffnen, die das erlauben – viele tun das nicht, dann öffnet die Kachel einfach weiter die Webseite.
+- **iPhone / iPad**: ein eigener Link der App (z. B. `homeassistant://`) oder ein Kurzbefehl: in der Kurzbefehle-App einen mit der Aktion *App öffnen* anlegen, genau wie die Kachel nennen und im Editor *Kurzbefehl* nehmen.
 
 ## Themes
 
@@ -111,6 +163,8 @@ Namen aus [dashboardicons.com](https://dashboardicons.com) (z. B. `jellyfin`), e
 - Für eine vollständige Sicherung samt Schlüsseln den Datenordner sichern (`./data` bei Docker, `/var/lib/heimdeck` beim Installationsskript). Er enthält die Datenbank und den Verschlüsselungsschlüssel – gut aufbewahren.
 
 ## Passwort vergessen?
+
+Setzt das Passwort des Hauptadmins zurück (des Kontos aus der Einrichtung):
 
 ```sh
 # Docker
