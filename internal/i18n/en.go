@@ -905,4 +905,5 @@ var en = map[string]string{
 	"Die Anmeldung läuft über SSO – bitte den Knopf darunter nehmen":                              "Login works through SSO – please use the button below",
 	"Ohne SSO könntest du dich nicht mehr anmelden – die Anmeldung mit Passwort ist abgeschaltet": "Without SSO you could no longer log in – the password login is turned off",
 	"Diese Anmeldung ist schon mit einem anderen Konto verknüpft":                                 "This login is already linked to another account",
+	"Beschäftigt": "Busy",
 }

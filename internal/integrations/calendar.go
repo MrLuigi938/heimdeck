@@ -146,7 +146,7 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		case 1:
 			badge = in.T("Morgen")
 		}
-		w.Items = append(w.Items, Item{Title: firstNonEmpty(e.Title, in.T("Belegt")), Subtitle: sub, Badge: badge, URL: e.URL})
+		w.Items = append(w.Items, Item{Title: firstNonEmpty(e.Title, in.T("Beschäftigt")), Subtitle: sub, Badge: badge, URL: e.URL})
 	}
 	if len(w.Items) > 0 {
 		w.ItemsTitle = in.T("Als Nächstes")
@@ -259,7 +259,7 @@ func parseICal(r io.Reader) ([]icalEvent, bool) {
 		case name == "BEGIN" && cur != nil:
 			depth++
 		case name == "END" && value == "VEVENT" && cur != nil:
-			// Without a title (e.g. a calendar shared as "busy only"), it shows as busy.
+			// Without a title (e.g. a calendar shared as "busy only"), it shows as busy ("Beschäftigt").
 			if !cur.Start.IsZero() {
 				out = append(out, *cur)
 			}
