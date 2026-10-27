@@ -83,9 +83,9 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				events = append(events, CalEvent{Title: e.Summary, Detail: e.Location, Source: name, At: at, AllDay: e.AllDay})
 			}
 		}
-		// Shared as "busy only": say why there are no titles.
+		// Shared as "busy only" (Proton, Google, Outlook … can do that): say why there are no titles.
 		if len(evs) > 0 && titled == 0 {
-			hints = append(hints, in.T("Kalender „%s“ zeigt nur, wann du beschäftigt bist – für Titel und Orte den Link mit voller Ansicht freigeben (bei Proton: „Vollständige Ansicht“).", firstNonEmpty(name, hostOf(u))))
+			hints = append(hints, in.T("Kalender „%s“ zeigt nur, wann du beschäftigt bist – der Link ist ohne Details freigegeben. Für Titel und Orte den Kalender beim Anbieter mit allen Details freigeben (oft „volle Ansicht“ oder „alle Details“).", firstNonEmpty(name, hostOf(u))))
 		}
 	}
 	if in.V("releases") == "true" && in.Others != nil {

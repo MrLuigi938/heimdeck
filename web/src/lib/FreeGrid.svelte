@@ -208,7 +208,17 @@
     const tile = () => cell.querySelector(':scope > .tile');
     const check = () => {
       const el = tile();
-      if (el) el.classList.toggle('scrolls', el.scrollHeight > el.clientHeight + 1);
+      if (!el) return;
+      // Some themes (frames, larger corners) make content a few pixels taller.
+      // If only the empty padding at the bottom sticks out, cut that off
+      // instead of showing a scrollbar for nothing.
+      const over = el.scrollHeight - el.clientHeight;
+      const last = el.lastElementChild;
+      const lastStyle = last && getComputedStyle(last);
+      const pad = (parseFloat(getComputedStyle(el).paddingBottom) || 0) +
+        (lastStyle ? (parseFloat(lastStyle.paddingBottom) || 0) + (parseFloat(lastStyle.marginBottom) || 0) : 0);
+      el.classList.toggle('scrolls', over > 1 && over > pad);
+      el.classList.toggle('snug', over > 1 && over <= pad);
     };
     const ro = new ResizeObserver(check);
     const watch = () => {
@@ -285,6 +295,7 @@
     scrollbar-width: thin; scrollbar-color: transparent transparent;
   }
   .cell > :global(.tile.scrolls) { overscroll-behavior: contain; }
+  .cell > :global(.tile.snug) { overflow: hidden; }
   .cell > :global(.tile:hover) { scrollbar-color: var(--border-strong) transparent; }
   /* Icon tiles scale with the cell instead of scrolling. */
   .cell > :global(.tile.compact) { aspect-ratio: auto; overflow: hidden; }
