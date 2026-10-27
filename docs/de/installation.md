@@ -122,7 +122,7 @@ Standardwerte lassen sich per Umgebungsvariable ändern, z. B. `CTID=150 IP=192.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `CTID` | nächste freie ID | Container-ID |
+| `CTID` | nächste freie ID | Container-ID; wird im Terminal abgefragt (Enter nimmt die nächste freie) |
 | `CT_HOSTNAME` | `heimdeck` | Name des Containers in Proxmox (Hostname); wird im Terminal abgefragt |
 | `CORES` / `MEMORY` / `DISK` | `1` / `512` / `2` | CPU-Kerne, RAM in MB, Speicher in GB |
 | `STORAGE` | erster Container-Speicher | Speicher für die Container-Disk |

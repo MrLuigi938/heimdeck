@@ -5,7 +5,7 @@
 #   sh proxmox-lxc.sh
 #
 # Options via environment variables (defaults in brackets):
-#   CTID (next free ID)  CT_HOSTNAME (heimdeck)  CORES (1)  MEMORY (512)
+#   CTID (asked for; next free ID)  CT_HOSTNAME (heimdeck)  CORES (1)  MEMORY (512)
 #   DISK (2, GB)  STORAGE (first container storage)  BRIDGE (vmbr0)
 #   IP (dhcp, or e.g. 192.168.1.50/24)  GATEWAY (static IP only)
 #   HEIMDECK_PORT (3000)
@@ -21,7 +21,26 @@ die() { printf '\033[31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 command -v pct >/dev/null 2>&1 || die "this script runs on the Proxmox host (pct not found)"
 [ "$(id -u)" = 0 ] || die "please run as root"
 
-CTID="${CTID:-$(pvesh get /cluster/nextid)}"
+# The container ID. Asked for in a terminal, unless set; Enter takes the next free one.
+free_id=$(pvesh get /cluster/nextid)
+if [ -z "${CTID:-}" ] && [ -t 0 ]; then
+  while :; do
+    printf 'Container ID [%s]: ' "$free_id"
+    read -r CTID || CTID=""
+    CTID="${CTID:-$free_id}"
+    # nextid with --vmid fails when the ID is taken (by a VM or a container, cluster-wide)
+    if ! printf '%s' "$CTID" | grep -Eq '^[1-9][0-9]{2,8}$' || [ "$CTID" -lt 100 ]; then
+      echo "Please enter a number from 100 (e.g. $free_id)."
+    elif ! pvesh get /cluster/nextid --vmid "$CTID" >/dev/null 2>&1; then
+      echo "ID $CTID is already in use – please choose another one."
+    else
+      break
+    fi
+  done
+fi
+CTID="${CTID:-$free_id}"
+printf '%s' "$CTID" | grep -Eq '^[1-9][0-9]{2,8}$' || die "invalid container ID \"$CTID\" – a number from 100"
+pvesh get /cluster/nextid --vmid "$CTID" >/dev/null 2>&1 || die "container ID $CTID is already in use"
 # The container's name in Proxmox (its host name). Asked for in a terminal, unless set.
 if [ -z "${CT_HOSTNAME:-}" ] && [ -t 0 ]; then
   printf 'Container name [heimdeck]: '

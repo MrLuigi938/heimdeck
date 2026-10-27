@@ -122,7 +122,7 @@ Change the defaults with environment variables, e.g. `CTID=150 IP=192.168.1.50/2
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CTID` | next free ID | Container ID |
+| `CTID` | next free ID | Container ID; asked for when the script runs in a terminal (Enter takes the next free one) |
 | `CT_HOSTNAME` | `heimdeck` | Container name in Proxmox (host name); asked for when the script runs in a terminal |
 | `CORES` / `MEMORY` / `DISK` | `1` / `512` / `2` | CPU cores, RAM in MB, disk in GB |
 | `STORAGE` | first container storage | Storage for the container disk |
