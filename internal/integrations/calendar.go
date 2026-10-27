@@ -146,7 +146,7 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		case 1:
 			badge = in.T("Morgen")
 		}
-		w.Items = append(w.Items, Item{Title: e.Title, Subtitle: sub, Badge: badge, URL: e.URL})
+		w.Items = append(w.Items, Item{Title: firstNonEmpty(e.Title, in.T("Belegt")), Subtitle: sub, Badge: badge, URL: e.URL})
 	}
 	if len(w.Items) > 0 {
 		w.ItemsTitle = in.T("Als Nächstes")
@@ -235,18 +235,32 @@ func parseICal(r io.Reader) ([]icalEvent, bool) {
 	calendar := false
 	var out []icalEvent
 	var cur *icalEvent
-	depth := 0 // nested components inside an event (VALARM)
+	depth := 0        // nested components inside an event (VALARM)
+	freeBusy := false // inside a VFREEBUSY block (busy times without details)
 	for _, l := range lines {
 		name, params, value := icalLine(l)
 		switch {
 		case name == "BEGIN" && value == "VCALENDAR":
 			calendar = true
+		case name == "BEGIN" && value == "VFREEBUSY":
+			freeBusy = true
+		case name == "END" && value == "VFREEBUSY":
+			freeBusy = false
+		case freeBusy && name == "FREEBUSY" && params["FBTYPE"] != "FREE":
+			// "20261028T100000Z/20261028T110000Z,…" – the start of each busy period
+			for _, period := range strings.Split(value, ",") {
+				start, _, _ := strings.Cut(period, "/")
+				if t, allDay := icalTime(start, nil); !t.IsZero() {
+					out = append(out, icalEvent{Start: t, AllDay: allDay, Exdates: map[string]bool{}})
+				}
+			}
 		case name == "BEGIN" && value == "VEVENT":
 			cur = &icalEvent{Exdates: map[string]bool{}}
 		case name == "BEGIN" && cur != nil:
 			depth++
 		case name == "END" && value == "VEVENT" && cur != nil:
-			if !cur.Start.IsZero() && cur.Summary != "" {
+			// Without a title (e.g. a calendar shared as "busy only"), it shows as busy.
+			if !cur.Start.IsZero() {
 				out = append(out, *cur)
 			}
 			cur, depth = nil, 0

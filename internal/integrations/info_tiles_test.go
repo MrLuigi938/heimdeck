@@ -105,3 +105,22 @@ func TestCalendar(t *testing.T) {
 		t.Fatalf("%+v", w.Items[0])
 	}
 }
+
+// A calendar shared as "busy only" (e.g. Proton's limited view) has events
+// without a title, or only busy blocks; they show as busy.
+func TestCalendarBusyOnly(t *testing.T) {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), now.Day()+1, 9, 0, 0, 0, time.Local).UTC()
+	ics := "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:" + start.Format("20060102T150405Z") + "\r\nEND:VEVENT\r\n" +
+		"BEGIN:VFREEBUSY\r\nFREEBUSY;FBTYPE=BUSY:" + start.Add(24*time.Hour).Format("20060102T150405Z") + "/" + start.Add(25*time.Hour).Format("20060102T150405Z") + "\r\nEND:VFREEBUSY\r\nEND:VCALENDAR\r\n"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(ics)) }))
+	defer srv.Close()
+	in := &Instance{Values: map[string]string{"ical": srv.URL + "/calendar.ics?CacheKey=a&PassphraseKey=b%3D%3D"}, Client: srv.Client(), Lang: "de"}
+	w, err := calendar{}.Fetch(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Items) != 2 || w.Items[0].Title != "Belegt" || w.Items[0].Badge != "Morgen" {
+		t.Fatalf("%+v", w.Items)
+	}
+}
