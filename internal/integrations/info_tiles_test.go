@@ -120,7 +120,7 @@ func TestCalendarBusyOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(w.Items) != 2 || w.Items[0].Title != "Beschäftigt" || w.Items[0].Badge != "Morgen" {
+	if len(w.Items) != 2 || w.Items[0].Title != "Beschäftigt" || w.Items[0].Badge != "Morgen" || len(w.Alerts) != 1 || !strings.Contains(w.Alerts[0], "voller Ansicht") {
 		t.Fatalf("%+v", w.Items)
 	}
 }

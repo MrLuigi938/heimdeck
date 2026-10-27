@@ -906,4 +906,5 @@ var en = map[string]string{
 	"Ohne SSO könntest du dich nicht mehr anmelden – die Anmeldung mit Passwort ist abgeschaltet": "Without SSO you could no longer log in – the password login is turned off",
 	"Diese Anmeldung ist schon mit einem anderen Konto verknüpft":                                 "This login is already linked to another account",
 	"Beschäftigt": "Busy",
+	"Kalender „%s“ zeigt nur, wann du beschäftigt bist – für Titel und Orte den Link mit voller Ansicht freigeben (bei Proton: „Vollständige Ansicht“).": "Calendar “%s” only shows when you are busy – share the link with full view to see titles and places (in Proton: “Full view”).",
 }

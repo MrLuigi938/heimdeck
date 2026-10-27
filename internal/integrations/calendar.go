@@ -63,7 +63,7 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	from := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	to := from.AddDate(0, 0, days+1)
 	var events []CalEvent
-	var problems []string
+	var problems, hints []string
 	for _, line := range strings.Split(in.V("ical"), "\n") {
 		name, u := calSource(line)
 		if u == "" {
@@ -74,10 +74,18 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			problems = append(problems, in.T("Kalender „%s“: %v", firstNonEmpty(name, hostOf(u)), err))
 			continue
 		}
+		titled := 0
 		for _, e := range evs {
+			if e.Summary != "" {
+				titled++
+			}
 			for _, at := range e.occurrences(from, to) {
 				events = append(events, CalEvent{Title: e.Summary, Detail: e.Location, Source: name, At: at, AllDay: e.AllDay})
 			}
+		}
+		// Shared as "busy only": say why there are no titles.
+		if len(evs) > 0 && titled == 0 {
+			hints = append(hints, in.T("Kalender „%s“ zeigt nur, wann du beschäftigt bist – für Titel und Orte den Link mit voller Ansicht freigeben (bei Proton: „Vollständige Ansicht“).", firstNonEmpty(name, hostOf(u))))
 		}
 	}
 	if in.V("releases") == "true" && in.Others != nil {
@@ -153,7 +161,7 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	} else {
 		w.ItemsTitle = in.T("Keine Termine in den nächsten %d Tagen", days)
 	}
-	w.Alerts = problems
+	w.Alerts = append(problems, hints...)
 	return w, nil
 }
 
