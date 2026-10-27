@@ -292,3 +292,58 @@ func (a *arr) upcoming(ctx context.Context, in *Instance) ([]Item, error) {
 	}
 	return items, nil
 }
+
+// Releases lists the upcoming episodes (Sonarr) or film releases (Radarr) for
+// the calendar tile.
+func (a *arr) Releases(ctx context.Context, in *Instance, from, to time.Time) ([]CalEvent, error) {
+	q := url.Values{
+		"start":       {from.UTC().Format(time.RFC3339)},
+		"end":         {to.UTC().Format(time.RFC3339)},
+		"unmonitored": {"false"},
+	}
+	var out []CalEvent
+	if a.movie {
+		var movies []struct {
+			Title           string `json:"title"`
+			InCinemas       string `json:"inCinemas"`
+			DigitalRelease  string `json:"digitalRelease"`
+			PhysicalRelease string `json:"physicalRelease"`
+		}
+		if err := a.get(ctx, in, "/calendar", q, &movies); err != nil {
+			return nil, err
+		}
+		for _, m := range movies {
+			for _, r := range []struct{ kind, date string }{{in.T("Kino"), m.InCinemas}, {"Digital", m.DigitalRelease}, {"Disc", m.PhysicalRelease}} {
+				t, err := time.Parse(time.RFC3339, r.date)
+				if err != nil || t.Before(from) || !t.Before(to) {
+					continue
+				}
+				// Release days are dates; Radarr sends them as midnight UTC.
+				day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+				out = append(out, CalEvent{Title: "🎬 " + m.Title, Detail: r.kind, Source: "Radarr", At: day, AllDay: true, URL: in.Link("/calendar")})
+			}
+		}
+		return out, nil
+	}
+	q.Set("includeSeries", "true")
+	var eps []struct {
+		Title         string `json:"title"`
+		SeasonNumber  int    `json:"seasonNumber"`
+		EpisodeNumber int    `json:"episodeNumber"`
+		AirDateUtc    string `json:"airDateUtc"`
+		Series        struct {
+			Title string `json:"title"`
+		} `json:"series"`
+	}
+	if err := a.get(ctx, in, "/calendar", q, &eps); err != nil {
+		return nil, err
+	}
+	for _, e := range eps {
+		t, err := time.Parse(time.RFC3339, e.AirDateUtc)
+		if err != nil {
+			continue
+		}
+		out = append(out, CalEvent{Title: fmt.Sprintf("📺 %s · S%02dE%02d", e.Series.Title, e.SeasonNumber, e.EpisodeNumber), Detail: e.Title, Source: "Sonarr", At: t, URL: in.Link("/calendar")})
+	}
+	return out, nil
+}

@@ -273,8 +273,35 @@ func (s *Server) instance(t store.Tile, lang string) *integrations.Instance {
 	if base == "" {
 		base = t.URL
 	}
-	ext := s.external(s.tileOwner(t))
-	return &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClientFor(t.Insecure, ext), Lang: lang, TileID: t.ID, PublicOnly: ext}
+	owner := s.tileOwner(t)
+	ext := s.external(owner)
+	in := &integrations.Instance{BaseURL: base, PublicURL: t.URL, Values: vals, Client: integrations.NewClientFor(t.Insecure, ext), Lang: lang, TileID: t.ID, PublicOnly: ext}
+	in.Others = func(kind string) []*integrations.Instance { return s.othersOf(owner, kind, lang) }
+	return in
+}
+
+// othersOf returns a user's tiles of one integration, outside protected
+// groups (e.g. the Sonarr and Radarr tiles for their calendar tile).
+func (s *Server) othersOf(owner int64, kind, lang string) []*integrations.Instance {
+	if owner == 0 {
+		return nil
+	}
+	tiles, err := s.store.Tiles()
+	if err != nil {
+		return nil
+	}
+	owners, _ := s.store.TileOwners()
+	var out []*integrations.Instance
+	for _, t := range tiles {
+		if t.Integration != kind || owners[t.ID] != owner {
+			continue
+		}
+		if g, err := s.store.Group(t.GroupID); err != nil || g.Visibility == store.Protected {
+			continue
+		}
+		out = append(out, s.instance(t, lang))
+	}
+	return out
 }
 
 // instanceFor is instance for a tile that is being edited in a request: an

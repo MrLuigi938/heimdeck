@@ -89,6 +89,9 @@ type Instance struct {
 	// only reaches internet addresses. Part of every cache key, so such a
 	// tile never gets what another tile fetched from the home network.
 	PublicOnly bool
+	// Others returns the owner's other tiles of an integration (e.g. the
+	// calendar tile reads the releases of their Sonarr and Radarr tiles).
+	Others func(integration string) []*Instance
 }
 
 func (i *Instance) V(key string) string { return strings.TrimSpace(i.Values[key]) }

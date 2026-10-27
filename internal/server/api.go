@@ -292,7 +292,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"boards":        boards,
 		"groups":        out,
 		"shareRequests": requests,
-		"integrations":  integrations.All(langOf(r)),
+		"integrations":  s.integrationsFor(admin, langOf(r)),
 		"docker":        admin && s.docker != nil,
 		"proxmox":       admin && hasProxmox,
 		"notify":        map[string]bool{"discord": ns.DiscordWebhook != "", "ntfyToken": ns.NtfyToken != "", "telegram": ns.TelegramToken != ""},
@@ -310,6 +310,21 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		data["debugForced"] = logging.Forced() // HEIMDECK_DEBUG=true, the setting cannot turn it off
 	}
 	writeJSON(w, data)
+}
+
+// integrationsFor lists the services a user can pick; the host tiles only for admins.
+func (s *Server) integrationsFor(admin bool, lang string) []integrations.Definition {
+	all := integrations.All(lang)
+	if admin {
+		return all
+	}
+	out := all[:0]
+	for _, d := range all {
+		if !adminTiles[d.ID] {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // tileLayouts are the tile sizes a group (or the setting tileLayout) can have.
@@ -442,8 +457,8 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 	if !ok {
 		return t, fmt.Errorf("unbekannter Dienst-Typ: %s", t.Integration)
 	}
-	// The Docker tile reads the host's containers without any key: only for admins.
-	if t.Integration == "docker" {
+	// The Docker and System tiles read the host without any key: only for admins.
+	if adminTiles[t.Integration] {
 		if u, err := s.store.User(owner); err != nil || u.Role != store.RoleAdmin {
 			return t, errAdmin
 		}

@@ -20,13 +20,17 @@ var (
 	errReadOnly    = errors.New("Dieses Dashboard ist nur zum Ansehen freigegeben")
 	errNoAct       = errors.New("Die Knöpfe dieses Dashboards sind für dich nicht freigegeben")
 	errAdmin       = errors.New("Das darf nur ein Admin")
-	errDockerOwner = errors.New("Die Docker-Kachel funktioniert nur, wenn sie einem Admin gehört")
+	errDockerOwner = errors.New("Diese Kachel funktioniert nur, wenn sie einem Admin gehört")
 )
 
-// dockerAllowed: the Docker tile reaches the host's containers without a key,
-// so it only works while its owner is an admin – also after a demotion.
+// adminTiles read the host itself without any key – its containers, its
+// load – so only admins can add them.
+var adminTiles = map[string]bool{"docker": true, "system": true}
+
+// dockerAllowed: a host tile (Docker, System) only works while its owner is
+// an admin – also after a demotion.
 func (s *Server) dockerAllowed(t store.Tile) bool {
-	if t.Integration != "docker" {
+	if !adminTiles[t.Integration] {
 		return true
 	}
 	b, err := s.store.TileBoard(t.ID)

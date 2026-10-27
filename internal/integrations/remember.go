@@ -17,7 +17,9 @@ type rememberedValue struct {
 }
 
 // cacheKey adds whether the tile may reach the home network to a cache key.
-func (in *Instance) cacheKey(key string) string { return fmt.Sprintf("%s|public=%v", key, in.PublicOnly) }
+func (in *Instance) cacheKey(key string) string {
+	return fmt.Sprintf("%s|public=%v", key, in.PublicOnly)
+}
 
 func remember[T any](in *Instance, key string, ttl time.Duration, fetch func() (T, error)) (T, error) {
 	key = in.cacheKey(key)
