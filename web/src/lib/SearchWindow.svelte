@@ -2,7 +2,7 @@
   import { faviconUrl } from './api.js';
   import Icon from './Icon.svelte';
   import { tileHref, rewrite } from './network.svelte.js';
-  import { t } from './i18n.svelte.js';
+  import { t, i18n } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
 
   // The large search window: filters by kind of service, a list that works
@@ -13,6 +13,8 @@
     onInput, makeAction, webSearch, openUrl, onClose, onForget = null, onJump = null,
     // anchored: opens right below the search field in the header, which stays the input.
     anchored = false, input = null,
+    // ai: the AI the admin set up ({label, local}), or null.
+    ai = null,
   } = $props();
 
   let field;
@@ -82,6 +84,68 @@
     if (cat !== 'all' && !chips.some((c) => c.id === cat)) cat = 'all';
   });
 
+  // ---- asking the AI (Shift+Enter or the chip) ----
+  // The question goes to the server with the hits shown here as context; the
+  // answer streams into the right-hand side.
+  let aiMode = $state(false);
+  let aiText = $state('');
+  let aiAsked = $state('');
+  let aiBusy = $state(false);
+  let aiError = $state('');
+  let aiAbort;
+  $effect(() => {
+    // A new search ends the answer to the old one.
+    q;
+    aiAbort?.abort();
+    aiMode = false;
+  });
+  async function askAI() {
+    const question = q.trim();
+    if (!ai || !question) return;
+    aiAbort?.abort();
+    const ctrl = (aiAbort = new AbortController());
+    aiMode = true;
+    sheet = true;
+    aiAsked = question;
+    aiText = '';
+    aiError = '';
+    aiBusy = true;
+    const hits = entries
+      .filter((e) => e.kind !== 'group')
+      .slice(0, 60)
+      .map((e) => (e.kind === 'tile'
+        ? { service: t('Kachel'), title: e.tile.name, subtitle: e.tile.description || '' }
+        : { service: e.group.name, title: e.item.title, subtitle: e.item.subtitle || '', badge: e.item.badge || '' }));
+    const date = new Date().toLocaleString(i18n.lang === 'de' ? 'de-DE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    try {
+      const res = await fetch('/api/ai/ask', {
+        method: 'POST', signal: ctrl.signal, credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Lang': i18n.lang },
+        body: JSON.stringify({ question, hits, date }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || t('Fehler {code}', { code: res.status }));
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        aiText += dec.decode(value, { stream: true });
+      }
+      if (!aiText.trim()) aiError = t('Die KI hat keine Antwort gegeben.');
+    } catch (err) {
+      if (err.name !== 'AbortError') aiError = err.message;
+    } finally {
+      if (aiAbort === ctrl) aiBusy = false;
+    }
+  }
+  // The services the answer names in [brackets], to show where it comes from.
+  let aiSources = $derived.by(() => {
+    const names = new Set(groups.map((g) => g.name).concat(tileHits.length ? [t('Kachel')] : []));
+    const out = [];
+    for (const m of aiText.matchAll(/\[([^\]]{1,40})\]/g)) if (names.has(m[1]) && !out.includes(m[1])) out.push(m[1]);
+    return out;
+  });
+
   const sectionName = (e) => (e.kind === 'tile' ? t('Kacheln') : e.kind === 'group' ? t('Gruppen') : e.group.name);
   const link = (e, u) => rewrite(u, e.tile, local);
 
@@ -107,6 +171,7 @@
   function onKey(e) {
     if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+    else if (e.key === 'Enter' && e.shiftKey && ai) { e.preventDefault(); askAI(); }
     else if (e.key === 'Enter') { e.preventDefault(); if (q.trim()) activate(current); }
     else if (e.key === 'Tab' && chips.length > 1) {
       e.preventDefault();
@@ -184,6 +249,10 @@
           </button>
         {/each}
         {#if loading}<span class="loading">{t('Suche in deinen Diensten …')}</span>{/if}
+        {#if ai}
+          <span class="spacer"></span>
+          <button class="chip ai-chip" class:on={aiMode} onclick={askAI} title={t('Shift+Enter')}>✨ {t('Frag {name}', { name: ai.label })}</button>
+        {/if}
       </div>
 
       <div class="body">
@@ -219,7 +288,25 @@
         </div>
 
         <div class="preview" class:open={sheet}>
-          {#if current}
+          {#if aiMode}
+            <button class="ghost sheet-close" onclick={() => { aiMode = false; sheet = false; }} aria-label={t('Schließen')}>✕</button>
+            <div class="ai-head">✨ {ai.label} · <span class="muted">{ai.local ? t('läuft bei dir') : t('Cloud-Anbieter')}</span></div>
+            <p class="ai-q">{aiAsked}</p>
+            {#if aiError}
+              <p class="bad">{aiError}</p>
+            {:else if !aiText && aiBusy}
+              <p class="muted">{t('Denkt nach …')}</p>
+            {:else}
+              <div class="ai-answer">{aiText}{#if aiBusy}<span class="caret">▍</span>{/if}</div>
+            {/if}
+            {#if aiSources.length}
+              <div class="ai-sources">{#each aiSources as s}<span class="badge">{s}</span>{/each}</div>
+            {/if}
+            <div class="p-actions">
+              <button disabled={aiBusy} onclick={askAI}>↻ {t('Nochmal fragen')}</button>
+              <button onclick={() => { aiMode = false; sheet = false; fieldEl()?.focus(); }}>{t('Zurück zu den Treffern')}</button>
+            </div>
+          {:else if current}
             <button class="ghost sheet-close" onclick={() => (sheet = false)} aria-label={t('Schließen')}>✕</button>
             {#if current.kind === 'tile'}
               <div class="p-icon"><Icon icon={current.tile.icon} name={current.tile.name} favicon={faviconUrl(current.tile)} size={64} /></div>
@@ -260,6 +347,7 @@
         <span><kbd>↑</kbd> <kbd>↓</kbd> {t('auswählen')}</span>
         <span><kbd>Enter</kbd> {t('öffnen, ohne Auswahl im Web suchen')}</span>
         {#if chips.length > 1}<span><kbd>Tab</kbd> {t('nächster Filter')}</span>{/if}
+        {#if ai}<span><kbd>Shift</kbd>+<kbd>Enter</kbd> {t('KI fragen')}</span>{/if}
         <span><kbd>!name</kbd> {t('nur in einem Dienst suchen')}</span>
       </div>
     {:else}
@@ -313,6 +401,14 @@
   .chips { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); overflow-x: auto; align-items: center; scrollbar-width: none; }
   .chip { border-radius: 999px; padding: 4px 12px; font-size: 13px; white-space: nowrap; background: var(--surface-2); border: 1px solid var(--border); }
   .chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
+  .ai-chip { border-style: dashed; }
+  .spacer { flex: 1; }
+  .ai-head { font-size: 12.5px; color: var(--accent); font-weight: 600; }
+  .ai-q { font-weight: 600; margin: 6px 0 10px; }
+  .ai-answer { white-space: pre-wrap; line-height: 1.55; font-size: 14px; }
+  .caret { animation: blink 1s steps(2) infinite; color: var(--accent); }
+  @keyframes blink { 50% { opacity: 0; } }
+  .ai-sources { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .n { color: var(--muted); font-size: 12px; margin-left: 2px; }
   .chip.on .n { color: inherit; }
   .loading { font-size: 12.5px; color: var(--muted); white-space: nowrap; }

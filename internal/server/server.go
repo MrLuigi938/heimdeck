@@ -131,6 +131,10 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/uploads", s.handleListUploads)
 	api.HandleFunc("GET /api/uploads/{id}", s.handleGetUpload)
 	api.HandleFunc("DELETE /api/uploads/{id}", s.handleDeleteUpload)
+	api.HandleFunc("GET /api/ai", s.adminOnly(s.handleGetAI))
+	api.HandleFunc("PUT /api/ai", s.adminOnly(s.handleSaveAI))
+	api.HandleFunc("POST /api/ai/models", s.adminOnly(s.handleAIModels))
+	api.HandleFunc("POST /api/ai/ask", s.handleAsk)
 	api.HandleFunc("GET /api/sso", s.adminOnly(s.handleGetSSO))
 	api.HandleFunc("PUT /api/sso", s.adminOnly(s.handleSaveSSO))
 	api.HandleFunc("DELETE /api/account/sso", s.handleUnlinkSSO)
@@ -187,6 +191,8 @@ type langWriter struct {
 	http.ResponseWriter
 	lang string
 }
+
+func (lw *langWriter) Unwrap() http.ResponseWriter { return lw.ResponseWriter }
 
 type langKey struct{}
 

@@ -16,6 +16,7 @@
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
   import { THEMES, SEASONS } from './themes.js';
   import Users from './Users.svelte';
+  import AiSettings from './AiSettings.svelte';
   import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
@@ -87,6 +88,7 @@
     { id: 'notify', label: 'Benachrichtigungen', icon: '🔔' },
     { id: 'keys', label: 'Tastenkürzel', icon: '⌨️' },
     { id: 'users', label: 'Benutzerverwaltung', icon: '👥', admin: true },
+    { id: 'ai', label: 'KI', icon: '✨', admin: true },
     { id: 'account', label: 'Konto und Sicherung', icon: '🔐' },
     { id: 'info', label: 'Info', icon: 'ℹ️' },
   ].filter((x) => admin || !x.admin);
@@ -567,6 +569,10 @@
       {#if admin}
         <section hidden={current !== 'users'} bind:this={sectionEls.users}>
           <Users />
+        </section>
+        <section hidden={current !== 'ai'} bind:this={sectionEls.ai}>
+          <h3>{t('KI in der Suche')}</h3>
+          <AiSettings />
         </section>
       {/if}
 

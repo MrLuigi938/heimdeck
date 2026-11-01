@@ -27,6 +27,9 @@ type statusWriter struct {
 	status int
 }
 
+// Unwrap lets http.ResponseController reach the real writer (e.g. to flush a streamed AI answer).
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (w *statusWriter) WriteHeader(code int) {
 	if w.status == 0 {
 		w.status = code

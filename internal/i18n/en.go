@@ -920,4 +920,9 @@ var en = map[string]string{
 	"In der Bibliothek": "In the library",
 	"Sortierung":        "Order",
 	"Reihenfolge der VMs und Container. „Status“: laufende zuerst, „Auslastung“: die am meisten arbeiten zuerst.": "Order of the VMs and containers. “Status”: running ones first, “Load”: the busiest first.",
+	"KI: bitte eine vollständige Adresse mit http:// oder https:// angeben":                                       "AI: please enter a complete address with http:// or https://",
+	"KI: Adresse und Modell werden gebraucht":                                                                     "AI: the address and the model are needed",
+	"Die KI ist nicht eingerichtet":                                                                               "The AI is not set up",
+	"Frage fehlt":                                                                                                 "Question missing",
+	"Die KI ist gerade nicht erreichbar":                                                                          "The AI cannot be reached right now",
 }

@@ -595,7 +595,7 @@
           </div>
         {/if}
       </div>
-      <Search bind:this={searchBox} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+      <Search bind:this={searchBox} ai={data.ai} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
         shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}

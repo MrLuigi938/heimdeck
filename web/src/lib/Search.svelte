@@ -15,7 +15,7 @@
   // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
   // history: remember recent searches in this browser (setting "searchHistory").
   // sections: the groups of the open dashboard ({id, name, count}); a hit jumps there with onJump.
-  let { tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  let { ai = null, tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
 
   // The search window opens right under the field when the field is in view
   // (anchored, you type in the field itself), otherwise in the middle of the
@@ -347,7 +347,7 @@
 </div>
 
 {#if windowOpen}
-  <SearchWindow bind:this={win} bind:q {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
+  <SearchWindow bind:this={win} bind:q {ai} {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
     {onInput} {makeAction} {webSearch} {openUrl} onJump={jump} onForget={forget} onClose={() => reset()} />
 {/if}
 

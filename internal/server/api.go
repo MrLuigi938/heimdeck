@@ -341,6 +341,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"username":      user.Username,
 		"userId":        me,
 		"sso":           s.ssoInfo(user),
+		"ai":            s.aiFor(user),
 		"role":          user.Role,
 		"version":       s.version,
 		"system":        s.systemInfo(),
