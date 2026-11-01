@@ -22,8 +22,8 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Lidarr | Warteschlange, neue und fehlende Alben, Warnungen | ✓ Künstler | fehlende Alben suchen |
 | Bazarr | fehlende Untertitel (Folgen/Filme), gedrosselte Anbieter | ✓ Serien und Filme | fehlende Untertitel suchen |
 | Prowlarr | aktive und gestörte Indexer | | |
-| Immich | Fotos, Videos, Speicher pro Benutzer | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
-| PhotoPrism (App-Passwort) | Fotos, Videos, Alben, Personen, zuletzt hinzugefügt | ✓ Fotos (Ort, Person, Motiv, Datum) | |
+| Immich | Fotos, Videos, Speicher pro Benutzer; Alben als Dashboard-Hintergrund | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
+| PhotoPrism (App-Passwort) | Fotos, Videos, Alben, Personen, zuletzt hinzugefügt; Alben als Dashboard-Hintergrund | ✓ Fotos (Ort, Person, Motiv, Datum) | |
 | Audiobookshelf | Hörbücher, Podcasts, Stunden, Weiterhören | ✓ Titel, Autoren, Serien | |
 | Kavita | Serien, Bände, Dateien, Weiterlesen | ✓ mit Covern | |
 | Komga | Serien, Bücher, angefangene Bücher | ✓ mit Covern | |
@@ -39,7 +39,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | NZBGet | Tempo, Warteschlange, Restgröße, Restzeit | | pausieren, fortsetzen |
 | qBittorrent, Transmission, Deluge | ↓/↑-Tempo, lädt/seedet, aktive Torrents mit Fortschritt | ✓ Torrents | alle pausieren/fortsetzen |
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
-| Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
+| Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher, Größe der Bibliothek, zuletzt fertige Downloads | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
 | **Dokumente** | | | |
 | Paperless-ngx | Dokumente, Posteingang | ✓ | |
 | Norish (API-Schlüssel) | heute geplante Gerichte, offene Einkäufe, Anzahl Rezepte | ✓ Rezepte | |
@@ -55,7 +55,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
 | Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
-| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, am stärksten ausgelastete und gestoppte Gäste bzw. Nodes | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, Liste der Gäste bzw. Nodes sortiert nach Name, VMID, Status oder Auslastung | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | openmediavault (Administrator) | CPU, RAM, Laufzeit, Updates, Dateisysteme, Festplatten-Zustand (S.M.A.R.T.) | | |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter mit eigenen Namen oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
@@ -85,7 +85,7 @@ Diese Kacheln brauchen keinen eigenen Dienst:
 
 - **Wetter**: einen Ort (`Berlin`, `Freiburg im Breisgau`) oder Koordinaten (`52.52, 13.40`) eintragen. Die Daten kommen von [Open-Meteo](https://open-meteo.com), höchstens alle 10 Minuten abgefragt.
 - **Kalender**: eine iCal-Adresse pro Zeile, optional mit Namen (`Familie = https://…`; `webcal://` geht auch). Private Kalender-Links werden verschlüsselt gespeichert. Mit *Neue Folgen und Filme aus Sonarr und Radarr zeigen* kommen die Neuerscheinungen deiner eigenen Sonarr- und Radarr-Kacheln dazu. Ein Kalender, der nur mit „beschäftigt“ geteilt ist, zeigt seine Termine als *Beschäftigt* mit einem Hinweis, ihn mit allen Details zu teilen. Kalender werden höchstens alle 15 Minuten gelesen.
-- **RSS-Feed**: ein Feed pro Zeile; mehrere Feeds werden nach Datum gemischt.
+- **RSS-Feed**: ein Feed pro Zeile; mehrere Feeds werden nach Datum gemischt. Steht die Anzahl der Einträge auf *automatisch*, zeigt eine Kachel im freien Raster so viele, wie hineinpassen – höher ziehen zeigt mehr. Auch die Listen von Kalender und Wetter passen sich ihrer Kachel an.
 - **System** (nur Admins): die Auslastung des Rechners, auf dem Heimdeck läuft. Im Docker-Container sind CPU, Arbeitsspeicher, Datenträger-Tempo und Temperatur die des Hosts, das Netzwerk das des Containers (für das des Hosts `network_mode: host`); weitere Laufwerke in den Container einbinden und auf der Kachel eintragen. Im Proxmox-LXC zeigt sie den Container – für den ganzen Server die Proxmox-Kachel nehmen.
 
 ## ioBroker verbinden

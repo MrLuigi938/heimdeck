@@ -22,8 +22,8 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Lidarr | queue, new and missing albums, warnings | ✓ artists | search missing albums |
 | Bazarr | missing subtitles (episodes/movies), throttled providers | ✓ series and movies | search missing subtitles |
 | Prowlarr | active and failing indexers | | |
-| Immich | photos, videos, storage per user | ✓ people, file names, optional smart search by image content | |
-| PhotoPrism (app password) | photos, videos, albums, people, recently added | ✓ photos (place, person, subject, date) | |
+| Immich | photos, videos, storage per user; albums as dashboard backgrounds | ✓ people, file names, optional smart search by image content | |
+| PhotoPrism (app password) | photos, videos, albums, people, recently added; albums as dashboard backgrounds | ✓ photos (place, person, subject, date) | |
 | Audiobookshelf | audiobooks, podcasts, hours, continue listening | ✓ titles, authors, series | |
 | Kavita | series, volumes, files, continue reading | ✓ with covers | |
 | Komga | series, books, books in progress | ✓ with covers | |
@@ -39,7 +39,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | NZBGet | speed, queue, size left, time left | | pause, resume |
 | qBittorrent, Transmission, Deluge | ↓/↑ speed, downloading/seeding, active torrents with progress | ✓ torrents | pause/resume all |
 | MeTube | active, finished, failed downloads | | |
-| Tubesy (API key from Tubesy → Account) | speed, active, queued, failed downloads, free space | ✓ library; paste a URL to download | cancel download, download URL |
+| Tubesy (API key from Tubesy → Account) | speed, active, queued, failed downloads, free space, library size, last finished downloads | ✓ library; paste a URL to download | cancel download, download URL |
 | **Documents** | | | |
 | Paperless-ngx | documents, inbox | ✓ | |
 | Norish (API key) | meals planned today, open groceries, number of recipes | ✓ recipes | |
@@ -55,7 +55,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
 | Docker (mounted socket) | running/stopped containers, optional updates | ✓ containers | optional start, stop, restart |
-| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, busiest and stopped guests or nodes | ✓ VMs and containers | start, shut down, reboot |
+| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, list of guests or nodes sorted by name, VMID, status or load | ✓ VMs and containers | start, shut down, reboot |
 | openmediavault (admin user) | CPU, RAM, uptime, updates, file systems, disk health (S.M.A.R.T.) | | |
 | **Smart home & energy** | | | |
 | Home Assistant (long-lived access token) | chosen sensors/switches with your own names, or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |
@@ -83,7 +83,7 @@ These tiles need no service of their own:
 
 - **Weather**: enter a place (`Berlin`, `Springfield, Illinois`) or coordinates (`52.52, 13.40`). Data from [Open-Meteo](https://open-meteo.com), fetched at most every 10 minutes.
 - **Calendar**: one iCal address per line, optionally named (`Family = https://…`; `webcal://` works too). Private calendar links are stored encrypted. Tick *Show new episodes and films from Sonarr and Radarr* to add the releases of your own Sonarr and Radarr tiles. A calendar shared "busy only" shows its events as *Busy* with a hint to share it with all details. Calendars are read at most every 15 minutes.
-- **RSS feed**: one feed per line; several feeds are mixed by date.
+- **RSS feed**: one feed per line; several feeds are mixed by date. With the number of entries on *automatic*, a tile in the free grid shows as many as fit – make it taller to see more. Calendar and weather lists also fit their tile.
 - **System** (admins only): the load of the machine Heimdeck runs on. In a Docker container CPU, memory, disk speed and temperature are the host's, the network is the container's (use `network_mode: host` for the host's); mount more drives into the container and list them on the tile. In a Proxmox LXC it shows the container – use the Proxmox tile for the whole server.
 
 ## Connecting ioBroker

@@ -9,9 +9,11 @@
 - [Opening the app on phones](#opening-the-app-on-phones)
 - [Home or away](#home-or-away)
 - [Search](#search)
+- [AI chat](#ai-chat)
 - [Notifications](#notifications)
 - [Docker labels](#docker-labels)
 - [Icons](#icons)
+- [Background pictures](#background-pictures)
 - [Backup](#backup)
 - [Forgot your password?](#forgot-your-password)
 - [Tips](#tips)
@@ -54,6 +56,13 @@ Everyone gets their own account with their own dashboards, settings and notifica
 - Outage alerts only go to the owner of a tile.
 - Either side can end a share at any time.
 
+### Sharing single groups
+
+![Sharing two groups of a dashboard](images/share-groups.webp)
+<sub>Demo data</sub>
+
+*Settings → Dashboards → Share groups …* shares only some groups of a dashboard – the rest stays private. Tick the groups, choose the person and whether they may use buttons, then *Share*. After they accept, the groups show up in their dashboard menu under *Shared groups*, with the same rules as a shared dashboard (view only, no settings sent). Groups added later are not shared on their own; ending works per group from either side.
+
 ### Login with SSO (OpenID Connect)
 
 ![Login page with the SSO button](images/login-sso.webp)
@@ -90,7 +99,7 @@ In the tile editor under *More options → Open the app on phones*, a tile can o
 - **Style options** work with every theme: corners (square or very round), tiles (glass or solid – solid is easier on weak tablets), font (system or monospace) and spacing (compact).
 - Every theme brings its **accent colour**; pick your own one below the themes, ✦ goes back to the theme's.
 - **Per dashboard**: under *Settings → Dashboards* a dashboard can get its own theme, e.g. Nord for “Work”.
-- A background image of your own (general or per dashboard) replaces the theme's backdrop.
+- A background image of your own (general or per dashboard) replaces the theme's backdrop – see [Background pictures](#background-pictures).
 - **Festive days**: New Year's Eve (Dec 28 – Jan 2, fireworks over a starry sky), Easter (Maundy Thursday – Easter Monday, a hopping bunny), start of summer (June 20 – 23, soap bubbles), Halloween (October, bats, pumpkins and cobwebs), Advent (1st Sunday of Advent – Dec 23, an Advent wreath) and Christmas (Dec 24 – 27, snow and a string of lights). Pick one like any other theme – outside its days too. With *Festive days automatically at the right time* each switches itself on for its days and off again afterwards (the *automatically* switch under each card leaves one out); during the days it is used as *decoration on my theme* or as the *whole theme*. The effects run behind the tiles and can be turned off; with "reduce motion" in your system only the still parts are shown.
 
 ## Info and updates
@@ -124,6 +133,25 @@ Pressing Enter without a matching tile searches the web. Choose the search engin
 
 Which services can be searched is listed in [Supported services](services.md).
 
+## AI chat
+
+![The AI chat with earlier chats on the left](images/ai-chat.webp)
+<sub>Demo data, answer from a local model</sub>
+
+Heimdeck can talk to an AI of your choice – any server with an OpenAI-compatible interface: self-hosted (**Ollama**, LM Studio, LocalAI …) or a provider (OpenAI, OpenRouter, Mistral …).
+
+**Setting it up** (admins, *Settings → AI*): enter the address (for Ollama e.g. `http://192.168.1.10:11434/v1`), an API key if the provider needs one, click *Load models* and choose one. Optional: a name shown in the chat, *Only admins may ask* (useful with providers that charge per request), and a **SearXNG** address for web search (allow `json` under `search → formats` in SearXNG). The key is stored encrypted and never sent to the browser.
+
+**Using it:**
+
+- Open the chat with ✨ in the search field, with `K`, or from the search window: *Ask <name>* (or Shift+Enter) asks about what you just searched – the visible hits from your own services go along as context, and the answer names the service it took something from.
+- **Files**: add them with 📎, by dragging or pasting – text, Markdown, CSV, JSON, PDF, Word (`.docx`) and pictures. Ask the AI to summarize, translate or rewrite them; answers and code blocks can be copied or saved as a file. Scanned PDFs without text go along as pictures of their first pages, which only models that can see understand.
+- **Web** 🌐 (with SearXNG): Heimdeck searches the web for your question and gives the AI the top results; the model itself never goes online.
+- **Earlier chats** are kept in your browser, per account (up to 30, without the pictures).
+- **On the computer** (*Settings → Search → AI chat on the computer*): a large window with the list of chats on the left (default), or a sidebar on the right – the dashboard moves aside and stays usable. On phones the chat always fills the screen.
+
+The AI only sees what the person asking can see anyway, and it never presses buttons (lights, downloads …). With a cloud provider your question and the hits leave your home – for the most privacy, use a local model.
+
 ## Notifications
 
 Settings → Notifications:
@@ -155,7 +183,20 @@ labels:
 
 ## Icons
 
-Use a name from [dashboardicons.com](https://dashboardicons.com) (e.g. `jellyfin`), an image URL or an emoji. Images of any aspect ratio are fitted into the icon area.
+Use a name from [dashboardicons.com](https://dashboardicons.com) (e.g. `jellyfin`), an image URL or an emoji – or **upload** a picture of your own in the tile editor (PNG, JPEG, WebP, GIF or SVG; large ones are scaled down in the browser). Images of any aspect ratio are fitted into the icon area.
+
+## Background pictures
+
+![Uploaded background pictures that take turns](images/backgrounds.webp)
+<sub>Demo data</sub>
+
+*Settings → Appearance → Background picture* (or per dashboard under *Settings → Dashboards → Own background*):
+
+- **Upload pictures**: large photos are scaled down in the browser before they are stored (to at most 2560 pixels, as WebP), so even a 10 MB photo ends up at a few hundred KB. Uploads are kept in Heimdeck's database and are included in the data-folder backup.
+- **Address**: any picture on the web (`https://…`).
+- **Album**: with an Immich or PhotoPrism tile, pick one of its albums – its photos are used as backgrounds.
+- **Several pictures or an album take turns**: *Change picture* every time the dashboard opens, every 1, 5 or 15 minutes, every hour or every day.
+- ✕ removes a picture from the list. Each account can keep up to 300 uploads (200 MB).
 
 ## Backup
 
@@ -197,6 +238,7 @@ When reporting a problem, please attach this log – it contains no passwords or
 | Key | Action |
 |---|---|
 | `/` | Open the search |
+| `K` | Open the AI chat (when an AI is set up) |
 | `E` | Edit mode on/off |
 | `,` | Open the settings |
 | `H` | Show/hide hidden groups |

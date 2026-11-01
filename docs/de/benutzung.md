@@ -9,9 +9,11 @@
 - [Auf dem Handy die App öffnen](#auf-dem-handy-die-app-öffnen)
 - [Zuhause oder unterwegs](#zuhause-oder-unterwegs)
 - [Suche](#suche)
+- [KI-Chat](#ki-chat)
 - [Benachrichtigungen](#benachrichtigungen)
 - [Docker-Labels](#docker-labels)
 - [Icons](#icons)
+- [Hintergrundbilder](#hintergrundbilder)
 - [Sicherung](#sicherung)
 - [Passwort vergessen?](#passwort-vergessen)
 - [Tipps](#tipps)
@@ -54,6 +56,13 @@ Jede Person bekommt ein eigenes Konto mit eigenen Dashboards, Einstellungen und 
 - Ausfall-Meldungen gehen nur an den Besitzer einer Kachel.
 - Beide Seiten können eine Freigabe jederzeit beenden.
 
+### Einzelne Gruppen teilen
+
+![Zwei Gruppen eines Dashboards teilen](../images/share-groups.webp)
+<sub>Demo-Daten, Oberfläche auf Englisch</sub>
+
+*Einstellungen → Dashboards → Gruppen teilen …* teilt nur einige Gruppen eines Dashboards – der Rest bleibt privat. Gruppen ankreuzen, Person wählen und ob sie Knöpfe benutzen darf, dann *Teilen*. Nach dem Annehmen erscheinen die Gruppen in ihrem Dashboard-Menü unter *Geteilte Gruppen*, mit denselben Regeln wie ein geteiltes Dashboard (nur ansehen, keine Einstellungen). Später hinzugefügte Gruppen werden nicht von selbst geteilt; beenden geht pro Gruppe von beiden Seiten.
+
 ### Anmeldung mit SSO (OpenID Connect)
 
 ![Anmeldeseite mit SSO-Knopf](../images/login-sso.webp)
@@ -90,7 +99,7 @@ Im Kachel-Editor unter *Weitere Optionen → Auf dem Handy die App öffnen* kann
 - **Stil-Optionen** passen zu jedem Theme: Ecken (eckig oder sehr rund), Kacheln (Glas oder massiv – massiv schont schwache Tablets), Schrift (System oder Monospace) und Abstände (kompakt).
 - Jedes Theme bringt seine **Akzentfarbe** mit; darunter lässt sich eine eigene wählen, ✦ nimmt wieder die des Themes.
 - **Pro Dashboard**: Unter *Einstellungen → Dashboards* bekommt ein Dashboard ein eigenes Theme, z. B. Nord für „Arbeit“.
-- Ein eigenes Hintergrundbild (allgemein oder pro Dashboard) ersetzt den Hintergrund des Themes.
+- Ein eigenes Hintergrundbild (allgemein oder pro Dashboard) ersetzt den Hintergrund des Themes – siehe [Hintergrundbilder](#hintergrundbilder).
 - **Festtage**: Silvester (28. Dez. – 2. Jan., Feuerwerk über Sternenhimmel), Ostern (Gründonnerstag – Ostermontag, hoppelnder Hase), Sommeranfang (20. – 23. Juni, Seifenblasen), Halloween (Oktober, Fledermäuse, Kürbisse und Spinnennetze), Advent (1. Advent – 23. Dez., Adventskranz) und Weihnachten (24. – 27. Dez., Schnee und Lichterkette). Wählbar wie jedes andere Theme – auch außerhalb ihrer Zeit. Mit *Festtage automatisch zur passenden Zeit* schaltet sich jedes zu seinen Tagen selbst ein und danach wieder aus (der Schalter *automatisch* unter einer Karte lässt einzelne aus); in der Zeit wirkt es als *Deko auf meinem Theme* oder als *ganzes Theme*. Die Effekte laufen hinter den Kacheln und lassen sich abschalten; bei „Bewegung reduzieren“ im System bleiben nur die stillen Teile.
 
 ## Info und Updates
@@ -124,6 +133,25 @@ Enter ohne passende Kachel startet die Websuche. Die Suchmaschine wählst du in 
 
 Welche Dienste durchsucht werden können, steht unter [Unterstützte Dienste](dienste.md).
 
+## KI-Chat
+
+![Der KI-Chat mit früheren Chats links](../images/ai-chat.webp)
+<sub>Demo-Daten, Oberfläche auf Englisch, Antwort eines lokalen Modells</sub>
+
+Heimdeck kann mit einer KI deiner Wahl sprechen – jeder Server mit OpenAI-kompatibler Schnittstelle: selbst gehostet (**Ollama**, LM Studio, LocalAI …) oder ein Anbieter (OpenAI, OpenRouter, Mistral …).
+
+**Einrichten** (Admins, *Einstellungen → KI*): Adresse eintragen (bei Ollama z. B. `http://192.168.1.10:11434/v1`), falls nötig einen API-Schlüssel, *Modelle laden* klicken und eines wählen. Optional: ein Name für den Chat, *Nur Admins dürfen fragen* (sinnvoll bei Anbietern, die pro Anfrage kosten) und eine **SearXNG**-Adresse für die Websuche (in SearXNG unter `search → formats` „json“ erlauben). Der Schlüssel wird verschlüsselt gespeichert und nie an den Browser geschickt.
+
+**Benutzen:**
+
+- Öffnen mit ✨ im Suchfeld, mit `K` oder aus dem Suchfenster: *Frag <Name>* (oder Shift+Enter) fragt zu dem, was du gerade gesucht hast – die sichtbaren Treffer aus deinen Diensten gehen als Kontext mit, und die Antwort nennt den Dienst, aus dem etwas stammt.
+- **Dateien** per 📎, Ziehen oder Einfügen – Text, Markdown, CSV, JSON, PDF, Word (`.docx`) und Bilder. Die KI fasst zusammen, übersetzt oder schreibt um; Antworten und Codeblöcke lassen sich kopieren oder als Datei speichern. Gescannte PDFs ohne Text gehen als Bilder ihrer ersten Seiten mit – das verstehen nur Modelle, die sehen können.
+- **Web** 🌐 (mit SearXNG): Heimdeck sucht im Web nach deiner Frage und gibt der KI die besten Treffer mit; das Modell selbst geht nie ins Internet.
+- **Frühere Chats** bleiben in deinem Browser gespeichert, pro Konto (bis zu 30, ohne die Bilder).
+- **Am Computer** (*Einstellungen → Suche → KI-Chat am Computer*): ein großes Fenster mit der Chat-Liste links (Standard) oder eine Seitenleiste rechts – das Dashboard rückt zur Seite und bleibt bedienbar. Auf dem Handy füllt der Chat immer den Bildschirm.
+
+Die KI sieht nur, was die fragende Person ohnehin sieht, und drückt nie Knöpfe (Licht, Downloads …). Bei einem Cloud-Anbieter verlassen Frage und Treffer dein Zuhause – für maximale Privatsphäre ein lokales Modell nehmen.
+
 ## Benachrichtigungen
 
 Einstellungen → Benachrichtigungen:
@@ -155,7 +183,20 @@ labels:
 
 ## Icons
 
-Namen aus [dashboardicons.com](https://dashboardicons.com) (z. B. `jellyfin`), eine Bild-URL oder ein Emoji. Bilder in jedem Seitenverhältnis werden ins Icon-Feld eingepasst.
+Namen aus [dashboardicons.com](https://dashboardicons.com) (z. B. `jellyfin`), eine Bild-URL oder ein Emoji – oder im Kachel-Editor ein eigenes Bild **hochladen** (PNG, JPEG, WebP, GIF oder SVG; große werden im Browser verkleinert). Bilder in jedem Seitenverhältnis werden ins Icon-Feld eingepasst.
+
+## Hintergrundbilder
+
+![Hochgeladene Hintergrundbilder, die sich abwechseln](../images/backgrounds.webp)
+<sub>Demo-Daten, Oberfläche auf Englisch</sub>
+
+*Einstellungen → Aussehen → Hintergrundbild* (oder pro Dashboard unter *Einstellungen → Dashboards → Eigener Hintergrund*):
+
+- **Bilder hochladen**: große Fotos werden schon im Browser verkleinert (auf höchstens 2560 Pixel, als WebP), aus einem 10-MB-Foto werden so einige Hundert KB. Hochgeladene Bilder liegen in Heimdecks Datenbank und sind in der Sicherung des Datenordners enthalten.
+- **Adresse**: ein beliebiges Bild aus dem Netz (`https://…`).
+- **Album**: mit einer Immich- oder PhotoPrism-Kachel eines ihrer Alben wählen – seine Fotos werden zu Hintergründen.
+- **Mehrere Bilder oder ein Album wechseln sich ab**: *Bild wechseln* bei jedem Öffnen, alle 1, 5 oder 15 Minuten, stündlich oder täglich.
+- ✕ nimmt ein Bild aus der Liste. Jedes Konto kann bis zu 300 Bilder (200 MB) hochladen.
 
 ## Sicherung
 
@@ -197,6 +238,7 @@ Bei einer Fehlermeldung bitte dieses Protokoll anhängen – es enthält keine P
 | Taste | Aktion |
 |---|---|
 | `/` | Suche öffnen |
+| `K` | KI-Chat öffnen (wenn eine KI eingerichtet ist) |
 | `E` | Bearbeitungsmodus an/aus |
 | `,` | Einstellungen öffnen |
 | `H` | Ausgeblendete Gruppen zeigen/verbergen |
