@@ -88,6 +88,40 @@ func (s *Server) boardsFor(user int64) (map[int64]boardAccess, error) {
 	return out, nil
 }
 
+// groupsFor returns what a user may do per group: every group of the
+// dashboards they see, plus single groups shared with them and accepted.
+func (s *Server) groupsFor(user int64) (map[int64]boardAccess, error) {
+	boards, err := s.boardsFor(user)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := s.store.Groups()
+	if err != nil {
+		return nil, err
+	}
+	out := map[int64]boardAccess{}
+	for _, g := range groups {
+		if acc, ok := boards[g.BoardID]; ok {
+			out[g.ID] = acc
+		}
+	}
+	shares, err := s.store.GroupSharesFor(user)
+	if err != nil {
+		return nil, err
+	}
+	for _, sh := range shares {
+		if _, ok := out[sh.GroupID]; !ok && sh.Accepted {
+			out[sh.GroupID] = boardAccess{Act: sh.Actions}
+		}
+	}
+	return out, nil
+}
+
+// sharedGroupsBoard is the dashboard ID under which single groups shared by
+// an owner appear for the people they are shared with (negative, so it never
+// meets a real dashboard).
+func sharedGroupsBoard(owner int64) int64 { return -owner }
+
 // groupBoards maps every group to its dashboard.
 func (s *Server) groupBoards() (map[int64]int64, error) {
 	groups, err := s.store.Groups()
@@ -103,11 +137,7 @@ func (s *Server) groupBoards() (map[int64]int64, error) {
 
 // accessibleTiles returns the tiles the user sees: on their dashboards, outside locked groups.
 func (s *Server) accessibleTiles(r *http.Request) ([]store.Tile, error) {
-	boards, err := s.boardsFor(uid(r))
-	if err != nil {
-		return nil, err
-	}
-	gb, err := s.groupBoards()
+	groups, err := s.groupsFor(uid(r))
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +151,7 @@ func (s *Server) accessibleTiles(r *http.Request) ([]store.Tile, error) {
 	}
 	out := tiles[:0]
 	for _, t := range tiles {
-		if _, ok := boards[gb[t.GroupID]]; ok && !locked[t.GroupID] {
+		if _, ok := groups[t.GroupID]; ok && !locked[t.GroupID] {
 			out = append(out, t)
 		}
 	}
@@ -135,15 +165,11 @@ func (s *Server) tileAccess(r *http.Request, id int64) (store.Tile, boardAccess,
 	if err != nil {
 		return t, boardAccess{}, 404, errNotFound
 	}
-	b, err := s.store.TileBoard(id)
-	if err != nil {
-		return t, boardAccess{}, 404, errNotFound
-	}
-	boards, err := s.boardsFor(uid(r))
+	groups, err := s.groupsFor(uid(r))
 	if err != nil {
 		return t, boardAccess{}, 500, err
 	}
-	acc, ok := boards[b.ID]
+	acc, ok := groups[t.GroupID]
 	if !ok {
 		return t, acc, 404, errNotFound
 	}
@@ -204,11 +230,11 @@ func (s *Server) seeGroup(r *http.Request, id int64) (store.Group, boardAccess, 
 	if err != nil {
 		return g, boardAccess{}, errNotFound
 	}
-	boards, err := s.boardsFor(uid(r))
+	groups, err := s.groupsFor(uid(r))
 	if err != nil {
 		return g, boardAccess{}, err
 	}
-	acc, ok := boards[g.BoardID]
+	acc, ok := groups[g.ID]
 	if !ok {
 		return g, acc, errNotFound
 	}

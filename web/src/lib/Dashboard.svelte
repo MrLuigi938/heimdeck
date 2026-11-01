@@ -121,6 +121,32 @@
       toast(e.message, 'bad');
     }
   }
+  // Single groups someone wants to share, one request per person.
+  let groupAsks = $derived.by(() => {
+    const by = new Map();
+    for (const g of data?.groupRequests || []) {
+      if (!by.has(g.ownerId)) by.set(g.ownerId, { ownerId: g.ownerId, owner: g.owner, actions: false, groups: [] });
+      const a = by.get(g.ownerId);
+      a.groups.push(g);
+      a.actions ||= g.actions;
+    }
+    return [...by.values()];
+  });
+  async function answerGroups(ask, yes) {
+    try {
+      for (const g of ask.groups) {
+        if (yes) await post(`/groups/${g.groupId}/accept`);
+        else await del(`/groups/${g.groupId}/shares/${g.userId}`);
+      }
+      await load();
+      if (yes) {
+        toast(t('Die Gruppen von {name} sind jetzt in deiner Dashboard-Liste.', { name: ask.owner }));
+        switchBoard(-ask.ownerId);
+      }
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
   // The groups to jump to from the search: the ones shown, hidden ones only while they are shown.
   let jumpTargets = $derived(
     boardGroups.filter((g) => g.visibility !== 'hidden' || showHidden).map((g) => ({ id: g.id, name: g.name, count: g.tiles.length })),
@@ -630,6 +656,19 @@
       </div>
     {/each}
 
+    {#each groupAsks as ask (ask.ownerId)}
+      <div class="share-ask card">
+        <span class="share-icon" aria-hidden="true">👥</span>
+        <span><b>{ask.groups.length === 1
+            ? t('{name} möchte die Gruppe „{group}“ mit dir teilen.', { name: ask.owner, group: ask.groups[0].groupName })
+            : t('{name} möchte {n} Gruppen mit dir teilen: {groups}.', { name: ask.owner, n: ask.groups.length, groups: ask.groups.map((g) => g.groupName).join(', ') })}</b>
+          <span class="muted">{ask.actions ? t('Du könntest sie ansehen und ihre Knöpfe benutzen.') : t('Du könntest sie ansehen, aber nichts verändern.')}</span></span>
+        <span class="spacer"></span>
+        <button class="small" onclick={() => answerGroups(ask, false)}>{t('Ablehnen')}</button>
+        <button class="small primary" onclick={() => answerGroups(ask, true)}>{t('Annehmen')}</button>
+      </div>
+    {/each}
+
     {#if readOnly}
       <div class="shared-note on-bg" title={t('Geteilte Dashboards kann nur ihr Besitzer ändern.')}>
         👁 {t('Geteilt von {name}', { name: board.owner })} · {board.canAct ? t('ansehen und Knöpfe benutzen') : t('nur ansehen')}
@@ -769,7 +808,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} {photoTiles} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>

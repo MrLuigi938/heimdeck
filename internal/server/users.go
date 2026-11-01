@@ -339,7 +339,17 @@ func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	writeJSON(w, map[string]any{"incoming": in, "outgoing": out})
+	groupsIn, err := s.store.GroupSharesFor(uid(r))
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	groupsOut, err := s.store.GroupSharesBy(uid(r))
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, map[string]any{"incoming": in, "outgoing": out, "groupsIncoming": groupsIn, "groupsOutgoing": groupsOut})
 }
 
 func shareTarget(r *http.Request) (int64, error) {
@@ -440,4 +450,83 @@ func (s *Server) forgetUser(user int64) {
 			s.forget(id)
 		}
 	}
+}
+
+// ---- sharing single groups ----
+
+// handleShareGroups offers several groups of the user's dashboards to one
+// person at once, or changes whether they may use the buttons.
+func (s *Server) handleShareGroups(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Groups  []int64 `json:"groups"`
+		User    int64   `json:"user"`
+		Actions bool    `json:"actions"`
+	}
+	if err := readJSON(r, &body); err != nil || len(body.Groups) == 0 || len(body.Groups) > 200 {
+		writeErr(w, 400, errors.New("Bitte mindestens eine Gruppe wählen"))
+		return
+	}
+	u, err := s.store.User(body.User)
+	if err != nil || u.Disabled || u.ID == uid(r) {
+		writeErr(w, 400, errors.New("unbekannter Benutzer"))
+		return
+	}
+	// All or nothing: every group must be the user's own.
+	names := []string{}
+	for _, id := range body.Groups {
+		g, code, err := s.ownGroup(r, id)
+		if err != nil {
+			writeErr(w, code, err)
+			return
+		}
+		names = append(names, g.Name)
+	}
+	for _, id := range body.Groups {
+		if err := s.store.OfferGroupShare(id, u.ID, body.Actions); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+	}
+	slog.Info("Gruppen freigegeben", "gruppen", strings.Join(names, ", "), "für", u.Username, "knöpfe", body.Actions, "von", s.username(r))
+	writeJSON(w, map[string]any{"ok": true, "groups": len(body.Groups)})
+}
+
+// handleUnshareGroup ends a group share: the owner takes it back, or the
+// other user declines or leaves it.
+func (s *Server) handleUnshareGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	target, err := shareTarget(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	sh, err := s.store.GroupShare(id, target)
+	if err != nil || (sh.OwnerID != uid(r) && target != uid(r)) {
+		writeErr(w, 404, errNotFound)
+		return
+	}
+	if err := s.store.DeleteGroupShare(id, target); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	slog.Info("Gruppenfreigabe beendet", "gruppe", sh.GroupName, "für", sh.Username, "von", s.username(r))
+	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleAcceptGroupShare(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if err := s.store.AcceptGroupShare(id, uid(r)); err != nil {
+		writeErr(w, 404, errNotFound)
+		return
+	}
+	slog.Info("Gruppenfreigabe angenommen", "gruppe", id, "von", s.username(r))
+	writeJSON(w, map[string]bool{"ok": true})
 }

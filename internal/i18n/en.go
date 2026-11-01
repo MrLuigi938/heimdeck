@@ -911,7 +911,9 @@ var en = map[string]string{
 	"Nur Bilder als PNG, JPEG, WebP oder GIF (Icons auch SVG)": "Only pictures as PNG, JPEG, WebP or GIF (icons also SVG)",
 	"Das Bild ist zu groß": "The picture is too large",
 	"Speicherplatz für eigene Bilder ist voll – alte Bilder löschen": "The space for your own pictures is full – delete old ones",
-	"unbekannte Art von Bild":       "unknown kind of picture",
-	"Dieser Dienst hat keine Alben": "This service has no albums",
-	"%d Bilder":                     "%d pictures",
+	"unbekannte Art von Bild":             "unknown kind of picture",
+	"Dieser Dienst hat keine Alben":       "This service has no albums",
+	"%d Bilder":                           "%d pictures",
+	"Geteilte Gruppen":                    "Shared groups",
+	"Bitte mindestens eine Gruppe wählen": "Please choose at least one group",
 }

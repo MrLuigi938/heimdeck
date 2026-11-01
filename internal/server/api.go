@@ -250,6 +250,37 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	for _, b := range boards {
 		visible[b.ID] = true
 	}
+	// Single groups shared with the user: each owner's groups appear as one
+	// dashboard of their own ("Shared by …"), unless the whole dashboard is shared anyway.
+	groupShares, err := s.store.GroupSharesFor(me)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	groupRequests := []store.GroupShare{}
+	sharedGroup := map[int64]int64{} // group -> its shared-groups dashboard
+	for _, sh := range groupShares {
+		if !sh.Accepted {
+			groupRequests = append(groupRequests, sh)
+			continue
+		}
+		if visible[sh.BoardID] {
+			continue
+		}
+		vb := sharedGroupsBoard(sh.OwnerID)
+		sharedGroup[sh.GroupID] = vb
+		if !visible[vb] {
+			visible[vb] = true
+			boards = append(boards, boardDTO{Board: store.Board{ID: vb, OwnerID: sh.OwnerID, Name: tr(r, "Geteilte Gruppen"), Icon: "👥"}, Shared: true, Owner: sh.Owner})
+		}
+		if sh.Actions {
+			for i := range boards {
+				if boards[i].ID == vb {
+					boards[i].CanAct = true
+				}
+			}
+		}
+	}
 	groups, err := s.store.Groups()
 	if err != nil {
 		writeErr(w, 500, err)
@@ -272,7 +303,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	hasProxmox := false
 	byGroup := map[int64][]tileDTO{}
 	for _, t := range tiles {
-		if !visible[boardOf[t.GroupID]] {
+		if !visible[boardOf[t.GroupID]] && sharedGroup[t.GroupID] == 0 {
 			continue
 		}
 		hasProxmox = hasProxmox || t.Integration == "proxmox"
@@ -286,7 +317,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []groupDTO{}
 	for _, g := range groups {
-		if !visible[g.BoardID] {
+		if vb := sharedGroup[g.ID]; vb != 0 {
+			g.BoardID = vb
+		} else if !visible[g.BoardID] {
 			continue
 		}
 		ts := byGroup[g.ID]
@@ -300,6 +333,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"boards":        boards,
 		"groups":        out,
 		"shareRequests": requests,
+		"groupRequests": groupRequests,
 		"integrations":  s.integrationsFor(admin, langOf(r)),
 		"docker":        admin && s.docker != nil,
 		"proxmox":       admin && hasProxmox,
@@ -1015,7 +1049,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	boards, err := s.boardsFor(uid(r))
+	groups, err := s.groupsFor(uid(r))
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -1025,11 +1059,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	// Only search the dashboard that is currently open.
+	// Only search the dashboard that is currently open (a negative ID is the
+	// groups one owner shared with the user).
 	if board, _ := strconv.ParseInt(r.URL.Query().Get("board"), 10, 64); board != 0 {
+		owners, _ := s.store.TileOwners()
 		filtered := tiles[:0]
 		for _, t := range tiles {
-			if gb[t.GroupID] == board {
+			if gb[t.GroupID] == board || board < 0 && sharedGroupsBoard(owners[t.ID]) == board {
 				filtered = append(filtered, t)
 			}
 		}
@@ -1059,7 +1095,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
 			}
-			if !boards[gb[t.GroupID]].Act {
+			if !groups[t.GroupID].Act {
 				items = stripItemActions(items)
 			}
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}

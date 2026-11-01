@@ -93,6 +93,7 @@ func (s *Store) DeleteUser(id int64) error {
 	}
 	for _, q := range []string{
 		`DELETE FROM shares WHERE user_id = ?`,
+		`DELETE FROM group_shares WHERE user_id = ?`,
 		`DELETE FROM uploads WHERE owner_id = ?`,
 		`DELETE FROM sessions WHERE user_id = ?`,
 		`DELETE FROM user_settings WHERE user_id = ?`,

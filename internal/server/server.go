@@ -139,6 +139,9 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/boards/{id}/shares/{user}", s.handleShareBoard)
 	api.HandleFunc("DELETE /api/boards/{id}/shares/{user}", s.handleUnshareBoard)
 	api.HandleFunc("POST /api/boards/{id}/accept", s.handleAcceptShare)
+	api.HandleFunc("PUT /api/groups/shares", s.handleShareGroups)
+	api.HandleFunc("DELETE /api/groups/{id}/shares/{user}", s.handleUnshareGroup)
+	api.HandleFunc("POST /api/groups/{id}/accept", s.handleAcceptGroupShare)
 	mux.Handle("/api/", s.auth.Require(api))
 
 	mux.Handle("/", s.spa())

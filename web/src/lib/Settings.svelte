@@ -19,7 +19,7 @@
   import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, photoTiles = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
   // svelte-ignore state_referenced_locally
   const admin = role === 'admin';
 
@@ -561,7 +561,7 @@
           <input bind:value={newBoard.name} placeholder={t('z. B. Arbeit')} required />
           <div class="board-actions"><button class="small primary">+ {t('Dashboard anlegen')}</button></div>
         </form>
-        <Shares boards={boardRows} {onSaved} {onSwitchBoard} {onClose} />
+        <Shares boards={boardRows} {groups} {onSaved} {onSwitchBoard} {onClose} />
       </section>
 
       {#if admin}

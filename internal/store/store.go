@@ -175,7 +175,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema + uploadSchema); err != nil {
+	if _, err := db.Exec(schema + uploadSchema + groupShareSchema); err != nil {
 		return nil, err
 	}
 	// Columns added after the first release; "duplicate column" errors mean they already exist.
@@ -495,6 +495,7 @@ func (s *Store) DeleteBoard(id int64) error {
 	for _, q := range []string{
 		`DELETE FROM status_log WHERE tile_id IN (SELECT t.id FROM tiles t JOIN groups g ON t.group_id = g.id WHERE g.board_id = ?)`,
 		`DELETE FROM tiles WHERE group_id IN (SELECT id FROM groups WHERE board_id = ?)`,
+		`DELETE FROM group_shares WHERE group_id IN (SELECT id FROM groups WHERE board_id = ?)`,
 		`DELETE FROM groups WHERE board_id = ?`,
 		`DELETE FROM shares WHERE board_id = ?`,
 		`DELETE FROM boards WHERE id = ?`,
@@ -516,6 +517,9 @@ func (s *Store) DeleteGroup(id int64) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM tiles WHERE group_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM group_shares WHERE group_id = ?`, id); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM groups WHERE id = ?`, id); err != nil {
