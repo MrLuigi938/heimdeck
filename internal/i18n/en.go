@@ -925,4 +925,8 @@ var en = map[string]string{
 	"Die KI ist nicht eingerichtet":                                                                               "The AI is not set up",
 	"Frage fehlt":                                                                                                 "Question missing",
 	"Die KI ist gerade nicht erreichbar":                                                                          "The AI cannot be reached right now",
+	"Das Gespräch ist zu lang – bitte einen neuen Chat beginnen":                                                  "The conversation is too long – please start a new chat",
+	"Die Datei ist zu groß":                                                                                       "The file is too large",
+	"ungültige Datei":                                                                                             "invalid file",
+	"Diese Datei kann Heimdeck nicht lesen – Text, Markdown, CSV, JSON und Word (.docx) gehen":                    "Heimdeck cannot read this file – text, Markdown, CSV, JSON and Word (.docx) work",
 }

@@ -19,6 +19,7 @@
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
   import { applyTheme, activeSeason } from './themes.js';
   import { backgroundImages, pickBackground } from './backgrounds.js';
+  import AiChat from './AiChat.svelte';
   import SeasonFx from './SeasonFx.svelte';
 
   let data = $state(null);
@@ -364,6 +365,13 @@
   let dateText = $derived(now.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }));
   let timeText = $derived(now.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }));
 
+  // ---- AI chat ----
+  // Opened from the search (with the question and the hits shown) or empty.
+  let chat = $state(null);
+  function openChat(question = '', hits = []) {
+    if (data?.ai) chat = { start: question ? { question, hits } : null };
+  }
+
   // ---- keyboard shortcuts ----
   let searchBox;
   let showKeys = $state(false);
@@ -394,6 +402,7 @@
       network: () => hasExternal && toggleNetwork(),
       prevBoard: () => step(-1),
       nextBoard: () => step(1),
+      ai: () => data.ai && openChat(),
       help: () => (showKeys = true),
     })[action]?.();
   }
@@ -595,7 +604,7 @@
           </div>
         {/if}
       </div>
-      <Search bind:this={searchBox} ai={data.ai} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
+      <Search bind:this={searchBox} ai={data.ai} onAskAI={openChat} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
         shortcut={shortcutsOn ? keys.search : ''} />
       <div class="tools on-bg">
         {#if hasExternal}
@@ -807,7 +816,10 @@
   {#if editingGroup}
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
-  {#if showSettings}
+  {#if chat && data?.ai}
+  <AiChat ai={data.ai} start={chat.start} onClose={() => (chat = null)} />
+{/if}
+{#if showSettings}
     <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}

@@ -10,6 +10,7 @@ export const ACTIONS = [
   { id: 'network', label: 'Zuhause/unterwegs umschalten', key: 'n' },
   { id: 'prevBoard', label: 'Vorheriges Dashboard', key: '[' },
   { id: 'nextBoard', label: 'Nächstes Dashboard', key: ']' },
+  { id: 'ai', label: 'KI-Chat öffnen', key: 'k' },
   { id: 'help', label: 'Tastenkürzel anzeigen', key: '?' },
 ];
 

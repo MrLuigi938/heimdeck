@@ -132,7 +132,9 @@ func (c calendar) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			week++
 		}
 	}
-	w := &Widget{Stats: []Stat{{Label: in.T("Heute"), Value: in.Num(today)}, {Label: in.T("Nächste 7 Tage"), Value: in.Num(week)}}}
+	// Fit: in the free grid the tile shows the entries that fit completely
+	// (no scrollbar for half an entry, whatever the theme's spacing).
+	w := &Widget{Fit: true, Stats: []Stat{{Label: in.T("Heute"), Value: in.Num(today)}, {Label: in.T("Nächste 7 Tage"), Value: in.Num(week)}}}
 	for i, e := range events {
 		if i >= count {
 			break

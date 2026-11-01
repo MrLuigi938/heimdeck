@@ -16,7 +16,7 @@
   async function load() {
     try {
       const res = await get('/ai');
-      cfg = { url: '', model: '', label: '', ...res.config };
+      cfg = { url: '', model: '', label: '', searxUrl: '', ...res.config };
       keySet = res.keySet;
     } catch (e) {
       toast(e.message, 'bad');
@@ -85,6 +85,11 @@
     <label class="field">
       <span>{t('Name im Suchfenster')}</span>
       <input bind:value={cfg.label} placeholder={cfg.model || 'Ollama'} />
+    </label>
+    <label class="field">
+      <span>{t('Websuche über SearXNG (optional)')}</span>
+      <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" />
+      <span class="help">{t('Die KI selbst kann nicht ins Internet. Mit einer SearXNG-Adresse sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit. In SearXNG unter search → formats „json“ erlauben.')}</span>
     </label>
     <label class="check"><input type="checkbox" bind:checked={cfg.adminsOnly} /> {t('Nur Admins dürfen fragen')}</label>
     <span class="help">{t('Sinnvoll bei Cloud-Anbietern, die pro Anfrage kosten.')}</span>

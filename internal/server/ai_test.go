@@ -1,6 +1,9 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,5 +75,70 @@ func TestAskAI(t *testing.T) {
 	_, d2 := anna.call("GET", "/api/dashboard", nil)
 	if d2["ai"] != nil {
 		t.Fatal("ai offered to anna")
+	}
+}
+
+// The chat sends the whole conversation, pictures as image parts and – when
+// asked – web results from SearXNG; Word documents are turned into text.
+func TestAIChat(t *testing.T) {
+	var got map[string]any
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&got)
+		io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Okay.\"}}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer model.Close()
+	searx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("format") != "json" {
+			w.WriteHeader(403)
+			return
+		}
+		io.WriteString(w, `{"results":[{"title":"Jellyfin 10.11","url":"https://jellyfin.org/posts/10.11","content":"Release notes"}]}`)
+	}))
+	defer searx.Close()
+
+	_, base := multiUserServer(t)
+	luis := newTestClient(t, base)
+	luis.call("POST", "/api/setup", map[string]string{"username": "luis", "password": "admin-pw-123", "language": "de"})
+	luis.call("PUT", "/api/ai", map[string]any{"enabled": true, "url": model.URL + "/v1", "model": "llava", "searxUrl": searx.URL})
+	_, dash := luis.call("GET", "/api/dashboard", nil)
+	if dash["ai"].(map[string]any)["web"] != true {
+		t.Fatalf("web search not offered: %v", dash["ai"])
+	}
+	ask := func(body string) (string, http.Header) {
+		req, _ := http.NewRequest("POST", base+"/api/ai/chat", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := luis.c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return string(b), resp.Header
+	}
+	answer, hdr := ask(`{"web":true,"messages":[{"role":"user","text":"Hallo"},{"role":"assistant","text":"Hi!"},{"role":"user","text":"Was ist neu in Jellyfin?","images":["data:image/png;base64,AAAA"]}]}`)
+	if answer != "Okay." || hdr.Get("X-Web-Results") != "1" {
+		t.Fatalf("answer %q web %q", answer, hdr.Get("X-Web-Results"))
+	}
+	msgs := got["messages"].([]any)
+	sys := fmt.Sprint(msgs[0])
+	lastMsg := fmt.Sprint(msgs[len(msgs)-1])
+	if len(msgs) != 4 || !strings.Contains(sys, "https://jellyfin.org/posts/10.11") || !strings.Contains(lastMsg, "image_url") {
+		t.Fatalf("messages %v", msgs)
+	}
+	// Without the switch nothing goes to the web.
+	ask(`{"messages":[{"role":"user","text":"Was ist neu?"}]}`)
+	if strings.Contains(fmt.Sprint(got["messages"]), "jellyfin.org") {
+		t.Fatal("web results without asking")
+	}
+
+	// A minimal Word document.
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	f, _ := zw.Create("word/document.xml")
+	f.Write([]byte(`<w:document xmlns:w="w"><w:body><w:p><w:r><w:t>Hallo</w:t></w:r></w:p><w:p><w:r><w:t>Welt</w:t></w:r></w:p></w:body></w:document>`))
+	zw.Close()
+	_, out := luis.call("POST", "/api/ai/extract", map[string]string{"name": "brief.docx", "data": base64.StdEncoding.EncodeToString(buf.Bytes())})
+	if out["text"] != "Hallo\nWelt" {
+		t.Fatalf("docx: %v", out)
 	}
 }

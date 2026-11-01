@@ -138,7 +138,7 @@ func (w weather) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	}
 	c := data.Current
 	icon, text := weatherCode(in, c.Code, c.IsDay == 1)
-	out := &Widget{Stats: []Stat{
+	out := &Widget{Fit: true, Stats: []Stat{
 		{Label: in.T(text), Value: icon + " " + temp(c.Temp, deg)},
 		{Label: in.T("Gefühlt"), Value: temp(c.Feels, deg)},
 		{Label: in.T("Wind"), Value: fmt.Sprintf("%.0f %s", c.Wind, speed), Tone: toneIf(c.Gusts >= 60 && !imperial || c.Gusts >= 37 && imperial, "warn")},

@@ -33,6 +33,7 @@ type aiConfig struct {
 	APIKey     string `json:"apiKey,omitempty"`
 	Label      string `json:"label"`      // shown on the button, e.g. "Ollama"
 	AdminsOnly bool   `json:"adminsOnly"` // only admins may ask (cloud costs)
+	SearxURL   string `json:"searxUrl"`   // optional SearXNG for web results (the model itself never browses)
 	Insecure   bool   `json:"insecure"`
 }
 
@@ -57,7 +58,7 @@ func (s *Server) aiFor(u store.User) map[string]any {
 	if label == "" {
 		label = c.Model
 	}
-	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL)}
+	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.SearxURL != ""}
 }
 
 // aiIsCloud guesses whether the hits leave the house (for a hint in the window).
@@ -121,6 +122,11 @@ func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
 		c.APIKey = old.APIKey
 	}
 	c.URL, c.Model, c.Label = strings.TrimSpace(c.URL), strings.TrimSpace(c.Model), strings.TrimSpace(c.Label)
+	c.SearxURL = strings.TrimSpace(c.SearxURL)
+	if p, err := url.Parse(c.SearxURL); c.SearxURL != "" && (err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "") {
+		writeErr(w, 400, errors.New("KI: bitte eine vollständige Adresse mit http:// oder https:// angeben"))
+		return
+	}
 	if c.URL != "" {
 		if p, err := url.Parse(c.URL); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
 			writeErr(w, 400, errors.New("KI: bitte eine vollständige Adresse mit http:// oder https:// angeben"))
@@ -253,11 +259,16 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		user += strings.Join(ctxLines, "\n")
 	}
 
+	s.streamChat(w, r, c, u, []any{map[string]string{"role": "system", "content": system}, map[string]string{"role": "user", "content": user}}, len(ctxLines))
+}
+
+// streamChat sends the messages to the model and passes its answer on as
+// plain text, piece by piece.
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, c aiConfig, u store.User, messages []any, hits int) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
 	resp, err := c.request(ctx, "POST", "/chat/completions", map[string]any{
-		"model": c.Model, "stream": true, "temperature": 0.3,
-		"messages": []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": user}},
+		"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages,
 	})
 	if err != nil {
 		slog.Warn("KI nicht erreichbar", "fehler", err)
@@ -305,5 +316,5 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 			rc.Flush()
 		}
 	}
-	slog.Debug("KI-Antwort", "modell", c.Model, "treffer", len(ctxLines), "zeichen", n, "dauer", time.Since(start).Round(time.Millisecond), "benutzer", u.Username)
+	slog.Debug("KI-Antwort", "modell", c.Model, "treffer", hits, "zeichen", n, "dauer", time.Since(start).Round(time.Millisecond), "benutzer", u.Username)
 }

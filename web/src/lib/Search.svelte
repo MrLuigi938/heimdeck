@@ -15,7 +15,7 @@
   // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
   // history: remember recent searches in this browser (setting "searchHistory").
   // sections: the groups of the open dashboard ({id, name, count}); a hit jumps there with onJump.
-  let { ai = null, tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  let { ai = null, onAskAI = null, tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
 
   // The search window opens right under the field when the field is in view
   // (anchored, you type in the field itself), otherwise in the middle of the
@@ -243,7 +243,11 @@
     placeholder={(hasSearchServices ? t('Suchen in Diensten, Filmen, Serien, Dokumenten …') : t('Dienste suchen oder im Web suchen …')) + (shortcut ? `  ( ${shortcut} )` : '')}
     aria-label={t('Suche')}
     autocomplete="off"
+    class:with-ai={ai && onAskAI}
   />
+  {#if ai && onAskAI}
+    <button class="ask-ai" class:shift={q && (view !== 'window' || anchored)} onclick={() => onAskAI(q.trim(), [])} title={t('KI-Chat öffnen')} aria-label={t('KI-Chat öffnen')}>✨</button>
+  {/if}
   {#if q && (view !== 'window' || anchored)}
     <button class="clear" onclick={() => reset({ focus: true })} aria-label={t('Suche leeren')} title={t('Suche leeren')}>
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -347,11 +351,15 @@
 </div>
 
 {#if windowOpen}
-  <SearchWindow bind:this={win} bind:q {ai} {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
+  <SearchWindow bind:this={win} bind:q {ai} onAskAI={(question, hits) => { reset(); onAskAI?.(question, hits); }} {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
     {onInput} {makeAction} {webSearch} {openUrl} onJump={jump} onForget={forget} onClose={() => reset()} />
 {/if}
 
 <style>
+  .ask-ai { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; padding: 0; justify-content: center; border: 0; background: transparent; font-size: 16px; opacity: .8; }
+  .ask-ai:hover { opacity: 1; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .ask-ai.shift { right: 40px; }
+  input.with-ai { padding-right: 76px; }
   .search { position: relative; width: 100%; max-width: 620px; }
   .glass { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
   input { padding: 12px 44px 12px 40px; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); }
