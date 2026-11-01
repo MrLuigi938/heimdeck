@@ -782,4 +782,12 @@ export const en = {
   '„{name}“ enthält keinen Text (gescannt?) – die ersten Seiten gehen als Bilder mit; das versteht nur ein Modell, das sehen kann.': '“{name}” contains no text (scanned?) – the first pages go along as pictures; only a model that can see understands them.',
   '„{name}“: diese Art von Datei geht noch nicht – Text, Markdown, CSV, JSON, PDF, Word und Bilder gehen.': '“{name}”: this kind of file doesn\'t work yet – text, Markdown, CSV, JSON, PDF, Word and pictures do.',
   'Dateien per 📎, Ziehen oder Einfügen. Text, Markdown, CSV, JSON, PDF, Word (.docx) und Bilder.': 'Files via 📎, dragging or pasting. Text, Markdown, CSV, JSON, PDF, Word (.docx) and pictures.',
+  'Chat löschen': 'Delete chat',
+  'Noch keine Chats.': 'No chats yet.',
+  'Chats bleiben in diesem Browser gespeichert.': 'Chats are kept in this browser.',
+  'Frühere Chats': 'Earlier chats',
+  'KI-Chat am Computer': 'AI chat on the computer',
+  'Großes Fenster mit Chat-Liste': 'Large window with the list of chats',
+  'Seitenleiste rechts – das Dashboard bleibt daneben bedienbar': 'Sidebar on the right – the dashboard stays usable next to it',
+  'Auf dem Handy öffnet sich der Chat immer als ganzer Bildschirm.': 'On phones the chat always opens full screen.',
 };

@@ -20,7 +20,7 @@
   import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, ai = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
   // svelte-ignore state_referenced_locally
   const admin = role === 'admin';
 
@@ -578,6 +578,16 @@
 
       <section hidden={current !== 'search'} bind:this={sectionEls.search}>
         <h3>{t('Suche')}</h3>
+        {#if ai}
+          <label class="field">
+            <span>✨ {t('KI-Chat am Computer')}</span>
+            <select value={s.aiChatLayout || 'window'} onchange={(e) => { s.aiChatLayout = e.currentTarget.value; saveSetting({ aiChatLayout: s.aiChatLayout }); }}>
+              <option value="window">{t('Großes Fenster mit Chat-Liste')}</option>
+              <option value="side">{t('Seitenleiste rechts – das Dashboard bleibt daneben bedienbar')}</option>
+            </select>
+            <span class="help">{t('Auf dem Handy öffnet sich der Chat immer als ganzer Bildschirm.')}</span>
+          </label>
+        {/if}
         <label class="field">
           <span>{t('Darstellung der Ergebnisse')}</span>
           <select value={s.searchView || 'window'} onchange={(e) => saveSetting({ searchView: e.target.value })}>

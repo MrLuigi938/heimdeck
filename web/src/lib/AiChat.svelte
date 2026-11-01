@@ -1,8 +1,10 @@
 <script>
-  // The AI chat window: write back and forth with the AI the admin set up,
-  // add files (text, Word, pictures) for it to work with, switch web results
-  // on, and save or copy what it writes. Small on the desktop, full screen on
-  // phones. The conversation stays while the tab is open.
+  // The AI chat: write back and forth with the AI the admin set up, add files
+  // (text, PDF, Word, pictures) for it to work with, switch web results on,
+  // and save or copy what it writes. On the desktop either a large window
+  // with the earlier chats on the left (layout "window", the default) or a
+  // sidebar the dashboard moves aside for ("side"); full screen on phones.
+  // Chats are kept in this browser, per account.
   import { post } from './api.js';
   import { t, i18n } from './i18n.svelte.js';
   import { toast } from './toast.svelte.js';
@@ -10,10 +12,16 @@
 
   // ai: {label, local, web}; start: a first question (from the search) with
   // the hits that were shown, sent right away.
-  let { ai, start = null, onClose } = $props();
+  let { ai, start = null, layout = 'window', userId = 0, onClose } = $props();
 
-  const KEY = 'heimdeck-ai-chat';
-  let messages = $state(load());
+  // svelte-ignore state_referenced_locally
+  const KEY = `heimdeck-ai-chats-${userId}`;
+  const MAX_CHATS = 30;
+  let chats = $state(loadChats()); // [{id, title, at, messages}], newest first
+  let currentId = $state('');
+  let current = $derived(chats.find((c) => c.id === currentId));
+  let messages = $derived(current?.messages || []);
+  let history = $state(false); // sidebar layout: the list of chats as a menu
   let text = $state('');
   let files = $state([]); // {name, kind: 'text'|'image', text?, data?}
   let busy = $state(false);
@@ -24,21 +32,56 @@
   let picker;
   let abort;
 
-  function load() {
+  function loadChats() {
     try {
-      return JSON.parse(sessionStorage.getItem(KEY) || '[]');
+      const list = JSON.parse(localStorage.getItem(KEY) || '[]');
+      return Array.isArray(list) ? list : [];
     } catch {
       return [];
     }
   }
   function keep() {
+    if (current) {
+      current.at = Date.now();
+      current.title = (current.messages.find((m) => m.role === 'user')?.shown || current.messages[0]?.files?.[0] || t('Neuer Chat')).slice(0, 60);
+    }
+    chats.sort((a, b) => b.at - a.at);
+    if (chats.length > MAX_CHATS) chats.length = MAX_CHATS;
     try {
       // Pictures are not kept – they would fill the storage.
-      sessionStorage.setItem(KEY, JSON.stringify(messages.map((m) => ({ ...m, images: [] }))));
+      localStorage.setItem(KEY, JSON.stringify(chats.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m, images: [] })) }))));
     } catch {
-      /* private mode */
+      /* private mode or full */
     }
   }
+  function openChat(id) {
+    stop();
+    currentId = id;
+    history = false;
+    hits = [];
+    scroll();
+    input?.focus();
+  }
+  function removeChat(id) {
+    const i = chats.findIndex((c) => c.id === id);
+    if (i >= 0) chats.splice(i, 1);
+    if (currentId === id) currentId = '';
+    keep();
+  }
+  const when = (at) => {
+    const d = new Date(at);
+    return d.toDateString() === new Date().toDateString()
+      ? d.toLocaleTimeString(i18n.lang === 'de' ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString(i18n.lang === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: 'short' });
+  };
+
+  // The sidebar leaves the dashboard usable next to it.
+  let narrow = $state(matchMedia('(max-width: 640px)').matches);
+  $effect(() => {
+    const docked = layout === 'side' && !narrow;
+    document.body.classList.toggle('chat-docked', docked);
+    return () => document.body.classList.remove('chat-docked');
+  });
 
   const scroll = () => queueMicrotask(() => list?.scrollTo({ top: list.scrollHeight }));
 
@@ -150,6 +193,10 @@
     const q = text.trim();
     if ((!q && !files.length) || busy) return;
     // Files go into the message as text; pictures as pictures (for models that can see).
+    if (!current) {
+      chats.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), title: '', at: Date.now(), messages: [] });
+      currentId = chats[0].id;
+    }
     let body = q;
     for (const f of files.filter((f) => f.kind === 'text')) body += `\n\n---\n${t('Datei')} „${f.name}“:\n\`\`\`\n${f.text}\n\`\`\``;
     messages.push({
@@ -198,9 +245,9 @@
   }
   function reset() {
     stop();
-    messages = [];
+    currentId = '';
+    history = false;
     hits = [];
-    keep();
     input?.focus();
   }
 
@@ -236,10 +283,29 @@
   }
 </script>
 
-<svelte:window onkeydown={onWindowKey} />
+<svelte:window onkeydown={onWindowKey} onresize={() => (narrow = matchMedia('(max-width: 640px)').matches)} />
 
-<div class="chat-backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onClose()}>
-  <div class="chat card" role="dialog" aria-modal="true" aria-label={t('KI-Chat')} ondragover={(e) => e.preventDefault()} ondrop={onDrop}>
+{#snippet chatList()}
+  {#each chats as c (c.id)}
+    <div class="chat-item" class:on={c.id === currentId}>
+      <button class="ghost pick" onclick={() => openChat(c.id)} title={c.title}><span class="ct">{c.title || t('Neuer Chat')}</span><span class="muted cw">{when(c.at)}</span></button>
+      <button class="ghost del" onclick={() => removeChat(c.id)} aria-label={t('Chat löschen')} title={t('Chat löschen')}>✕</button>
+    </div>
+  {:else}
+    <p class="muted small none">{t('Noch keine Chats.')}</p>
+  {/each}
+{/snippet}
+
+<div class="chat-backdrop {layout}" class:narrow role="presentation" onclick={(e) => e.target === e.currentTarget && layout !== 'side' && onClose()}>
+  <div class="chat card {layout}" class:narrow role="dialog" aria-modal={layout !== 'side'} aria-label={t('KI-Chat')} ondragover={(e) => e.preventDefault()} ondrop={onDrop}>
+    {#if layout === 'window' && !narrow}
+      <aside class="chats">
+        <button class="small primary new" onclick={reset}>＋ {t('Neuer Chat')}</button>
+        <div class="chat-list">{@render chatList()}</div>
+        <p class="muted tiny keep-note">{t('Chats bleiben in diesem Browser gespeichert.')}</p>
+      </aside>
+    {/if}
+    <div class="main">
     <header>
       <span class="title">✨ {ai.label}</span>
       <span class="muted where">{ai.local ? t('läuft bei dir') : t('Cloud-Anbieter')}</span>
@@ -247,7 +313,13 @@
       {#if ai.web}
         <button class="small toggle" class:on={web} aria-pressed={web} onclick={() => (web = !web)} title={t('Die KI bekommt Ergebnisse aus der Websuche dazu')}>🌐 {t('Web')}</button>
       {/if}
-      <button class="small" onclick={reset} disabled={!messages.length}>＋ {t('Neuer Chat')}</button>
+      {#if layout !== 'window' || narrow}
+        <div class="hist">
+          <button class="small" class:on={history} onclick={() => (history = !history)} aria-expanded={history} title={t('Frühere Chats')}>🕘</button>
+          {#if history}<div class="hist-menu card">{@render chatList()}</div>{/if}
+        </div>
+        <button class="small" onclick={reset} disabled={!messages.length}>＋ {t('Neuer Chat')}</button>
+      {/if}
       <button class="ghost small close" onclick={onClose} aria-label={t('Schließen')}>✕</button>
     </header>
 
@@ -319,12 +391,34 @@
       </div>
       <p class="muted tiny">{t('Enter sendet, Shift+Enter neue Zeile.')} {hits.length ? t('{n} Suchtreffer gehen als Kontext mit.', { n: hits.length }) : ''}</p>
     </footer>
+    </div>
   </div>
 </div>
 
 <style>
-  .chat-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; justify-content: flex-end; padding: 18px; }
-  .chat { width: min(560px, 100%); height: min(720px, calc(100vh - 36px)); display: flex; flex-direction: column; background: var(--surface-solid); padding: 0; overflow: hidden; }
+  /* Large window (default): centred, earlier chats on the left. */
+  .chat-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, .5); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .chat { width: min(1060px, 100%); height: min(780px, calc(100vh - 48px)); display: flex; background: var(--surface-solid); padding: 0; overflow: hidden; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .chats { width: 240px; flex: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; padding: 10px; background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+  .chats .new { justify-content: center; }
+  .chat-list { flex: 1; overflow-y: auto; display: grid; gap: 2px; align-content: start; }
+  .keep-note { text-align: center; }
+  .chat-item { display: flex; align-items: center; border-radius: var(--r-sm); }
+  .chat-item:hover, .chat-item.on { background: var(--surface-2); }
+  .chat-item.on { box-shadow: inset 3px 0 0 var(--accent); }
+  .pick { flex: 1; min-width: 0; display: grid; text-align: left; padding: 6px 8px; border: 0; background: none; }
+  .ct { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+  .cw { font-size: 11.5px; }
+  .del { opacity: 0; padding: 0 6px; font-size: 11px; }
+  .chat-item:hover .del, .chat-item.on .del { opacity: .7; }
+  .none { padding: 8px; }
+  .hist { position: relative; }
+  .hist-menu { position: absolute; right: 0; top: calc(100% + 6px); width: 280px; max-height: 60vh; overflow-y: auto; z-index: 5; padding: 6px; display: grid; gap: 2px; background: var(--surface-solid); }
+  /* Sidebar: full height on the right, no dark backdrop – the dashboard moves aside and stays usable. */
+  .chat-backdrop.side:not(.narrow) { background: none; padding: 0; pointer-events: none; justify-content: flex-end; align-items: stretch; }
+  .chat.side:not(.narrow) { pointer-events: auto; width: 440px; height: 100vh; border-radius: 0; border-top: 0; border-bottom: 0; border-right: 0; }
+  :global(body.chat-docked) { padding-right: 440px; }
   header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
   .title { font-weight: 600; }
   .where { font-size: 12px; }
@@ -361,6 +455,7 @@
   @media (max-width: 640px) {
     .chat-backdrop { padding: 0; }
     .chat { width: 100%; height: 100%; height: 100dvh; border-radius: 0; }
+    .hist-menu { width: min(300px, calc(100vw - 24px)); }
     .msg { max-width: 100%; }
   }
 </style>

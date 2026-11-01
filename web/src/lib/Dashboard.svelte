@@ -817,10 +817,10 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if chat && data?.ai}
-  <AiChat ai={data.ai} start={chat.start} onClose={() => (chat = null)} />
+  <AiChat ai={data.ai} start={chat.start} layout={settings.aiChatLayout === 'side' ? 'side' : 'window'} userId={data.userId} onClose={() => (chat = null)} />
 {/if}
 {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} ai={data.ai} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
@@ -839,7 +839,8 @@
   /* Its own layer above the seasonal effects, which run behind the tiles. */
   .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; position: relative; z-index: 1; }
   /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
-  .top { display: grid; grid-template-columns: 1fr minmax(0, 620px) 1fr; gap: 16px; align-items: center; position: relative; z-index: 30; }
+  /* Title and icons keep their width, the search gives way (also next to the AI sidebar). */
+  .top { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(240px, 620px) minmax(max-content, 1fr); gap: 16px; align-items: center; position: relative; z-index: 30; }
   /* The brand block (with the dashboard menu) sits above the icons and search next to it. */
   .brand { min-width: 0; position: relative; z-index: 2; }
   h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; }
