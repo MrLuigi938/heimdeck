@@ -907,4 +907,11 @@ var en = map[string]string{
 	"Diese Anmeldung ist schon mit einem anderen Konto verknüpft":                                 "This login is already linked to another account",
 	"Beschäftigt": "Busy",
 	"Kalender „%s“ zeigt nur, wann du beschäftigt bist – der Link ist ohne Details freigegeben. Für Titel und Orte den Kalender beim Anbieter mit allen Details freigeben (oft „volle Ansicht“ oder „alle Details“).": "Calendar “%s” only shows when you are busy – the link is shared without details. To see titles and places, share the calendar with all details at your provider (often called “full view” or “all details”).",
+	// uploads and photo album backgrounds
+	"Nur Bilder als PNG, JPEG, WebP oder GIF (Icons auch SVG)": "Only pictures as PNG, JPEG, WebP or GIF (icons also SVG)",
+	"Das Bild ist zu groß": "The picture is too large",
+	"Speicherplatz für eigene Bilder ist voll – alte Bilder löschen": "The space for your own pictures is full – delete old ones",
+	"unbekannte Art von Bild":       "unknown kind of picture",
+	"Dieser Dienst hat keine Alben": "This service has no albums",
+	"%d Bilder":                     "%d pictures",
 }

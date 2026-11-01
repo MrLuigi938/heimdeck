@@ -175,7 +175,7 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec(schema + uploadSchema); err != nil {
 		return nil, err
 	}
 	// Columns added after the first release; "duplicate column" errors mean they already exist.

@@ -5,6 +5,12 @@
   import { detectLocal } from './network.svelte.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
+  import BackgroundPicker from './BackgroundPicker.svelte';
+  import { parseBackgrounds, ROTATE_CHOICES } from './backgrounds.js';
+
+  // "Every 5 minutes" and so on, for the background rotation.
+  const rotateLabel = (sec) =>
+    !sec ? t('bei jedem Öffnen') : sec < 3600 ? t('alle {n} Min.', { n: sec / 60 }) : sec === 3600 ? t('stündlich') : t('täglich');
   import { importFile } from './importFile.js';
   import { browserNotify, setBrowserNotify, notifySupported } from './browserNotify.svelte.js';
   import { ACTIONS, keymap, usableKey, keyLabel } from './shortcuts.js';
@@ -13,7 +19,7 @@
   import Shares from './Shares.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, photoTiles = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
   // svelte-ignore state_referenced_locally
   const admin = role === 'admin';
 
@@ -505,10 +511,18 @@
             <input type="color" value={s.accent || '#5b8cff'} onchange={(e) => saveSetting({ accent: e.target.value })} aria-label={t('Eigene Farbe')} />
           </div>
         </div>
-        <label class="field">
-          <span>{t('Hintergrundbild (URL, optional)')}</span>
-          <input bind:value={s.background} onchange={saveField('background')} placeholder="https://…/wallpaper.jpg" />
-        </label>
+        <div class="field">
+          <span>{t('Hintergrundbild (optional)')}</span>
+          <BackgroundPicker value={s.background} {photoTiles} onChange={(v) => { s.background = v; saveSetting({ background: v }); }} />
+          {#if parseBackgrounds(s.background).length > 1 || parseBackgrounds(s.background).some((e) => e.kind === 'album')}
+            <label class="inline">
+              {t('Bild wechseln')}
+              <select value={s.backgroundEvery || '0'} onchange={(e) => { s.backgroundEvery = e.currentTarget.value; saveSetting({ backgroundEvery: s.backgroundEvery }); }}>
+                {#each ROTATE_CHOICES as sec}<option value={String(sec)}>{rotateLabel(sec)}</option>{/each}
+              </select>
+            </label>
+          {/if}
+        </div>
         <label class="field">
           <span>{t('Kachelgröße')}</span>
           <select bind:value={s.tileLayout} onchange={() => saveSetting({ tileLayout: s.tileLayout })}>
@@ -528,7 +542,10 @@
           <div class="board-row">
             <input class="emoji" bind:value={b.icon} onchange={() => saveBoard(b)} maxlength="4" aria-label={t('Symbol')} />
             <input bind:value={b.name} onchange={() => saveBoard(b)} aria-label={t('Name')} />
-            <input class="board-bg" bind:value={b.background} onchange={() => saveBoard(b)} placeholder={t('Eigenes Hintergrundbild (URL, optional)')} aria-label={t('Hintergrundbild')} />
+            <details class="board-bg">
+              <summary>🖼 {parseBackgrounds(b.background).length ? t('Eigener Hintergrund ({n})', { n: parseBackgrounds(b.background).length }) : t('Eigener Hintergrund (optional)')}</summary>
+              <BackgroundPicker compact value={b.background} {photoTiles} onChange={(v) => { b.background = v; saveBoard(b); }} />
+            </details>
             <select class="board-theme" bind:value={b.theme} onchange={() => saveBoard(b)} aria-label={t('Theme')}>
               <option value="">{t('Allgemeines Theme')}</option>
               {#each THEMES.filter((th) => th.id !== 'auto') as th}<option value={th.id}>{t(th.name)}</option>{/each}
@@ -895,6 +912,9 @@
   .board-actions { display: flex; gap: 6px; justify-content: flex-end; }
   /* Background URL gets its own line under icon and name. */
   .board-bg { grid-column: 1 / -1; grid-row: 2; font-size: 13px; }
+  .board-bg > summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
+  .inline { display: flex; gap: 8px; align-items: center; font-size: 13.5px; white-space: nowrap; }
+  .inline select { width: auto; }
   .board-theme { grid-column: 1 / -1; grid-row: 3; font-size: 13px; }
   .board-row:not(form) { margin-bottom: 8px; }
   /* Theme cards: a tiny tile in the theme's colours. */

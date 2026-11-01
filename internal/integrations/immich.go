@@ -218,7 +218,7 @@ func (i immich) Search(ctx context.Context, in *Instance, query string) ([]Item,
 	return out, nil
 }
 
-var immichImageRe = regexp.MustCompile(`^/api/(assets|people)/[0-9a-f-]{36}/thumbnail(\?size=thumbnail)?$`)
+var immichImageRe = regexp.MustCompile(`^/api/(assets|people)/[0-9a-f-]{36}/thumbnail(\?size=(thumbnail|preview))?$`)
 
 func (immich) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
 	if !immichImageRe.MatchString(path) {

@@ -158,7 +158,7 @@ func (p photoprism) Search(ctx context.Context, in *Instance, query string) ([]I
 	return out, nil
 }
 
-var ppThumbRe = regexp.MustCompile(`^/api/v1/t/([0-9a-f]{40})/tile_224$`)
+var ppThumbRe = regexp.MustCompile(`^/api/v1/t/([0-9a-f]{40})/(tile_224|fit_1920)$`)
 
 // ImageRequest adds the preview token to a thumbnail path.
 func (p photoprism) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
@@ -177,6 +177,6 @@ func (p photoprism) ImageRequest(ctx context.Context, in *Instance, path string)
 	if !ppHashRe.MatchString(m[1]) || tok == "" || strings.ContainsAny(tok.(string), "/?#") {
 		return "", nil, in.Errorf("nicht gefunden")
 	}
-	return "/api/v1/t/" + m[1] + "/" + url.PathEscape(tok.(string)) + "/tile_224",
+	return "/api/v1/t/" + m[1] + "/" + url.PathEscape(tok.(string)) + "/" + m[2],
 		map[string]string{"Authorization": "Bearer " + in.V("token")}, nil
 }

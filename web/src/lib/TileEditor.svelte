@@ -11,6 +11,7 @@
   import Widget from './Widget.svelte';
   import { APPS, ANDROID_APPS, androidApp, packageOf, shortcutLink } from './apps.js';
   import { platform } from './network.svelte.js';
+  import { uploadImage } from './upload.js';
   import { t } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
 
@@ -37,6 +38,23 @@
 
   let def = $derived(integrations.find((d) => d.id === (form.integration || 'link')));
   let app = $derived(APPS[form.integration]);
+
+  // Own icon: uploaded, scaled down in the browser, then used by its address.
+  let iconFile = $state();
+  let iconUploading = $state(false);
+  async function uploadIcon(e) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    iconUploading = true;
+    try {
+      form.icon = (await uploadImage(file, 'icon')).url;
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      iconUploading = false;
+    }
+  }
 
   // Tries the Android app link right away on the phone: the page goes to the
   // background when the app opens; if not, Chrome comes back to this page
@@ -465,8 +483,12 @@
           <div class="grid2">
             <label class="field">
               <span>{t('Icon')}</span>
-              <div class="row"><Icon icon={form.icon} name={form.name} size={34} /><input bind:value={form.icon} placeholder={t('radarr, URL oder Emoji')} /></div>
-              <span class="help">{t('Name aus')} <a href="https://dashboardicons.com" target="_blank" rel="noopener noreferrer">dashboardicons.com</a>, {t('Bild-URL oder Emoji')}</span>
+              <div class="row">
+                <Icon icon={form.icon} name={form.name} size={34} /><input bind:value={form.icon} placeholder={t('radarr, URL oder Emoji')} />
+                <button type="button" class="small" title={t('Eigenes Bild hochladen')} aria-label={t('Eigenes Bild hochladen')} disabled={iconUploading} onclick={() => iconFile.click()}>{iconUploading ? '…' : '⬆'}</button>
+                <input type="file" accept="image/*" hidden bind:this={iconFile} onchange={uploadIcon} />
+              </div>
+              <span class="help">{t('Name aus')} <a href="https://dashboardicons.com" target="_blank" rel="noopener noreferrer">dashboardicons.com</a>, {t('Bild-URL oder Emoji')} – {t('oder mit ⬆ ein eigenes Bild hochladen.')}</span>
             </label>
             <label class="field"><span>{t('Beschreibung')}</span><input bind:value={form.description} placeholder={t('z. B. Filme')} /></label>
           </div>

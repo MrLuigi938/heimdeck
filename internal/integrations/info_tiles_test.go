@@ -124,3 +124,32 @@ func TestCalendarBusyOnly(t *testing.T) {
 		t.Fatalf("%+v", w.Items)
 	}
 }
+
+func TestAlbumBackgrounds(t *testing.T) {
+	f := newFake(t, map[string]any{
+		"GET /api/albums": []obj{{"id": "3f1c2b8e-0000-4000-8000-000000000001", "albumName": "Urlaub", "assetCount": 2}},
+		"GET /api/albums/3f1c2b8e-0000-4000-8000-000000000001": obj{"assets": []obj{
+			{"id": "aaaaaaaa-0000-4000-8000-000000000001", "type": "IMAGE"},
+			{"id": "aaaaaaaa-0000-4000-8000-000000000002", "type": "VIDEO"},
+		}},
+	}, nil)
+	in := f.instance(map[string]string{"apiKey": "k"})
+	albums, err := immich{}.Albums(context.Background(), in)
+	if err != nil || len(albums) != 1 || albums[0].Name != "Urlaub" {
+		t.Fatalf("%v %v", albums, err)
+	}
+	images, err := immich{}.AlbumImages(context.Background(), in, albums[0].ID)
+	if err != nil || len(images) != 1 || !strings.Contains(images[0], "size%3Dpreview") {
+		t.Fatalf("%v %v", images, err)
+	}
+	// The proxy accepts the bigger picture, nothing else.
+	if _, _, err := (immich{}).ImageRequest(context.Background(), in, "/api/assets/aaaaaaaa-0000-4000-8000-000000000001/thumbnail?size=preview"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := (immich{}).ImageRequest(context.Background(), in, "/api/assets/aaaaaaaa-0000-4000-8000-000000000001/original"); err == nil {
+		t.Fatal("original files must not pass the proxy")
+	}
+	if _, err := (immich{}).AlbumImages(context.Background(), in, "../../users"); err == nil {
+		t.Fatal("album id not checked")
+	}
+}

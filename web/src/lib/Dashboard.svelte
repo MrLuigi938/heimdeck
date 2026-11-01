@@ -18,6 +18,7 @@
   import Modal from './Modal.svelte';
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
   import { applyTheme, activeSeason } from './themes.js';
+  import { backgroundImages, pickBackground } from './backgrounds.js';
   import SeasonFx from './SeasonFx.svelte';
 
   let data = $state(null);
@@ -254,16 +255,51 @@
     apply();
     media.addEventListener('change', apply);
     document.title = settings.title || 'Heimdeck';
-    // A dashboard can have its own background; otherwise the global one is used.
-    const background = board?.background || settings.background;
-    if (background) {
-      document.body.style.setProperty('--bg-image', `url("${background.replace(/"/g, '%22').replace(/[\\\r\n]/g, '')}")`);
+    return () => media.removeEventListener('change', apply);
+  });
+
+  // Background: the dashboard's own or the global one – one picture, several
+  // or a photo album taking turns (setting backgroundEvery, in seconds).
+  const bgSeed = Math.floor(Math.random() * 1e6);
+  // The own Immich and PhotoPrism tiles, whose albums can be a background.
+  let photoTiles = $derived(
+    (data?.groups || []).filter((g) => !(data.boards || []).find((b) => b.id === g.boardId)?.shared)
+      .flatMap((g) => g.tiles).filter((tl) => tl.integration === 'immich' || tl.integration === 'photoprism'),
+  );
+  function showBackground(url) {
+    if (url) {
+      document.body.style.setProperty('--bg-image', `url("${url.replace(/"/g, '%22').replace(/[\\\r\n]/g, '')}")`);
       document.body.classList.add('has-bg');
     } else {
       document.body.style.removeProperty('--bg-image');
       document.body.classList.remove('has-bg');
     }
-    return () => media.removeEventListener('change', apply);
+  }
+  $effect(() => {
+    const value = board?.background || settings.background || '';
+    const every = Number(settings.backgroundEvery) || 0;
+    let stopped = false;
+    let timer;
+    backgroundImages(value).then((images) => {
+      if (stopped) return;
+      let current = pickBackground(images, every, bgSeed);
+      showBackground(current);
+      if (images.length < 2 || !every) return;
+      // Look for the next picture regularly; load it first, then swap, so the page never flashes empty.
+      timer = setInterval(() => {
+        const next = pickBackground(images, every, bgSeed);
+        if (next === current) return;
+        const img = new Image();
+        img.onload = () => {
+          if (!stopped) showBackground((current = next));
+        };
+        img.src = next;
+      }, Math.min(every, 60) * 1000);
+    });
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
   });
 
   // The festive season in effect; its moving effects can be turned off (setting seasonalFx).
@@ -733,7 +769,7 @@
     <GroupEditor group={editingGroup} {boards} onClose={() => (editingGroup = null)} onSaved={saved} />
   {/if}
   {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} {photoTiles} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
