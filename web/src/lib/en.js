@@ -778,4 +778,8 @@ export const en = {
   'KI-Chat öffnen': 'Open the AI chat',
   'Websuche über SearXNG (optional)': 'Web search through SearXNG (optional)',
   'Die KI selbst kann nicht ins Internet. Mit einer SearXNG-Adresse sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit. In SearXNG unter search → formats „json“ erlauben.': 'The AI itself cannot go online. With a SearXNG address Heimdeck searches when asked (🌐 in the chat) and gives it the results. In SearXNG allow “json” under search → formats.',
+  'Seite': 'Page',
+  '„{name}“ enthält keinen Text (gescannt?) – die ersten Seiten gehen als Bilder mit; das versteht nur ein Modell, das sehen kann.': '“{name}” contains no text (scanned?) – the first pages go along as pictures; only a model that can see understands them.',
+  '„{name}“: diese Art von Datei geht noch nicht – Text, Markdown, CSV, JSON, PDF, Word und Bilder gehen.': '“{name}”: this kind of file doesn\'t work yet – text, Markdown, CSV, JSON, PDF, Word and pictures do.',
+  'Dateien per 📎, Ziehen oder Einfügen. Text, Markdown, CSV, JSON, PDF, Word (.docx) und Bilder.': 'Files via 📎, dragging or pasting. Text, Markdown, CSV, JSON, PDF, Word (.docx) and pictures.',
 };

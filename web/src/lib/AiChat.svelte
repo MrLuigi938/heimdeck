@@ -71,11 +71,50 @@
       r.readAsDataURL(file);
     });
 
+  // PDFs are read by pdf.js (Mozilla's PDF reader), loaded only when needed.
+  // Scanned PDFs have no text: then the first pages go along as pictures.
+  async function readPdf(file) {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+    const task = pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false });
+    const doc = await task.promise;
+    let text = '';
+    for (let n = 1; n <= doc.numPages && text.length < MAX_TEXT; n++) {
+      const page = await doc.getPage(n);
+      const content = await page.getTextContent();
+      text += (n > 1 ? `\n\n— ${t('Seite')} ${n} —\n` : '') + content.items.map((it) => it.str + (it.hasEOL ? '\n' : '')).join('');
+    }
+    const images = [];
+    if (text.replace(/\s|—|\d/g, '').length < 20 * Math.min(doc.numPages, 5)) {
+      for (let n = 1; n <= Math.min(doc.numPages, 4); n++) {
+        const page = await doc.getPage(n);
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: Math.min(2, 1568 / Math.max(base.width, base.height)) });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        await page.render({ canvas, canvasContext: canvas.getContext('2d'), viewport }).promise;
+        images.push(canvas.toDataURL('image/jpeg', 0.85));
+      }
+      text = '';
+    }
+    const pages = doc.numPages;
+    task.destroy();
+    return { text: text.slice(0, MAX_TEXT), images, pages };
+  }
+
   async function addFiles(list) {
     for (const f of list) {
       try {
         if (f.type.startsWith('image/')) {
           files.push({ name: f.name, kind: 'image', data: await readImage(f) });
+        } else if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+          const pdf = await readPdf(f);
+          if (pdf.text) files.push({ name: f.name, kind: 'text', text: pdf.text });
+          else if (pdf.images.length) {
+            toast(t('„{name}“ enthält keinen Text (gescannt?) – die ersten Seiten gehen als Bilder mit; das versteht nur ein Modell, das sehen kann.', { name: f.name }));
+            pdf.images.forEach((data, i) => files.push({ name: `${f.name} (${t('Seite')} ${i + 1})`, kind: 'image', data }));
+          }
         } else if (/\.docx$/i.test(f.name)) {
           const { text } = await post('/ai/extract', { name: f.name, data: await toBase64(f) });
           files.push({ name: f.name, kind: 'text', text: text.slice(0, MAX_TEXT) });
@@ -84,7 +123,7 @@
           if (content.length > MAX_TEXT) toast(t('„{name}“ ist sehr lang – nur der Anfang geht mit.', { name: f.name }));
           files.push({ name: f.name, kind: 'text', text: content.slice(0, MAX_TEXT) });
         } else {
-          toast(t('„{name}“: diese Art von Datei geht noch nicht – Text, Markdown, CSV, JSON, Word und Bilder gehen.', { name: f.name }), 'bad');
+          toast(t('„{name}“: diese Art von Datei geht noch nicht – Text, Markdown, CSV, JSON, PDF, Word und Bilder gehen.', { name: f.name }), 'bad');
         }
       } catch (err) {
         toast(`${f.name}: ${err.message}`, 'bad');
@@ -217,7 +256,7 @@
         <div class="empty">
           <p class="big">✨</p>
           <p>{t('Frag etwas – oder gib der KI eine Datei, die sie zusammenfassen, übersetzen oder umschreiben soll.')}</p>
-          <p class="muted small">{t('Dateien per 📎, Ziehen oder Einfügen. Text, Markdown, CSV, JSON, Word (.docx) und Bilder.')}{ai.web ? ' ' + t('🌐 holt Ergebnisse aus dem Web dazu.') : ''}</p>
+          <p class="muted small">{t('Dateien per 📎, Ziehen oder Einfügen. Text, Markdown, CSV, JSON, PDF, Word (.docx) und Bilder.')}{ai.web ? ' ' + t('🌐 holt Ergebnisse aus dem Web dazu.') : ''}</p>
         </div>
       {/if}
       {#each messages as m, i (i)}
