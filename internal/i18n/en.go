@@ -916,4 +916,8 @@ var en = map[string]string{
 	"%d Bilder":                           "%d pictures",
 	"Geteilte Gruppen":                    "Shared groups",
 	"Bitte mindestens eine Gruppe wählen": "Please choose at least one group",
+	"„automatisch“: im freien Raster so viele, wie in die Kachel passen – größer ziehen zeigt mehr.": "“automatically”: in the free grid as many as fit into the tile – make it bigger to see more.",
+	"In der Bibliothek": "In the library",
+	"Sortierung":        "Order",
+	"Reihenfolge der VMs und Container. „Status“: laufende zuerst, „Auslastung“: die am meisten arbeiten zuerst.": "Order of the VMs and containers. “Status”: running ones first, “Load”: the busiest first.",
 }

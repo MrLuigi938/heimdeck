@@ -153,3 +153,22 @@ func TestAlbumBackgrounds(t *testing.T) {
 		t.Fatal("album id not checked")
 	}
 }
+
+// With an empty queue the Tubesy tile shows what finished last.
+func TestTubesyRecentDownloads(t *testing.T) {
+	f := newFake(t, map[string]any{
+		"GET /api/v1/stats": obj{"downloads": obj{"completed": 42}},
+		"GET /api/v1/queue": []obj{},
+		"GET /api/downloads": obj{"total": 42, "items": []obj{
+			{"id": 7, "title": "Homelab-Tour", "uploader": "Techno Tim", "finished_at": time.Now().Add(-2 * time.Hour).UTC().Format("2006-01-02T15:04:05.000000"), "file_size": 734003200},
+		}},
+	}, nil)
+	w, err := tubesy{}.Fetch(context.Background(), f.instance(map[string]string{"apiKey": "k"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats(w)["In der Bibliothek"] != "42" || w.ItemsTitle != "Zuletzt fertig" || len(w.Items) != 1 ||
+		!strings.Contains(w.Items[0].Subtitle, "Techno Tim") || w.Items[0].Badge == "" || !strings.HasSuffix(w.Items[0].URL, "/api/downloads/7/file?inline=1") {
+		t.Fatalf("%v %+v", w.Stats, w.Items)
+	}
+}

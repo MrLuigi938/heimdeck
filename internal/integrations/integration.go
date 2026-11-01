@@ -161,6 +161,9 @@ type Widget struct {
 	Actions    []Action `json:"actions,omitempty"`
 	// Thumbs shows the items as a grid of their pictures (snapshots, photos).
 	Thumbs bool `json:"thumbs,omitempty"`
+	// Fit: the list may be longer than shown – in the free grid the tile shows
+	// as many entries as fit into its size.
+	Fit bool `json:"fit,omitempty"`
 }
 
 type Integration interface {

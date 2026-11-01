@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Tubesy (github.com/mrluigi938/tubesy) is a multi-user yt-dlp web UI.
@@ -163,6 +164,42 @@ func (t tubesy) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		it.Actions = []Action{{ID: "cancel", Label: in.T("Abbrechen"), Tone: "danger",
 			Params: map[string]string{"id": strconv.Itoa(d.ID)}, Confirm: in.T("Download „%s“ abbrechen?", d.Title)}}
 		w.Items = append(w.Items, it)
+	}
+
+	// The library: how much is there, and with an empty queue what finished last.
+	q := url.Values{"view": {"library"}, "limit": {"5"}}
+	if st.Instance != nil {
+		q.Set("scope", "all")
+	}
+	var lib struct {
+		Total int              `json:"total"`
+		Items []tubesyDownload `json:"items"`
+	}
+	if t.call(ctx, in, "GET", "/api/downloads", q, nil, &lib) == nil {
+		w.Stats = append(w.Stats, Stat{Label: in.T("In der Bibliothek"), Value: in.Num(lib.Total)})
+		if len(w.Items) == 0 && len(lib.Items) > 0 {
+			w.ItemsTitle = in.T("Zuletzt fertig")
+			for _, d := range lib.Items {
+				parts := []string{}
+				if st.Instance != nil && d.Username != "" {
+					parts = append(parts, "@"+d.Username)
+				}
+				if d.Uploader != "" {
+					parts = append(parts, d.Uploader)
+				}
+				if at, err := time.Parse(time.RFC3339, d.FinishedAt); err == nil {
+					parts = append(parts, in.Since(at))
+				} else if at, err := time.Parse("2006-01-02T15:04:05.999999", d.FinishedAt); err == nil {
+					parts = append(parts, in.Since(at))
+				}
+				it := Item{Title: d.Title, Subtitle: strings.Join(parts, " · "), Image: d.Thumbnail,
+					URL: in.Link(fmt.Sprintf("/api/downloads/%d/file?inline=1", d.ID))}
+				if d.FileSize != nil {
+					it.Badge = in.Bytes(*d.FileSize)
+				}
+				w.Items = append(w.Items, it)
+			}
+		}
 	}
 	return w, nil
 }

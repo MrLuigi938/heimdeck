@@ -27,7 +27,7 @@ func TestProxmox(t *testing.T) {
 	}, func(r *http.Request) bool {
 		return r.Header.Get("Authorization") == "PVEAPIToken=root@pam!heimdeck=abc-123"
 	})
-	in := f.instance(map[string]string{"token": "root@pam!heimdeck=abc-123"})
+	in := f.instance(map[string]string{"token": "root@pam!heimdeck=abc-123", "sort": "Auslastung"})
 	if err := (proxmox{}).Test(context.Background(), in); err != nil {
 		t.Fatal(err)
 	}
@@ -42,6 +42,11 @@ func TestProxmox(t *testing.T) {
 	// running guests first (busiest on top), then the stopped one; local-lvm is nearly full
 	if len(w.Items) != 3 || w.Items[0].Title != "jellyfin" || w.Items[2].Title != "adguard-home" || w.Items[2].Actions[0].Label != "Starten" || len(w.Alerts) != 1 {
 		t.Fatalf("items %+v alerts %v", w.Items, w.Alerts)
+	}
+	// The default order is by name.
+	byName := f.instance(map[string]string{"token": "root@pam!heimdeck=abc-123"})
+	if wn, _ := (proxmox{}).Fetch(context.Background(), byName); wn == nil || wn.Items[0].Title != "adguard-home" || wn.Items[1].Title != "haos16.0" || wn.Items[2].Title != "jellyfin" {
+		t.Fatalf("by name: %+v", wn)
 	}
 	if err := (proxmox{}).Action(context.Background(), in, "power", w.Items[2].Actions[0].Params); err != nil {
 		t.Fatal(err)

@@ -28,6 +28,42 @@
     }
   }
   const keyOf = (a) => a.id + JSON.stringify(a.params || {});
+
+  // A list that fills its tile (widget.fit, e.g. RSS with "automatic"): in
+  // the free grid only as many entries as fit into the tile's size are
+  // shown – a taller tile shows more, and nothing is cut in half.
+  function fitList(node, on) {
+    let ro;
+    // New data replaces the entries: fit again.
+    const mo = new MutationObserver(() => on && fit());
+    mo.observe(node, { childList: true });
+    const fit = () => {
+      const tile = node.closest('.cell > .tile');
+      const rows = [...node.querySelectorAll(':scope > .item')];
+      rows.forEach((r) => (r.style.display = ''));
+      if (!on || !tile) return;
+      for (let i = rows.length - 1; i > 0 && tile.scrollHeight > tile.clientHeight + 1; i--) rows[i].style.display = 'none';
+    };
+    const start = () => {
+      ro?.disconnect();
+      const tile = node.closest('.cell > .tile');
+      if (!on || !tile) return fit();
+      ro = new ResizeObserver(fit);
+      ro.observe(tile);
+      fit();
+    };
+    start();
+    return {
+      update(v) {
+        on = v;
+        start();
+      },
+      destroy: () => {
+        ro?.disconnect();
+        mo.disconnect();
+      },
+    };
+  }
 </script>
 
 {#if widget}
@@ -63,7 +99,7 @@
         </div>
       </div>
     {:else if items.length}
-      <div class="items">
+      <div class="items" use:fitList={!compact && !!widget.fit}>
         {#if widget.itemsTitle}<div class="items-title">{widget.itemsTitle}</div>{/if}
         {#each items.slice(0, items.length - hiddenItems) as it}
           <div class="item">

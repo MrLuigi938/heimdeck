@@ -34,7 +34,9 @@ func (proxmox) Def() Definition {
 			"Den Token als benutzer@pam!token-id=geheimnis eintragen, z. B. root@pam!heimdeck=1234abcd-…. Mit Privilegtrennung: dem Token selbst unter Rechenzentrum → Berechtigungen → Hinzufügen → API-Token-Berechtigung auf „/“ die Rolle PVEAuditor geben (für Start/Stopp zusätzlich PVEVMUser).",
 		},
 		Fields: []Field{{Key: "token", Label: "API-Token", Type: "password", Required: true, Secret: true,
-			Help: "Eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser."}},
+			Help: "Eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser."},
+			{Key: "sort", Label: "Sortierung", Type: "select", Options: []string{"Name", "VMID", "Status", "Auslastung"}, Display: true,
+				Help: "Reihenfolge der VMs und Container. „Status“: laufende zuerst, „Auslastung“: die am meisten arbeiten zuerst."}},
 		HasWidget: true, HasSearch: true, Port: 8006,
 	}
 }
@@ -237,15 +239,10 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			w.Items = append(w.Items, it)
 		}
 	} else {
-		// One node: all VMs and containers – the ones that work hardest first,
-		// then the stopped ones. The tile shows a few and folds the rest away.
+		// One node: all VMs and containers in the chosen order. The tile shows
+		// a few and folds the rest away.
 		w.ItemsTitle = in.T("VMs und Container")
-		sort.Slice(runningGuests, func(i, j int) bool {
-			a, b := runningGuests[i], runningGuests[j]
-			return a.CPU*a.MaxCPU+a.Mem/1e10 > b.CPU*b.MaxCPU+b.Mem/1e10
-		})
-		sort.Slice(stopped, func(i, j int) bool { return stopped[i].VMID < stopped[j].VMID })
-		all := append(runningGuests, stopped...)
+		all := sortGuests(append(runningGuests, stopped...), in.V("sort"))
 		for _, r := range all[:min(200, len(all))] {
 			w.Items = append(w.Items, p.guestItem(in, r))
 		}
@@ -445,4 +442,39 @@ func usableIP(s string) string {
 		return ""
 	}
 	return ip.String()
+}
+
+// sortGuests orders VMs and containers for the list: by name (default),
+// VMID, status (running first, then by name) or load (the busiest first,
+// stopped ones last by VMID).
+func sortGuests(g []pveResource, by string) []pveResource {
+	name := func(a, b pveResource) bool {
+		if na, nb := strings.ToLower(a.Name), strings.ToLower(b.Name); na != nb {
+			return na < nb
+		}
+		return a.VMID < b.VMID
+	}
+	load := func(r pveResource) float64 { return r.CPU*r.MaxCPU + r.Mem/1e10 }
+	sort.SliceStable(g, func(i, j int) bool {
+		a, b := g[i], g[j]
+		switch by {
+		case "VMID":
+			return a.VMID < b.VMID
+		case "Status":
+			if (a.Status == "running") != (b.Status == "running") {
+				return a.Status == "running"
+			}
+			return name(a, b)
+		case "Auslastung":
+			if (a.Status == "running") != (b.Status == "running") {
+				return a.Status == "running"
+			}
+			if a.Status == "running" {
+				return load(a) > load(b)
+			}
+			return a.VMID < b.VMID
+		}
+		return name(a, b)
+	})
+	return g
 }

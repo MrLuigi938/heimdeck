@@ -32,7 +32,8 @@ func (feed) Def() Definition {
 		Fields: []Field{
 			{Key: "feeds", Label: "Feeds", Type: "textarea", Required: true,
 				Help: "Eine Feed-Adresse pro Zeile, z. B. https://www.tagesschau.de/index~rss2.xml oder https://github.com/MrLuigi938/heimdeck/releases.atom. Mehrere Feeds werden nach Datum gemischt."},
-			{Key: "count", Label: "Einträge", Type: "select", Options: []string{"5", "10", "15", "20"}, Display: true},
+			{Key: "count", Label: "Einträge", Type: "select", Options: []string{"automatisch", "5", "10", "15", "20"}, Display: true,
+				Help: "„automatisch“: im freien Raster so viele, wie in die Kachel passen – größer ziehen zeigt mehr."},
 		},
 	}
 }
@@ -191,11 +192,12 @@ func (f feed) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		return nil, errors.Join(errs...)
 	}
 	sort.SliceStable(all, func(i, j int) bool { return all[i].At.After(all[j].At) })
-	count, _ := strconv.Atoi(in.V("count"))
-	if count <= 0 {
-		count = 5
-	}
 	w := &Widget{ItemsTitle: in.T("Neueste Einträge")}
+	count, err := strconv.Atoi(in.V("count"))
+	if err != nil || count <= 0 {
+		// automatic (also for tiles from before): enough entries for a tall tile, the tile shows what fits
+		count, w.Fit = 30, true
+	}
 	today := 0
 	for _, e := range all {
 		if !e.At.IsZero() && time.Since(e.At) < 24*time.Hour {

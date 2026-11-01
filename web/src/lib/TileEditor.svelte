@@ -428,7 +428,7 @@
                 <label class="field choice-field">
                   <span>{f.label}</span>
                   <select bind:value={form.config[f.key]}>
-                    {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
+                    {#each f.options || [] as o}<option value={o}>{t(o)}</option>{/each}
                   </select>
                   {#if f.help}<span class="help">{f.help}</span>{/if}
                 </label>

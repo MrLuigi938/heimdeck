@@ -728,4 +728,6 @@ export const en = {
   'Mit wem?': 'With whom?',
   '{n} Gruppen teilen': 'Share {n} groups',
   'Gruppen wählen': 'Choose groups',
+  'Auslastung': 'Load',
+  'VMID': 'VMID',
 };
