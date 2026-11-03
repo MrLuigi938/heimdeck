@@ -215,10 +215,62 @@
     }
   }
 
-  function fullscreen() {
-    const el = box;
-    (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  // Full screen, and back: the same button, plus ✕ in the corner – Esc alone
+  // is no way out on a phone. Where a page may not go full screen (iPhone),
+  // the picture fills the window instead.
+  let full = $state(false); // the browser's full screen
+  let maxed = $state(false); // filling the window instead
+  function onFullChange() {
+    full = (document.fullscreenElement || document.webkitFullscreenElement) === box;
   }
+  async function toggleFull() {
+    if (full) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+      return;
+    }
+    if (maxed) {
+      maxed = false;
+      return;
+    }
+    const enter = box.requestFullscreen || box.webkitRequestFullscreen;
+    try {
+      if (!enter) throw new Error('no full screen');
+      await enter.call(box);
+    } catch {
+      maxed = true;
+    }
+  }
+  // While filling the window the picture moves to <body>: tiles have a
+  // transform (and themes a backdrop filter), which would keep a fixed
+  // element inside the tile. A placeholder marks where it goes back to.
+  function portal(node, on) {
+    const mark = document.createComment('camera');
+    const apply = (v) => {
+      if (v && !mark.parentNode) {
+        node.before(mark);
+        document.body.appendChild(node);
+      } else if (!v && mark.parentNode) {
+        mark.replaceWith(node);
+      }
+    };
+    apply(on);
+    return { update: apply, destroy: () => mark.remove() };
+  }
+  function closeFull() {
+    if (full) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    maxed = false;
+  }
+  $effect(() => {
+    document.addEventListener('fullscreenchange', onFullChange);
+    document.addEventListener('webkitfullscreenchange', onFullChange);
+    const esc = (e) => e.key === 'Escape' && maxed && (maxed = false);
+    window.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullChange);
+      document.removeEventListener('webkitfullscreenchange', onFullChange);
+      window.removeEventListener('keydown', esc);
+    };
+  });
 
   // --- refreshing ---
   let timer = null;
@@ -284,7 +336,7 @@
 </script>
 
 <div class="cam" class:fill>
-  <div class="screen" bind:this={box}>
+  <div class="screen" class:maxed class:full={full || maxed} bind:this={box} use:portal={maxed}>
     <!-- svelte-ignore a11y_media_has_caption -->
     <video bind:this={video} muted playsinline class:on={live}></video>
     {#if !live}
@@ -322,8 +374,11 @@
           <button class="chip main play" onclick={startLive} title={t('Livebild')} aria-label={t('Livebild')}>▶</button>
         {/if}
       {/if}
-      <button class="chip" onclick={fullscreen} title={t('Vollbild')} aria-label={t('Vollbild')}>⛶</button>
+      <button class="chip main" onclick={toggleFull} title={full || maxed ? t('Vollbild beenden') : t('Vollbild')} aria-label={full || maxed ? t('Vollbild beenden') : t('Vollbild')}>{full || maxed ? '⤡' : '⛶'}</button>
     </div>
+    {#if full || maxed}
+      <button class="chip exit" onclick={closeFull} title={t('Vollbild beenden')} aria-label={t('Vollbild beenden')}>✕</button>
+    {/if}
   </div>
 
   {#if error}<div class="error">{error}</div>{/if}
@@ -354,6 +409,12 @@
   .cam.fill .events, .cam.fill .quiet, .cam.fill .error { flex: none; }
   @container cam (max-height: 230px) { .events, .quiet { display: none; } }
   .screen:fullscreen { border-radius: 0; aspect-ratio: auto; }
+  .screen.maxed { position: fixed; inset: 0; z-index: 150; border-radius: 0; aspect-ratio: auto; }
+  .chip.exit { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; font-size: 18px; z-index: 2; }
+  /* Full screen is never "small": the buttons always show. */
+  .screen.full .controls { opacity: 1 !important; padding: 24px 16px 16px; }
+  .screen.full .chip { width: 40px; height: 40px; font-size: 16px; }
+  .screen.full .chip.close { top: 12px; right: 64px; }
   .screen img, .screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
   .screen video { visibility: hidden; }
   .screen video.on { visibility: visible; }

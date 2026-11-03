@@ -6,6 +6,8 @@
   import { toast } from './toast.svelte.js';
   import { t } from './i18n.svelte.js';
 
+  let { onSaved = () => {} } = $props();
+
   let cfg = $state(null);
   let key = $state('');
   let keySet = $state(false);
@@ -44,7 +46,10 @@
     try {
       models = (await post('/ai/models', { ...$state.snapshot(cfg), apiKey: key })).models;
       toast(models.length ? t('Verbunden – {n} Modelle gefunden.', { n: models.length }) : t('Verbunden, aber keine Modelle gefunden.'));
-      if (!cfg.model && models.length) cfg.model = models[0];
+      if (!cfg.model && models.length) {
+        cfg.model = models[0];
+        scheduleSave();
+      }
     } catch (e) {
       toast(e.message, 'bad');
     } finally {
@@ -70,6 +75,14 @@
   };
   let needsKey = $derived(cfg?.webSearch === 'brave' || cfg?.webSearch === 'tavily');
   let keyStored = $derived(webKeySet && webSaved === cfg?.webSearch);
+  // A web search that still lacks something waits with saving (instead of
+  // an error the moment it is picked) and says what is missing.
+  let webMissing = $derived(
+    !cfg ? '' :
+    cfg.webSearch === 'searxng' && !cfg.searxUrl.trim() ? t('Wird gespeichert, sobald die SearXNG-Adresse eingetragen ist.') :
+    needsKey && !webKey && !keyStored ? t('Wird gespeichert, sobald der API-Schlüssel eingetragen ist.') :
+    cfg.webSearch === 'openrouter' && !/openrouter\.ai/i.test(cfg.url) ? t('Geht nur, wenn oben OpenRouter als Adresse eingetragen ist.') : ''
+  );
 
   // A real search with the chosen service, so the admin sees right away
   // whether it works (public SearXNG instances usually do not let Heimdeck in).
@@ -87,15 +100,33 @@
     }
   }
 
+  // Saved right away like every other setting: checkboxes and selects when
+  // they change, text fields when they are left (or Enter). Keys go along only
+  // when something was typed into their field.
+  let saveTimer;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 300);
+  }
   async function save(e) {
-    e.preventDefault();
+    e?.preventDefault?.();
+    clearTimeout(saveTimer);
+    if (webMissing) return;
+    if (saving) return scheduleSave();
     saving = true;
+    const sentKey = key, sentWebKey = webKey;
     try {
-      await put('/ai', { ...$state.snapshot(cfg), apiKey: key, webKey });
-      key = '';
-      webKey = '';
-      toast(t('Gespeichert'));
-      load();
+      await put('/ai', { ...$state.snapshot(cfg), apiKey: sentKey, webKey: sentWebKey });
+      if (sentKey) {
+        keySet = true;
+        if (key === sentKey) key = '';
+      }
+      if (sentWebKey) {
+        webKeySet = true;
+        webSaved = cfg.webSearch;
+        if (webKey === sentWebKey) webKey = '';
+      }
+      onSaved();
     } catch (err) {
       toast(err.message, 'bad');
     } finally {
@@ -105,12 +136,12 @@
 </script>
 
 {#if cfg}
-  <form class="ai" onsubmit={save}>
+  <form class="ai" onsubmit={save} onchange={scheduleSave}>
     <p class="help">{t('Mit einer KI lassen sich Fragen direkt im Suchfenster stellen – die Treffer aus deinen Diensten gehen als Kontext mit. Es geht jede Schnittstelle im OpenAI-Format: selbst gehostet (Ollama, LM Studio, LocalAI) oder per API (OpenAI, OpenRouter, Mistral …).')}</p>
     <label class="field">
       <span>{t('Adresse')}</span>
       <input bind:value={cfg.url} placeholder="http://ollama:11434/v1" spellcheck="false" />
-      <span class="help">{t('Beispiele:')} {#each EXAMPLES as [name, url], i}{i ? ', ' : ''}<button type="button" class="link" onclick={() => (cfg.url = url)}>{name}</button>{/each}. {t('Bei Ollama mit /v1 am Ende.')}</span>
+      <span class="help">{t('Beispiele:')} {#each EXAMPLES as [name, url], i}{i ? ', ' : ''}<button type="button" class="link" onclick={() => { cfg.url = url; scheduleSave(); }}>{name}</button>{/each}. {t('Bei Ollama mit /v1 am Ende.')}</span>
     </label>
     <div class="two">
       <label class="field">
@@ -130,23 +161,23 @@
       <span>{t('Name im Suchfenster')}</span>
       <input bind:value={cfg.label} placeholder={cfg.model || 'Ollama'} />
     </label>
-    <div class="field">
-      <label class="field">
-        <span>{t('Websuche über')}</span>
-        <select bind:value={cfg.webSearch} onchange={() => (searxResult = null)}>
+    <div class="field web">
+      <span>{t('Websuche über')}</span>
+      <!-- The Test button sits next to the choice for every service; address or key below. -->
+      <div class="row">
+        <select bind:value={cfg.webSearch} onchange={() => (searxResult = null)} aria-label={t('Websuche über')}>
           {#each WEB as [v, label]}<option value={v}>{t(label)}</option>{/each}
         </select>
-      </label>
-      {#if cfg.webSearch !== 'none'}
-        <div class="row">
-          {#if cfg.webSearch === 'searxng'}
-            <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" aria-label={t('SearXNG-Adresse')} oninput={() => (searxResult = null)} />
-          {:else if needsKey}
-            <input type="password" bind:value={webKey} placeholder={keyStored ? t('gespeichert – leer lassen zum Behalten') : t('API-Schlüssel')} aria-label={t('API-Schlüssel')} autocomplete="new-password" oninput={() => (searxResult = null)} />
-          {/if}
+        {#if cfg.webSearch !== 'none'}
           <button type="button" class="small" disabled={searxBusy || (cfg.webSearch === 'searxng' && !cfg.searxUrl) || (needsKey && !webKey && !keyStored)} onclick={testSearx}>{searxBusy ? t('Prüfe …') : t('Testen')}</button>
-        </div>
+        {/if}
+      </div>
+      {#if cfg.webSearch === 'searxng'}
+        <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" aria-label={t('SearXNG-Adresse')} oninput={() => (searxResult = null)} />
+      {:else if needsKey}
+        <input type="password" bind:value={webKey} placeholder={keyStored ? t('gespeichert – leer lassen zum Behalten') : t('API-Schlüssel')} aria-label={t('API-Schlüssel')} autocomplete="new-password" oninput={() => (searxResult = null)} />
       {/if}
+      {#if webMissing}<span class="help warn">{webMissing}</span>{/if}
       {#if searxResult}<span class="help" class:ok={searxResult.ok} class:bad={!searxResult.ok}>{searxResult.text}</span>{/if}
       <span class="help">{t(WEB_HELP[cfg.webSearch] || WEB_HELP.none)}</span>
     </div>
@@ -161,7 +192,6 @@
     <label class="check"><input type="checkbox" bind:checked={cfg.insecure} /> {t('Zertifikat nicht prüfen (selbstsigniert)')}</label>
     <p class="help">🔒 {t('Die KI sieht nur die Treffer, die die fragende Person ohnehin sieht. Knöpfe (Licht, Downloads …) führt sie nie aus. Bei Cloud-Anbietern verlassen die Treffer dein Zuhause – für maximale Privatsphäre ein lokales Modell nehmen.')}</p>
     <label class="check"><input type="checkbox" bind:checked={cfg.enabled} /> <b>{t('KI im Suchfenster einschalten')}</b></label>
-    <div class="row"><span class="spacer"></span><button class="primary small" disabled={saving}>{t('Speichern')}</button></div>
   </form>
 {/if}
 
@@ -170,9 +200,11 @@
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 600px) { .two { grid-template-columns: 1fr; } }
   .row { display: flex; gap: 8px; align-items: center; }
-  .row input { flex: 1; min-width: 0; }
+  .row input, .row select { flex: 1; min-width: 0; }
+  .web { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
   .spacer { flex: 1; }
   .help.ok { color: var(--ok); }
+  .help.warn { color: var(--warn); }
   .sub { margin-left: 26px; }
   .help.bad { color: var(--bad); }
   .link { border: 0; background: none; padding: 0; color: var(--accent); font-size: inherit; text-decoration: underline; cursor: pointer; }

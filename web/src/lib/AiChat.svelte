@@ -26,7 +26,15 @@
   let text = $state('');
   let files = $state([]); // {name, kind: 'text'|'image', text?, data?}
   let busy = $state(false);
-  let web = $state(false);
+  // 🌐 and 📋 stay as last chosen, in this browser.
+  let web = $state(readFlag('heimdeck-ai-web'));
+  function readFlag(key) {
+    try { return localStorage.getItem(key) === '1'; } catch { return false; }
+  }
+  function toggleWeb() {
+    web = !web;
+    try { localStorage.setItem('heimdeck-ai-web', web ? '1' : '0'); } catch { /* private window */ }
+  }
   // 📋: the AI gets what the tiles show. Remembered in this browser.
   let dash = $state(readDash());
   function readDash() {
@@ -379,7 +387,7 @@
         <button class="small toggle" class:on={dash} aria-pressed={dash} onclick={toggleDash} title={t('Die KI bekommt mit, was deine Kacheln gerade zeigen')}>📋 {t('Dashboard')}</button>
       {/if}
       {#if ai.web}
-        <button class="small toggle" class:on={web} aria-pressed={web} onclick={() => (web = !web)} title={t('Die KI bekommt Ergebnisse aus der Websuche dazu')}>🌐 {t('Web')}</button>
+        <button class="small toggle" class:on={web} aria-pressed={web} onclick={toggleWeb} title={t('Die KI bekommt Ergebnisse aus der Websuche dazu')}>🌐 {t('Web')}</button>
       {/if}
       {#if layout !== 'window' || narrow}
         <div class="hist">

@@ -847,4 +847,8 @@ export const en = {
   'ohne Werkzeuge': 'without tools',
   'Die KI fragt selbst nach (Werkzeuge)': 'The AI asks for what it needs (tools)',
   'Statt der ganzen Übersicht bekommt die KI Werkzeuge: Kacheln auflisten, eine Kachel lesen, in deinen Diensten suchen und Aktionen als Knopf vorschlagen – ausführen tut sie nie etwas, das macht nur ein Klick. Braucht ein Modell, das Werkzeuge (Function Calling) kann, z. B. die meisten bei OpenRouter oder Llama 3.1 / Qwen bei Ollama; sonst bekommt es automatisch die Übersicht.': 'Instead of the whole overview the AI gets tools: list the tiles, read a tile, search your services and propose actions as a button – it never runs anything itself, only a click does. Needs a model that can use tools (function calling), e.g. most on OpenRouter or Llama 3.1 / Qwen on Ollama; otherwise it gets the overview automatically.',
+  'Vollbild beenden': 'Exit full screen',
+  'Wird gespeichert, sobald die SearXNG-Adresse eingetragen ist.': 'Saved as soon as the SearXNG address is entered.',
+  'Wird gespeichert, sobald der API-Schlüssel eingetragen ist.': 'Saved as soon as the API key is entered.',
+  'Geht nur, wenn oben OpenRouter als Adresse eingetragen ist.': 'Only works when OpenRouter is entered as the address above.',
 };

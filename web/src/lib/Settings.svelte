@@ -572,7 +572,7 @@
         </section>
         <section hidden={current !== 'ai'} bind:this={sectionEls.ai}>
           <h3>{t('KI in der Suche')}</h3>
-          <AiSettings />
+          <AiSettings onSaved={flash} />
         </section>
       {/if}
 
