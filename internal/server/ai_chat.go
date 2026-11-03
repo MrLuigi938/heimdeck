@@ -99,9 +99,16 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := timeout(r, 12*time.Second)
 		results, err := webResults(ctx, c, clip(last.Text, 300))
 		cancel()
-		if err != nil {
+		switch {
+		case err != nil:
 			slog.Warn("Websuche für die KI", "fehler", err)
-		} else if len(results) > 0 {
+			// The chat shows why; the model must not claim it never has internet.
+			w.Header().Set("X-Web-Error", url.PathEscape(tr(r, err.Error())))
+			system += " The web search the user switched on failed this time (" + err.Error() + "). If the question needs current information, say briefly that the web search did not work – do not say that you never have internet access."
+		case len(results) == 0:
+			w.Header().Set("X-Web-Error", url.PathEscape(tr(r, "Die Websuche hat nichts gefunden")))
+			system += " The web search found nothing for this question."
+		default:
 			webUsed = len(results)
 			system += "\n\nWeb search results for the last question (cite them as [1], [2] … with the link when you use them):\n" + strings.Join(results, "\n")
 		}
@@ -148,11 +155,22 @@ func webResults(ctx context.Context, c aiConfig, q string) ([]string, error) {
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.client().Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("SearXNG ist nicht erreichbar – stimmt die Adresse?")
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	switch {
+	case resp.StatusCode == 429 || resp.StatusCode == 403:
+		// Public instances block automated requests (their "limiter").
+		return nil, errors.New("Diese SearXNG-Instanz lehnt automatische Anfragen ab – öffentliche Instanzen tun das fast immer. Eine eigene SearXNG nehmen (z. B. als Docker-Container)")
+	case resp.StatusCode != 200:
 		return nil, errors.New("SearXNG antwortet mit " + resp.Status + " – ist „json“ unter search.formats erlaubt?")
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.HasPrefix(bytes.TrimSpace(data), []byte("{")) {
+		return nil, errors.New("SearXNG liefert eine Webseite statt JSON (Bot-Schutz, oder „json“ ist nicht erlaubt) – bei einer eigenen SearXNG unter search.formats „json“ erlauben")
 	}
 	var res struct {
 		Results []struct {
@@ -161,7 +179,7 @@ func webResults(ctx context.Context, c aiConfig, q string) ([]string, error) {
 			Content string `json:"content"`
 		} `json:"results"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&res); err != nil {
+	if err := json.Unmarshal(data, &res); err != nil {
 		return nil, err
 	}
 	var out []string
@@ -172,6 +190,27 @@ func webResults(ctx context.Context, c aiConfig, q string) ([]string, error) {
 		out = append(out, "["+strconv.Itoa(i+1)+"] "+clip(x.Title, 150)+" — "+clip(x.URL, 300)+"\n    "+clip(x.Content, 400))
 	}
 	return out, nil
+}
+
+// handleSearxTest tries a SearXNG address from the AI settings (admins).
+func (s *Server) handleSearxTest(w http.ResponseWriter, r *http.Request) {
+	var c aiConfig
+	if err := readJSON(r, &c); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if p, err := url.Parse(strings.TrimSpace(c.SearxURL)); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
+		writeErr(w, 400, errors.New("SearXNG: bitte eine vollständige Adresse mit http:// oder https:// angeben"))
+		return
+	}
+	ctx, cancel := timeout(r, 12*time.Second)
+	defer cancel()
+	results, err := webResults(ctx, c, "Heimdeck dashboard")
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	writeJSON(w, map[string]int{"results": len(results)})
 }
 
 // handleExtract returns the text of a Word document (.docx) for the chat;

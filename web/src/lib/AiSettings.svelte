@@ -12,6 +12,8 @@
   let models = $state([]);
   let checking = $state(false);
   let saving = $state(false);
+  let searxBusy = $state(false);
+  let searxResult = $state(null);
 
   async function load() {
     try {
@@ -41,6 +43,20 @@
       toast(e.message, 'bad');
     } finally {
       checking = false;
+    }
+  }
+
+  // A real search through the SearXNG address, so the admin sees right away
+  // whether it lets Heimdeck in (public instances usually do not).
+  async function testSearx() {
+    searxBusy = true;
+    try {
+      const res = await post('/ai/searx', $state.snapshot(cfg));
+      searxResult = { ok: res.results > 0, text: res.results > 0 ? t('Funktioniert – {n} Ergebnisse gefunden.', { n: res.results }) : t('Erreichbar, aber keine Ergebnisse – sind in SearXNG Suchmaschinen eingeschaltet?') };
+    } catch (e) {
+      searxResult = { ok: false, text: e.message };
+    } finally {
+      searxBusy = false;
     }
   }
 
@@ -88,8 +104,12 @@
     </label>
     <label class="field">
       <span>{t('Websuche über SearXNG (optional)')}</span>
-      <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" />
-      <span class="help">{t('Die KI selbst kann nicht ins Internet. Mit einer SearXNG-Adresse sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit. In SearXNG unter search → formats „json“ erlauben.')}</span>
+      <div class="row">
+        <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" oninput={() => (searxResult = null)} />
+        <button type="button" class="small" disabled={searxBusy || !cfg.searxUrl} onclick={testSearx}>{searxBusy ? t('Prüfe …') : t('Testen')}</button>
+      </div>
+      {#if searxResult}<span class="help" class:ok={searxResult.ok} class:bad={!searxResult.ok}>{searxResult.text}</span>{/if}
+      <span class="help">{t('Die KI selbst kann nicht ins Internet. Mit einer SearXNG-Adresse sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit. In SearXNG unter search → formats „json“ erlauben.')} {t('Öffentliche SearXNG-Instanzen lassen das meist nicht zu – am besten eine eigene betreiben.')}</span>
     </label>
     <label class="check"><input type="checkbox" bind:checked={cfg.adminsOnly} /> {t('Nur Admins dürfen fragen')}</label>
     <span class="help">{t('Sinnvoll bei Cloud-Anbietern, die pro Anfrage kosten.')}</span>
@@ -107,5 +127,7 @@
   .row { display: flex; gap: 8px; align-items: center; }
   .row input { flex: 1; min-width: 0; }
   .spacer { flex: 1; }
+  .help.ok { color: var(--ok); }
+  .help.bad { color: var(--bad); }
   .link { border: 0; background: none; padding: 0; color: var(--accent); font-size: inherit; text-decoration: underline; cursor: pointer; }
 </style>

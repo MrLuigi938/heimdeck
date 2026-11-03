@@ -137,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/ai", s.adminOnly(s.handleGetAI))
 	api.HandleFunc("PUT /api/ai", s.adminOnly(s.handleSaveAI))
 	api.HandleFunc("POST /api/ai/models", s.adminOnly(s.handleAIModels))
+	api.HandleFunc("POST /api/ai/searx", s.adminOnly(s.handleSearxTest))
 	api.HandleFunc("POST /api/ai/ask", s.handleAsk)
 	api.HandleFunc("POST /api/ai/chat", s.handleChat)
 	api.HandleFunc("POST /api/ai/extract", s.handleExtract)

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -125,6 +126,33 @@ func TestAIChat(t *testing.T) {
 	if len(msgs) != 4 || !strings.Contains(sys, "https://jellyfin.org/posts/10.11") || !strings.Contains(lastMsg, "image_url") {
 		t.Fatalf("messages %v", msgs)
 	}
+	// A public instance that blocks Heimdeck: the chat says why, and the
+	// model is told the search failed (not that it has no internet).
+	blocked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+	}))
+	defer blocked.Close()
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "<!doctype html><title>Security check</title>")
+	}))
+	defer page.Close()
+	for _, c := range []struct{ url, want string }{{blocked.URL, "automatische Anfragen"}, {page.URL, "Webseite statt JSON"}} {
+		luis.call("PUT", "/api/ai", map[string]any{"enabled": true, "url": model.URL + "/v1", "model": "llava", "searxUrl": c.url})
+		_, hdr := ask(`{"web":true,"messages":[{"role":"user","text":"Suche online nach Heimdeck"}]}`)
+		reason, _ := url.PathUnescape(hdr.Get("X-Web-Error"))
+		if !strings.Contains(reason, c.want) || !strings.Contains(fmt.Sprint(got["messages"]), "web search the user switched on failed") {
+			t.Fatalf("%s: reason %q", c.url, reason)
+		}
+		status, res := luis.call("POST", "/api/ai/searx", map[string]any{"searxUrl": c.url})
+		if status != 502 || !strings.Contains(fmt.Sprint(res["error"]), c.want) {
+			t.Fatalf("test button: %d %v", status, res)
+		}
+	}
+	if status, res := luis.call("POST", "/api/ai/searx", map[string]any{"searxUrl": searx.URL}); status != 200 || res["results"] != float64(1) {
+		t.Fatalf("test button with a working SearXNG: %d %v", status, res)
+	}
+	luis.call("PUT", "/api/ai", map[string]any{"enabled": true, "url": model.URL + "/v1", "model": "llava", "searxUrl": searx.URL})
+
 	// Without the switch nothing goes to the web.
 	ask(`{"messages":[{"role":"user","text":"Was ist neu?"}]}`)
 	if strings.Contains(fmt.Sprint(got["messages"]), "jellyfin.org") {

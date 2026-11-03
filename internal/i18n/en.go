@@ -979,4 +979,9 @@ var en = map[string]string{
 	"Sabotage":         "Tampering",
 	"Bereich betreten": "Area entered",
 	"Um %s erkannt":    "Detected at %s",
+	"Diese SearXNG-Instanz lehnt automatische Anfragen ab – öffentliche Instanzen tun das fast immer. Eine eigene SearXNG nehmen (z. B. als Docker-Container)": "This SearXNG instance refuses automated requests – public instances almost always do. Use your own SearXNG (e.g. as a Docker container)",
+	"SearXNG liefert eine Webseite statt JSON (Bot-Schutz, oder „json“ ist nicht erlaubt) – bei einer eigenen SearXNG unter search.formats „json“ erlauben":    "SearXNG returns a web page instead of JSON (bot protection, or “json” is not allowed) – on your own SearXNG allow “json” under search.formats",
+	"SearXNG ist nicht erreichbar – stimmt die Adresse?":                         "SearXNG cannot be reached – is the address right?",
+	"Die Websuche hat nichts gefunden":                                           "The web search found nothing",
+	"SearXNG: bitte eine vollständige Adresse mit http:// oder https:// angeben": "SearXNG: please enter a complete address with http:// or https://",
 }

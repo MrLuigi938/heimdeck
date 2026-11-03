@@ -222,6 +222,8 @@
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || t('Fehler {code}', { code: res.status }));
       msg.web = Number(res.headers.get('X-Web-Results')) || 0;
+      const webErr = res.headers.get('X-Web-Error');
+      if (webErr) msg.webError = decodeURIComponent(webErr);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       for (;;) {
@@ -361,6 +363,7 @@
             {#if m.text && !(busy && i === messages.length - 1)}
               <div class="msg-actions">
                 {#if m.web}<span class="muted small">🌐 {t('{n} Web-Ergebnisse', { n: m.web })}</span>{/if}
+                {#if m.webError}<span class="web-error small">⚠ {t('Websuche:')} {m.webError}</span>{/if}
                 <span class="spacer"></span>
                 <button class="ghost small" onclick={() => copy(m.text)}>{t('Kopieren')}</button>
                 <button class="ghost small" onclick={() => save(m.text)}>⬇ {t('Speichern')}</button>
@@ -452,6 +455,7 @@
   .attach { font-size: 18px; width: 38px; height: 38px; padding: 0; justify-content: center; }
   .tiny { font-size: 11.5px; margin: 0; }
   .small { font-size: 12.5px; }
+  .web-error { color: var(--warn); line-height: 1.4; }
   @media (max-width: 640px) {
     .chat-backdrop { padding: 0; }
     .chat { width: 100%; height: 100%; height: 100dvh; border-radius: 0; }

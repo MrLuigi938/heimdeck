@@ -816,4 +816,8 @@ export const en = {
   'alle 5 Minuten': 'every 5 minutes',
   'alle 15 Minuten': 'every 15 minutes',
   'nur auf Klick': 'only on click',
+  'Websuche:': 'Web search:',
+  'Funktioniert – {n} Ergebnisse gefunden.': 'Works – found {n} results.',
+  'Erreichbar, aber keine Ergebnisse – sind in SearXNG Suchmaschinen eingeschaltet?': 'Reachable, but no results – are search engines turned on in SearXNG?',
+  'Öffentliche SearXNG-Instanzen lassen das meist nicht zu – am besten eine eigene betreiben.': 'Public SearXNG instances usually do not allow this – best run your own.',
 };
