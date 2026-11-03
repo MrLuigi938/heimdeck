@@ -372,6 +372,8 @@ func (e *HTTPError) Error() string {
 		return i18n.T(e.Lang, "Zugriff verweigert (%d) – API-Key bzw. Zugangsdaten prüfen", e.Status)
 	case 404:
 		return i18n.T(e.Lang, "Adresse nicht gefunden (404) – stimmt die URL bzw. der Dienst-Typ?")
+	case 429, 502, 503, 504:
+		return i18n.T(e.Lang, "Der Dienst ist gerade überlastet oder nicht erreichbar (%d) – Heimdeck versucht es gleich wieder", e.Status)
 	}
 	msg := i18n.T(e.Lang, "Dienst antwortet mit Status %d", e.Status)
 	if e.Body != "" {

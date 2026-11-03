@@ -1,20 +1,33 @@
 package integrations
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 )
 
 // remember keeps results of slow or rate-limited sources (weather, feeds,
 // calendars) for a while, so the dashboard's refresh every few seconds does
-// not reach them each time. Failures are not kept.
+// not reach them each time. When the source fails (e.g. Open-Meteo answering
+// "overloaded"), the last good result stays on the tile for up to a day, and
+// the source is asked again only after a short pause – also when there is no
+// earlier result, so a struggling service is not asked on every refresh.
 var remembered sync.Map
 
 type rememberedValue struct {
-	at  time.Time
+	at  time.Time // when to count the ttl (or the pause) from
+	got time.Time // when val was fetched
 	val any
+	err error // set while a failure is kept for the pause
 }
+
+const (
+	rememberRetry    = time.Minute    // pause after a failure
+	rememberKeepGood = 24 * time.Hour // how long an old result covers failures
+)
 
 // cacheKey adds whether the tile may reach the home network to a cache key.
 func (in *Instance) cacheKey(key string) string {
@@ -23,12 +36,31 @@ func (in *Instance) cacheKey(key string) string {
 
 func remember[T any](in *Instance, key string, ttl time.Duration, fetch func() (T, error)) (T, error) {
 	key = in.cacheKey(key)
-	if v, ok := remembered.Load(key); ok && time.Since(v.(rememberedValue).at) < ttl {
-		return v.(rememberedValue).val.(T), nil
+	var old *rememberedValue
+	if v, ok := remembered.Load(key); ok {
+		rv := v.(rememberedValue)
+		old = &rv
+		if rv.err != nil && time.Since(rv.at) < rememberRetry {
+			var zero T
+			return zero, rv.err
+		}
+		if rv.err == nil && time.Since(rv.at) < ttl {
+			return rv.val.(T), nil
+		}
 	}
 	val, err := fetch()
-	if err == nil {
-		remembered.Store(key, rememberedValue{time.Now(), val})
+	switch {
+	case errors.Is(err, context.Canceled):
+		// The page was closed – nothing to learn about the source.
+	case err == nil:
+		remembered.Store(key, rememberedValue{at: time.Now(), got: time.Now(), val: val})
+	case old != nil && old.val != nil && time.Since(old.got) < rememberKeepGood:
+		// Keep showing the last good result; ask again after the pause.
+		slog.Debug("Quelle fehlgeschlagen, zeige letzte Daten", "fehler", err)
+		remembered.Store(key, rememberedValue{at: time.Now().Add(rememberRetry - ttl), got: old.got, val: old.val})
+		return old.val.(T), nil
+	default:
+		remembered.Store(key, rememberedValue{at: time.Now(), err: err})
 	}
 	return val, err
 }
