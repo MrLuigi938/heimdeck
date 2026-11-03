@@ -44,6 +44,7 @@ func (s *Server) Monitor(ctx context.Context) {
 	case <-time.After(startDelay):
 	}
 	s.runChecks(ctx, nil)
+	s.syncCameraWatchers(ctx)
 	tick := time.NewTicker(checkInterval)
 	defer tick.Stop()
 	prune := time.NewTicker(time.Hour)
@@ -54,8 +55,10 @@ func (s *Server) Monitor(ctx context.Context) {
 			return
 		case <-tick.C:
 			s.runChecks(ctx, nil)
+			s.syncCameraWatchers(ctx)
 		case id := <-s.recheck:
 			s.runChecks(ctx, &id)
+			s.syncCameraWatchers(ctx)
 		case <-prune.C:
 			logErr("Statusverlauf aufräumen", s.store.PruneChecks(time.Now().Add(-historyKeep)))
 		}

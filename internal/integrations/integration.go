@@ -164,6 +164,8 @@ type Widget struct {
 	// Fit: the list may be longer than shown – in the free grid the tile shows
 	// as many entries as fit into its size.
 	Fit bool `json:"fit,omitempty"`
+	// Camera makes the tile a camera view (still picture, live stream, events).
+	Camera *CameraView `json:"camera,omitempty"`
 }
 
 type Integration interface {

@@ -349,7 +349,7 @@
             <textarea rows="3" bind:value={form.config[f.key]} autocomplete="off" spellcheck="false"></textarea>
           {:else if f.type === 'select'}
             <select bind:value={form.config[f.key]}>
-              {#each f.options || [] as o}<option value={o}>{o}</option>{/each}
+              {#each f.options || [] as o}<option value={o}>{t(o)}</option>{/each}
             </select>
           {:else if f.type === 'hook'}
             <div class="row">

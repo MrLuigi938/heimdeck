@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -60,3 +61,13 @@ func NewClientFor(insecure, external bool) *http.Client {
 
 // HomeNetworkBlocked reports whether an error came from the external check.
 func HomeNetworkBlocked(err error) bool { return errors.Is(err, ErrHomeNetwork) }
+
+// DialerFor returns how to open plain connections (e.g. RTSP to a camera):
+// for an external account only to public addresses.
+func DialerFor(external bool) func(ctx context.Context, network, address string) (net.Conn, error) {
+	d := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	if external {
+		d.Control = publicOnly
+	}
+	return d.DialContext
+}

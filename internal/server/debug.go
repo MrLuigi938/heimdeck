@@ -67,7 +67,7 @@ func logRequests(next http.Handler) http.Handler {
 			}
 			d := time.Since(start)
 			switch {
-			case d > slowRequest:
+			case d > slowRequest && !streaming(r.URL.Path):
 				slog.Warn("Langsame Anfrage", "methode", r.Method, "pfad", r.URL.Path, "status", sw.status, "dauer", d.Round(time.Millisecond))
 			case logging.Debug():
 				slog.Debug("Anfrage", "methode", r.Method, "pfad", r.URL.Path, "status", sw.status, "dauer", d.Round(time.Millisecond))
@@ -75,6 +75,11 @@ func logRequests(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(sw, r)
 	})
+}
+
+// streaming reports requests that run long on purpose (camera, AI answers).
+func streaming(path string) bool {
+	return strings.Contains(path, "/camera/") || strings.HasPrefix(path, "/api/ai/")
 }
 
 // Watch checks every few seconds that the database and the server's shared

@@ -165,6 +165,7 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 type notification struct {
 	Title, Body, URL string
 	Down             bool
+	Camera           bool // an event of a camera tile
 }
 
 func where(lang, kind string) string {
@@ -238,6 +239,9 @@ func sendTelegram(ctx context.Context, token, chat string, m notification) error
 	if m.Down {
 		icon = "🔴"
 	}
+	if m.Camera {
+		icon = "📹"
+	}
 	text := icon + " <b>" + html.EscapeString(m.Title) + "</b>\n" + html.EscapeString(m.Body)
 	if strings.HasPrefix(m.URL, "http") {
 		text += "\n" + html.EscapeString(m.URL)
@@ -298,6 +302,9 @@ func sendDiscord(ctx context.Context, webhook string, m notification) error {
 	if m.Down {
 		color, icon = 0xe5484d, "🔴"
 	}
+	if m.Camera {
+		color, icon = 0xf5a524, "📹"
+	}
 	embed := map[string]any{"title": icon + " " + m.Title, "description": m.Body, "color": color,
 		"footer": map[string]string{"text": "Heimdeck"}, "timestamp": time.Now().UTC().Format(time.RFC3339)}
 	if strings.HasPrefix(m.URL, "http") {
@@ -311,6 +318,9 @@ func sendNtfy(ctx context.Context, topicURL, token string, m notification) error
 	h := map[string]string{"Title": encodeHeader(m.Title), "Tags": "white_check_mark", "Priority": "default"}
 	if m.Down {
 		h["Tags"], h["Priority"] = "red_circle", "high"
+	}
+	if m.Camera {
+		h["Tags"], h["Priority"] = "video_camera", "high"
 	}
 	if strings.HasPrefix(m.URL, "http") {
 		h["Click"] = m.URL

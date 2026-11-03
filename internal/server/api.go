@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/auth"
+	"github.com/heimdeck/heimdeck/internal/camera"
 	"github.com/heimdeck/heimdeck/internal/docker"
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
@@ -674,6 +675,7 @@ func (s *Server) handleDeleteTile(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("Kachel gelöscht", "kachel", id)
 	s.forget(id)
+	camera.ForgetEvents(id)
 	writeJSON(w, map[string]bool{"ok": true})
 }
 

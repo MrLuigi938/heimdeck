@@ -22,6 +22,7 @@
   import { get, post, faviconUrl } from './api.js';
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
+  import Camera from './Camera.svelte';
   import Widget from './Widget.svelte';
   import { tileHref, rewrite, isAppLink } from './network.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
@@ -147,7 +148,11 @@
       {:else if !loaded}
         <div class="skeleton"></div>
       {:else}
-        <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} compact={!free} />
+        {#if widget?.camera}
+          <Camera tileId={tile.id} view={widget.camera} />
+        {:else}
+          <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} compact={!free} />
+        {/if}
       {/if}
     </div>
   {/if}
