@@ -34,7 +34,11 @@ type aiConfig struct {
 	Label      string `json:"label"`      // shown on the button, e.g. "Ollama"
 	AdminsOnly bool   `json:"adminsOnly"` // only admins may ask (cloud costs)
 	SearxURL   string `json:"searxUrl"`   // optional SearXNG for web results (the model itself never browses)
-	Insecure   bool   `json:"insecure"`
+	// WebSearch picks the web search: searxng | brave | tavily | openrouter
+	// (empty: SearXNG when an address is set, as before there was a choice).
+	WebSearch string `json:"webSearch"`
+	WebKey    string `json:"webKey,omitempty"` // API key for Brave or Tavily, never sent back
+	Insecure  bool   `json:"insecure"`
 }
 
 func (s *Server) aiConfig() aiConfig {
@@ -58,7 +62,7 @@ func (s *Server) aiFor(u store.User) map[string]any {
 	if label == "" {
 		label = c.Model
 	}
-	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.SearxURL != ""}
+	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider())}
 }
 
 // aiIsCloud guesses whether the hits leave the house (for a hint in the window).
@@ -106,9 +110,10 @@ func (c aiConfig) request(ctx context.Context, method, path string, body any) (*
 
 func (s *Server) handleGetAI(w http.ResponseWriter, r *http.Request) {
 	c := s.aiConfig()
-	keySet := c.APIKey != ""
-	c.APIKey = ""
-	writeJSON(w, map[string]any{"config": c, "keySet": keySet})
+	keySet, webKeySet := c.APIKey != "", c.WebKey != ""
+	c.APIKey, c.WebKey = "", ""
+	c.WebSearch = c.webProvider()
+	writeJSON(w, map[string]any{"config": c, "keySet": keySet, "webKeySet": webKeySet})
 }
 
 func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
@@ -122,9 +127,16 @@ func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
 		c.APIKey = old.APIKey
 	}
 	c.URL, c.Model, c.Label = strings.TrimSpace(c.URL), strings.TrimSpace(c.Model), strings.TrimSpace(c.Label)
-	c.SearxURL = strings.TrimSpace(c.SearxURL)
-	if p, err := url.Parse(c.SearxURL); c.SearxURL != "" && (err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "") {
-		writeErr(w, 400, errors.New("KI: bitte eine vollständige Adresse mit http:// oder https:// angeben"))
+	c.SearxURL, c.WebKey = strings.TrimSpace(c.SearxURL), strings.TrimSpace(c.WebKey)
+	if c.WebSearch == "none" {
+		c.WebSearch, c.SearxURL = "", ""
+	}
+	// An empty key field keeps the stored key – of the same service only.
+	if c.WebKey == "" && c.webProvider() == old.webProvider() {
+		c.WebKey = old.WebKey
+	}
+	if err := c.checkWeb(); err != nil {
+		writeErr(w, 400, errors.New(webErrText(r, err)))
 		return
 	}
 	if c.URL != "" {
@@ -259,17 +271,21 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 		user += strings.Join(ctxLines, "\n")
 	}
 
-	s.streamChat(w, r, c, u, []any{map[string]string{"role": "system", "content": system}, map[string]string{"role": "user", "content": user}}, len(ctxLines))
+	s.streamChat(w, r, c, u, []any{map[string]string{"role": "system", "content": system}, map[string]string{"role": "user", "content": user}}, len(ctxLines), nil)
 }
 
 // streamChat sends the messages to the model and passes its answer on as
 // plain text, piece by piece.
-func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, c aiConfig, u store.User, messages []any, hits int) {
+// streamChat sends the conversation and streams the answer back; extra goes
+// into the request as well (e.g. OpenRouter's web search plugin).
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, c aiConfig, u store.User, messages []any, hits int, extra map[string]any) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
 	defer cancel()
-	resp, err := c.request(ctx, "POST", "/chat/completions", map[string]any{
-		"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages,
-	})
+	body := map[string]any{"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages}
+	for k, v := range extra {
+		body[k] = v
+	}
+	resp, err := c.request(ctx, "POST", "/chat/completions", body)
 	if err != nil {
 		slog.Warn("KI nicht erreichbar", "fehler", err)
 		writeErr(w, 502, errors.New("Die KI ist gerade nicht erreichbar"))

@@ -143,12 +143,12 @@ func TestAIChat(t *testing.T) {
 		if !strings.Contains(reason, c.want) || !strings.Contains(fmt.Sprint(got["messages"]), "web search the user switched on failed") {
 			t.Fatalf("%s: reason %q", c.url, reason)
 		}
-		status, res := luis.call("POST", "/api/ai/searx", map[string]any{"searxUrl": c.url})
+		status, res := luis.call("POST", "/api/ai/websearch", map[string]any{"searxUrl": c.url})
 		if status != 502 || !strings.Contains(fmt.Sprint(res["error"]), c.want) {
 			t.Fatalf("test button: %d %v", status, res)
 		}
 	}
-	if status, res := luis.call("POST", "/api/ai/searx", map[string]any{"searxUrl": searx.URL}); status != 200 || res["results"] != float64(1) {
+	if status, res := luis.call("POST", "/api/ai/websearch", map[string]any{"searxUrl": searx.URL}); status != 200 || res["results"] != float64(1) {
 		t.Fatalf("test button with a working SearXNG: %d %v", status, res)
 	}
 	luis.call("PUT", "/api/ai", map[string]any{"enabled": true, "url": model.URL + "/v1", "model": "llava", "searxUrl": searx.URL})

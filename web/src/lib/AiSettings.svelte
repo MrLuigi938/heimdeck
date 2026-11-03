@@ -9,6 +9,9 @@
   let cfg = $state(null);
   let key = $state('');
   let keySet = $state(false);
+  let webKey = $state('');
+  let webKeySet = $state(false);
+  let webSaved = $state(''); // the provider the stored key belongs to
   let models = $state([]);
   let checking = $state(false);
   let saving = $state(false);
@@ -19,7 +22,10 @@
     try {
       const res = await get('/ai');
       cfg = { url: '', model: '', label: '', searxUrl: '', ...res.config };
+      cfg.webSearch ||= 'none';
       keySet = res.keySet;
+      webKeySet = res.webKeySet;
+      webSaved = cfg.webSearch;
     } catch (e) {
       toast(e.message, 'bad');
     }
@@ -46,13 +52,34 @@
     }
   }
 
-  // A real search through the SearXNG address, so the admin sees right away
-  // whether it lets Heimdeck in (public instances usually do not).
+  // The web search services. Brave and Tavily need an API key; OpenRouter
+  // searches by itself, so it only works with an OpenRouter address.
+  const WEB = [
+    ['none', 'Keine'],
+    ['searxng', 'SearXNG (selbst gehostet)'],
+    ['brave', 'Brave Search API'],
+    ['tavily', 'Tavily'],
+    ['openrouter', 'OpenRouter (eingebaute Websuche)'],
+  ];
+  const WEB_HELP = {
+    none: 'Die KI selbst kann nicht ins Internet. Mit einer Websuche sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit.',
+    searxng: 'Eine eigene SearXNG, z. B. als Docker-Container. In ihrer settings.yml unter search → formats „json“ erlauben. Öffentliche SearXNG-Instanzen lassen das meist nicht zu.',
+    brave: 'Eigener Suchindex von Brave. Den API-Schlüssel gibt es unter api-dashboard.search.brave.com – mit einem kleinen kostenlosen Kontingent.',
+    tavily: 'Eine Such-API für KI-Assistenten. Den API-Schlüssel (tvly-…) gibt es unter app.tavily.com – mit einem kostenlosen Kontingent pro Monat.',
+    openrouter: 'OpenRouter sucht selbst und gibt der KI die Ergebnisse mit – das kostet bei OpenRouter etwas pro Frage zusätzlich. Nur, wenn oben OpenRouter eingetragen ist.',
+  };
+  let needsKey = $derived(cfg?.webSearch === 'brave' || cfg?.webSearch === 'tavily');
+  let keyStored = $derived(webKeySet && webSaved === cfg?.webSearch);
+
+  // A real search with the chosen service, so the admin sees right away
+  // whether it works (public SearXNG instances usually do not let Heimdeck in).
   async function testSearx() {
     searxBusy = true;
     try {
-      const res = await post('/ai/searx', $state.snapshot(cfg));
-      searxResult = { ok: res.results > 0, text: res.results > 0 ? t('Funktioniert – {n} Ergebnisse gefunden.', { n: res.results }) : t('Erreichbar, aber keine Ergebnisse – sind in SearXNG Suchmaschinen eingeschaltet?') };
+      const res = await post('/ai/websearch', { ...$state.snapshot(cfg), webKey });
+      searxResult = res.provider === 'openrouter'
+        ? { ok: true, text: t('Passt – OpenRouter sucht bei jeder Frage mit 🌐 selbst.') }
+        : { ok: res.results > 0, text: res.results > 0 ? t('Funktioniert – {n} Ergebnisse gefunden.', { n: res.results }) : t('Erreichbar, aber keine Ergebnisse – sind in SearXNG Suchmaschinen eingeschaltet?') };
     } catch (e) {
       searxResult = { ok: false, text: e.message };
     } finally {
@@ -64,8 +91,9 @@
     e.preventDefault();
     saving = true;
     try {
-      await put('/ai', { ...$state.snapshot(cfg), apiKey: key });
+      await put('/ai', { ...$state.snapshot(cfg), apiKey: key, webKey });
       key = '';
+      webKey = '';
       toast(t('Gespeichert'));
       load();
     } catch (err) {
@@ -102,15 +130,26 @@
       <span>{t('Name im Suchfenster')}</span>
       <input bind:value={cfg.label} placeholder={cfg.model || 'Ollama'} />
     </label>
-    <label class="field">
-      <span>{t('Websuche über SearXNG (optional)')}</span>
-      <div class="row">
-        <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" oninput={() => (searxResult = null)} />
-        <button type="button" class="small" disabled={searxBusy || !cfg.searxUrl} onclick={testSearx}>{searxBusy ? t('Prüfe …') : t('Testen')}</button>
-      </div>
+    <div class="field">
+      <label class="field">
+        <span>{t('Websuche über')}</span>
+        <select bind:value={cfg.webSearch} onchange={() => (searxResult = null)}>
+          {#each WEB as [v, label]}<option value={v}>{t(label)}</option>{/each}
+        </select>
+      </label>
+      {#if cfg.webSearch !== 'none'}
+        <div class="row">
+          {#if cfg.webSearch === 'searxng'}
+            <input bind:value={cfg.searxUrl} placeholder="http://searxng:8080" spellcheck="false" aria-label={t('SearXNG-Adresse')} oninput={() => (searxResult = null)} />
+          {:else if needsKey}
+            <input type="password" bind:value={webKey} placeholder={keyStored ? t('gespeichert – leer lassen zum Behalten') : t('API-Schlüssel')} aria-label={t('API-Schlüssel')} autocomplete="new-password" oninput={() => (searxResult = null)} />
+          {/if}
+          <button type="button" class="small" disabled={searxBusy || (cfg.webSearch === 'searxng' && !cfg.searxUrl) || (needsKey && !webKey && !keyStored)} onclick={testSearx}>{searxBusy ? t('Prüfe …') : t('Testen')}</button>
+        </div>
+      {/if}
       {#if searxResult}<span class="help" class:ok={searxResult.ok} class:bad={!searxResult.ok}>{searxResult.text}</span>{/if}
-      <span class="help">{t('Die KI selbst kann nicht ins Internet. Mit einer SearXNG-Adresse sucht Heimdeck auf Wunsch (🌐 im Chat) und gibt ihr die Ergebnisse mit. In SearXNG unter search → formats „json“ erlauben.')} {t('Öffentliche SearXNG-Instanzen lassen das meist nicht zu – am besten eine eigene betreiben.')}</span>
-    </label>
+      <span class="help">{t(WEB_HELP[cfg.webSearch] || WEB_HELP.none)}</span>
+    </div>
     <label class="check"><input type="checkbox" bind:checked={cfg.adminsOnly} /> {t('Nur Admins dürfen fragen')}</label>
     <span class="help">{t('Sinnvoll bei Cloud-Anbietern, die pro Anfrage kosten.')}</span>
     <label class="check"><input type="checkbox" bind:checked={cfg.insecure} /> {t('Zertifikat nicht prüfen (selbstsigniert)')}</label>

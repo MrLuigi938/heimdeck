@@ -222,6 +222,7 @@
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || t('Fehler {code}', { code: res.status }));
       msg.web = Number(res.headers.get('X-Web-Results')) || 0;
+      msg.webVia = res.headers.get('X-Web-Via') || '';
       const webErr = res.headers.get('X-Web-Error');
       if (webErr) msg.webError = decodeURIComponent(webErr);
       const reader = res.body.getReader();
@@ -363,6 +364,7 @@
             {#if m.text && !(busy && i === messages.length - 1)}
               <div class="msg-actions">
                 {#if m.web}<span class="muted small">🌐 {t('{n} Web-Ergebnisse', { n: m.web })}</span>{/if}
+                {#if m.webVia}<span class="muted small">🌐 {t('mit Websuche über {name}', { name: m.webVia })}</span>{/if}
                 {#if m.webError}<span class="web-error small">⚠ {t('Websuche:')} {m.webError}</span>{/if}
                 <span class="spacer"></span>
                 <button class="ghost small" onclick={() => copy(m.text)}>{t('Kopieren')}</button>
