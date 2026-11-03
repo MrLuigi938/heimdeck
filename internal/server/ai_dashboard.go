@@ -28,27 +28,30 @@ const (
 	dashWait       = 4 * time.Second
 )
 
-// dashboardContext returns the text and how many tiles it covers.
-func (s *Server) dashboardContext(r *http.Request) (string, int) {
+// aiGroup is a group as the AI gets to know it.
+type aiGroup struct {
+	name, board string
+	pos         int
+}
+
+// aiTiles are the tiles the AI may look at for this user: the ones they can
+// see, without locked or hidden groups, in dashboard order.
+func (s *Server) aiTiles(r *http.Request) ([]store.Tile, map[int64]aiGroup) {
 	tiles, err := s.accessibleTiles(r)
-	if err != nil || len(tiles) == 0 {
-		return "", 0
+	if err != nil {
+		return nil, nil
 	}
-	type group struct {
-		name, board string
-		pos         int
-	}
-	groups := map[int64]group{}
+	groups := map[int64]aiGroup{}
 	var shown []store.Tile
 	for _, t := range tiles {
 		g, ok := groups[t.GroupID]
 		if !ok {
 			sg, err := s.store.Group(t.GroupID)
 			if err != nil || sg.Visibility == store.Hidden {
-				groups[t.GroupID] = group{}
+				groups[t.GroupID] = aiGroup{}
 				continue
 			}
-			g = group{name: sg.Name, pos: sg.Position}
+			g = aiGroup{name: sg.Name, pos: sg.Position}
 			if b, err := s.store.Board(sg.BoardID); err == nil {
 				g.board = b.Name
 			}
@@ -72,6 +75,15 @@ func (s *Server) dashboardContext(r *http.Request) (string, int) {
 		}
 		return shown[i].Position < shown[j].Position
 	})
+	return shown, groups
+}
+
+// dashboardContext returns the text and how many tiles it covers.
+func (s *Server) dashboardContext(r *http.Request) (string, int) {
+	shown, groups := s.aiTiles(r)
+	if len(shown) == 0 {
+		return "", 0
+	}
 	if len(shown) > dashMaxTiles {
 		shown = shown[:dashMaxTiles]
 	}
@@ -125,6 +137,11 @@ func withoutAddresses(s string) string {
 
 // tileSummary is one tile as a few lines of text.
 func (s *Server) tileSummary(t store.Tile, lang string) string {
+	return s.tileDetail(t, lang, dashItems, dashTileChars)
+}
+
+// tileDetail is one tile as text, with up to items list entries and chars characters.
+func (s *Server) tileDetail(t store.Tile, lang string, items, chars int) string {
 	var b strings.Builder
 	b.WriteString("- " + clip(t.Name, 60))
 	if integ, ok := integrations.Get(t.Integration); ok && t.Integration != "" && t.Integration != "link" {
@@ -174,8 +191,8 @@ func (s *Server) tileSummary(t store.Tile, lang string) string {
 			}
 			b.WriteString("  " + title + ":\n")
 			for i, it := range w.Items {
-				if i == dashItems {
-					fmt.Fprintf(&b, "    … %d more\n", len(w.Items)-dashItems)
+				if i == items {
+					fmt.Fprintf(&b, "    … %d more\n", len(w.Items)-items)
 					break
 				}
 				line := "    · " + clip(it.Title, 100)
@@ -201,8 +218,8 @@ func (s *Server) tileSummary(t store.Tile, lang string) string {
 		}
 	}
 	out := b.String()
-	if r := []rune(out); len(r) > dashTileChars {
-		out = string(r[:dashTileChars]) + "…\n" // keeps the lines, unlike clip
+	if r := []rune(out); len(r) > chars {
+		out = string(r[:chars]) + "…\n" // keeps the lines, unlike clip
 	}
 	return out
 }

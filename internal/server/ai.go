@@ -40,7 +40,11 @@ type aiConfig struct {
 	WebKey    string `json:"webKey,omitempty"` // API key for Brave or Tavily, never sent back
 	// Dashboard lets people hand the AI what their tiles show (📋 in the chat).
 	Dashboard bool `json:"dashboard"`
-	Insecure  bool `json:"insecure"`
+	// Tools: with 📋 the AI asks for what it needs (list, read, search, propose
+	// an action) instead of getting the whole dashboard; models without tool
+	// support fall back to the whole dashboard.
+	Tools    bool `json:"tools"`
+	Insecure bool `json:"insecure"`
 }
 
 func (s *Server) aiConfig() aiConfig {
@@ -64,7 +68,7 @@ func (s *Server) aiFor(u store.User) map[string]any {
 	if label == "" {
 		label = c.Model
 	}
-	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider()), "dashboard": c.Dashboard}
+	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider()), "dashboard": c.Dashboard, "tools": c.Dashboard && c.Tools}
 }
 
 // aiIsCloud guesses whether the hits leave the house (for a hint in the window).

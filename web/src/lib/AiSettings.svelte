@@ -151,6 +151,10 @@
       <span class="help">{t(WEB_HELP[cfg.webSearch] || WEB_HELP.none)}</span>
     </div>
     <label class="check"><input type="checkbox" bind:checked={cfg.dashboard} /> {t('Dashboard-Daten an die KI geben (📋 im Chat)')}</label>
+    {#if cfg.dashboard}
+      <label class="check sub"><input type="checkbox" bind:checked={cfg.tools} /> {t('Die KI fragt selbst nach (Werkzeuge)')}</label>
+      <span class="help sub">{t('Statt der ganzen Übersicht bekommt die KI Werkzeuge: Kacheln auflisten, eine Kachel lesen, in deinen Diensten suchen und Aktionen als Knopf vorschlagen – ausführen tut sie nie etwas, das macht nur ein Klick. Braucht ein Modell, das Werkzeuge (Function Calling) kann, z. B. die meisten bei OpenRouter oder Llama 3.1 / Qwen bei Ollama; sonst bekommt es automatisch die Übersicht.')}</span>
+    {/if}
     <span class="help">{t('Wer 📋 im Chat einschaltet, gibt der KI mit, was die eigenen Kacheln gerade zeigen – Werte, Listen, Warnungen und welche Dienste nicht erreichbar sind. Nur Kacheln, die die Person selbst sieht; nie Einstellungen oder Schlüssel.')}</span>
     <label class="check"><input type="checkbox" bind:checked={cfg.adminsOnly} /> {t('Nur Admins dürfen fragen')}</label>
     <span class="help">{t('Sinnvoll bei Cloud-Anbietern, die pro Anfrage kosten.')}</span>
@@ -169,6 +173,7 @@
   .row input { flex: 1; min-width: 0; }
   .spacer { flex: 1; }
   .help.ok { color: var(--ok); }
+  .sub { margin-left: 26px; }
   .help.bad { color: var(--bad); }
   .link { border: 0; background: none; padding: 0; color: var(--accent); font-size: inherit; text-decoration: underline; cursor: pointer; }
 </style>

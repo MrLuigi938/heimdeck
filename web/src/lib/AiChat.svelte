@@ -9,6 +9,7 @@
   import { t, i18n } from './i18n.svelte.js';
   import { toast } from './toast.svelte.js';
   import { renderMarkdown } from './markdown.js';
+  import { confirmDialog } from './dialog.svelte.js';
 
   // ai: {label, local, web, dashboard}; start: a first question (from the search) with
   // the hits that were shown, sent right away.
@@ -58,7 +59,7 @@
     if (chats.length > MAX_CHATS) chats.length = MAX_CHATS;
     try {
       // Pictures are not kept – they would fill the storage.
-      localStorage.setItem(KEY, JSON.stringify(chats.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m, images: [] })) }))));
+      localStorage.setItem(KEY, JSON.stringify(chats.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m, images: [], actions: undefined })) }))));
     } catch {
       /* private mode or full */
     }
@@ -235,12 +236,32 @@
       msg.webVia = res.headers.get('X-Web-Via') || '';
       const webErr = res.headers.get('X-Web-Error');
       if (webErr) msg.webError = decodeURIComponent(webErr);
+      if (res.headers.get('X-AI-Tools') === 'fallback') msg.noTools = true;
       const reader = res.body.getReader();
       const dec = new TextDecoder();
+      // Between the text come events, framed by \x1e … \x1f: a tool the AI
+      // used, or an action it proposes as a button.
+      let pending = '';
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        msg.text += dec.decode(value, { stream: true });
+        pending += dec.decode(value, { stream: true });
+        for (;;) {
+          const i = pending.indexOf('\x1e');
+          if (i < 0) {
+            msg.text += pending;
+            pending = '';
+            break;
+          }
+          msg.text += pending.slice(0, i);
+          const j = pending.indexOf('\x1f', i);
+          if (j < 0) {
+            pending = pending.slice(i);
+            break;
+          }
+          try { onEvent(msg, JSON.parse(pending.slice(i + 1, j))); } catch { /* broken event */ }
+          pending = pending.slice(j + 1);
+        }
         scroll();
       }
       if (!msg.text.trim()) msg.error = t('Die KI hat keine Antwort gegeben.');
@@ -250,6 +271,37 @@
       busy = false;
       keep();
       input?.focus();
+    }
+  }
+
+  function onEvent(msg, ev) {
+    // Assign first, then push through the reactive array – pushing into the
+    // value of `msg.x ||= []` would miss Svelte's proxy the first time.
+    if (ev.tool) {
+      if (!msg.tools) msg.tools = [];
+      msg.tools.push({ tool: ev.tool, arg: ev.arg || '' });
+    }
+    if (ev.propose) {
+      if (!msg.actions) msg.actions = [];
+      msg.actions.push({ ...ev.propose, reason: ev.reason || '', state: '' });
+    }
+  }
+  const toolText = (x) =>
+    x.tool === 'list' ? t('Kacheln angesehen') : x.tool === 'read' ? t('{name} gelesen', { name: x.arg }) : t('gesucht: „{q}“', { q: x.arg });
+
+  // A proposed action runs only when clicked – through the tile's normal
+  // action, with the same rights as its buttons on the dashboard.
+  async function runAction(a) {
+    if (a.state === 'busy' || a.state === 'done') return;
+    if (a.confirm && !(await confirmDialog(a.confirm, { confirmLabel: a.label, danger: a.tone === 'danger' }))) return;
+    a.state = 'busy';
+    try {
+      await post(`/tiles/${a.tileId}/action`, { action: a.action, params: a.params || {} });
+      a.state = 'done';
+      toast(t('{label} – erledigt', { label: a.label }));
+    } catch (e) {
+      a.state = '';
+      toast(e.message, 'bad');
     }
   }
 
@@ -358,8 +410,10 @@
             {#if m.error}
               <p class="bad">{m.error}</p>
             {:else if !m.text}
+              {#if m.tools?.length}<p class="tools muted small">🔧 {m.tools.map(toolText).join(' · ')} …</p>{/if}
               <p class="muted">{t('Denkt nach …')}</p>
             {:else}
+              {#if m.tools?.length}<p class="tools muted small">🔧 {m.tools.map(toolText).join(' · ')}</p>{/if}
               {#each renderMarkdown(m.text) as part}
                 {#if part.kind === 'code'}
                   <div class="code">
@@ -374,8 +428,18 @@
                 {/if}
               {/each}
             {/if}
+            {#if m.actions?.length}
+              <div class="proposals">
+                {#each m.actions as a}
+                  <button class="small {a.tone === 'danger' ? 'danger' : 'primary'}" disabled={a.state === 'busy' || a.state === 'done'} title={a.reason} onclick={() => runAction(a)}>
+                    {a.state === 'done' ? '✓' : '▶'} {a.label} <span class="ptile">· {a.tile}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
             {#if m.text && !(busy && i === messages.length - 1)}
               <div class="msg-actions">
+                {#if m.noTools}<span class="muted small" title={t('Dieses Modell kann keine Werkzeuge benutzen – es hat stattdessen die ganze Übersicht bekommen.')}>📋 {t('ohne Werkzeuge')}</span>{/if}
                 {#if m.dash}<span class="muted small">{t('📋 {n} Kacheln als Kontext', { n: m.dash })}</span>{/if}
                 {#if m.web}<span class="muted small">🌐 {t('{n} Web-Ergebnisse', { n: m.web })}</span>{/if}
                 {#if m.webVia}<span class="muted small">🌐 {t('mit Websuche über {name}', { name: m.webVia })}</span>{/if}
@@ -472,6 +536,9 @@
   .tiny { font-size: 11.5px; margin: 0; }
   .small { font-size: 12.5px; }
   .web-error { color: var(--warn); line-height: 1.4; }
+  .tools { margin: 0 0 6px; }
+  .proposals { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+  .ptile { opacity: .75; font-weight: 400; }
   @media (max-width: 640px) {
     .chat-backdrop { padding: 0; }
     .chat { width: 100%; height: 100%; height: 100dvh; border-radius: 0; }

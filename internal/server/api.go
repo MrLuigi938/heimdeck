@@ -1076,6 +1076,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 8*time.Second)
 	defer cancel()
+	writeJSON(w, s.searchTiles(ctx, langOf(r), tiles, groups, q))
+}
+
+// searchTiles asks every searchable tile for q at once (the search window,
+// and the AI chat's search tool). Buttons only where the user may use them.
+func (s *Server) searchTiles(ctx context.Context, lang string, tiles []store.Tile, groups map[int64]boardAccess, q string) []searchGroup {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	out := []searchGroup{}
@@ -1093,7 +1099,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 			defer logging.Recover("Suche", "kachel", t.ID, "dienst", t.Integration)
 			start := time.Now()
-			items, err := searcher.Search(ctx, s.instance(t, langOf(r)), q)
+			items, err := searcher.Search(ctx, s.instance(t, lang), q)
 			items = safeItems(items)
 			if errors.Is(err, integrations.ErrNoSearch) {
 				return
@@ -1131,7 +1137,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		return ri < rj
 	})
-	writeJSON(w, out)
+	return out
 }
 
 func (s *Server) handleDiscover(w http.ResponseWriter, r *http.Request) {

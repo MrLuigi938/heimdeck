@@ -991,4 +991,5 @@ var en = map[string]string{
 	"%s: bitte den API-Schlüssel eintragen":                                             "%s: please enter the API key",
 	"Die Websuche über OpenRouter geht nur, wenn die KI-Adresse OpenRouter ist":         "The web search through OpenRouter only works when the AI address is OpenRouter",
 	"Unbekannte Websuche":                                                               "Unknown web search",
+	"Die KI antwortet mit %s – Details im Protokoll":                                    "The AI answers with %s – details in the log",
 }

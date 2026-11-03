@@ -16,7 +16,7 @@
 </script>
 
 {#each dialogs as d (d.id)}
-  <Modal title={d.title || (d.kind === 'prompt' ? t('Eingabe') : t('Bitte bestätigen'))} onClose={() => cancel(d)}>
+  <Modal top title={d.title || (d.kind === 'prompt' ? t('Eingabe') : t('Bitte bestätigen'))} onClose={() => cancel(d)}>
     <form id="dialog-{d.id}" class="form" onsubmit={(e) => submit(e, d)}>
       {#if d.message}<p>{d.message}</p>{/if}
       {#if d.kind === 'prompt'}

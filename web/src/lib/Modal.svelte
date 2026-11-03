@@ -6,7 +6,8 @@
   // Esc in a text field first only leaves the field (and closes the browser's
   // autocomplete); a second Esc closes the dialog.
   // size: "" (normal), "settings" (large and of fixed height; the content scrolls by itself).
-  let { title, onClose, children, footer, wide = false, size = '' } = $props();
+  // top: above everything else, also the AI chat (confirmations and prompts).
+  let { title, onClose, children, footer, wide = false, size = '', top = false } = $props();
   let backdrop;
 
   function onKey(e) {
@@ -26,7 +27,7 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="backdrop" role="presentation" bind:this={backdrop}>
+<div class="backdrop" class:top role="presentation" bind:this={backdrop}>
   <div class="modal card {size}" class:wide role="dialog" aria-modal="true" aria-label={title}>
     <header>
       <h2>{title}</h2>
@@ -42,6 +43,7 @@
     position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .55);
     display: grid; place-items: center; padding: 16px; animation: fade .12s;
   }
+  .backdrop.top { z-index: 200; }
   .modal {
     /* dvh: the visible height on phones (100vh includes the browser bars) */
     width: min(540px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);

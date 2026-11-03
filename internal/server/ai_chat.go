@@ -94,13 +94,21 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if len(hits) > 0 {
 		system += "\n\nResults from the user's own services (from their Heimdeck search) – cite the service in [brackets] when you use one:\n" + strings.Join(hits, "\n")
 	}
-	if body.Dashboard && c.Dashboard {
-		if dash, n := s.dashboardContext(r); n > 0 {
-			w.Header().Set("X-Dashboard-Tiles", strconv.Itoa(n))
-			system += "\n\nThe user's Heimdeck dashboard right now (their tiles by dashboard and group, with live data; " +
-				"\"OFFLINE\" means the service did not answer the last check). Use it to answer questions about their services, " +
-				"name the tile you take something from, and say so when something is not on the dashboard:\n" + dash + "\n\n"
+	useTools := body.Dashboard && c.Dashboard && c.Tools
+	// withDashboard adds the whole dashboard (stage 1, and the fallback for
+	// models without tools).
+	withDashboard := func(system string) string {
+		dash, n := s.dashboardContext(r)
+		if n == 0 {
+			return system
 		}
+		w.Header().Set("X-Dashboard-Tiles", strconv.Itoa(n))
+		return system + "\n\nThe user's Heimdeck dashboard right now (their tiles by dashboard and group, with live data; " +
+			"\"OFFLINE\" means the service did not answer the last check). Use it to answer questions about their services, " +
+			"name the tile you take something from, and say so when something is not on the dashboard:\n" + dash + "\n\n"
+	}
+	if body.Dashboard && c.Dashboard && !useTools {
+		system = withDashboard(system)
 	}
 	webUsed := 0
 	var extra map[string]any
@@ -130,7 +138,15 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		system += " You have no internet access; if asked, say that web search can be switched on in the chat (when the admin set it up)."
 	}
 
-	msgs := []any{map[string]string{"role": "system", "content": system}}
+	toolPrompt := "\n\nYou can look at the user's Heimdeck dashboard with tools: list_tiles (which services they have), read_tile (what a tile shows now, " +
+		"and its actions), search_services (search their media, documents, smart home …). Use them whenever a question is about their services or home – " +
+		"do not guess, and name the tile you take something from. You never run actions yourself: when the user wants something done (pause, switch, request …), " +
+		"read the tile or search to get the action key, call propose_action, and tell them to click the button."
+	sys := system
+	if useTools {
+		sys += toolPrompt
+	}
+	msgs := []any{map[string]string{"role": "system", "content": sys}}
 	for _, m := range body.Messages {
 		role := "user"
 		if m.Role == "assistant" {
@@ -154,6 +170,14 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if webUsed > 0 {
 		w.Header().Set("X-Web-Results", strconv.Itoa(webUsed))
+	}
+	if useTools {
+		if err := s.chatWithTools(w, r, c, u, msgs, extra); !errors.Is(err, errNoTools) {
+			return
+		}
+		// The model cannot use tools: give it the whole dashboard instead.
+		w.Header().Set("X-AI-Tools", "fallback")
+		msgs[0] = map[string]string{"role": "system", "content": withDashboard(system)}
 	}
 	s.streamChat(w, r, c, u, msgs, len(hits), extra)
 }
