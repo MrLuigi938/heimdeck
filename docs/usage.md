@@ -140,17 +140,27 @@ Which services can be searched is listed in [Supported services](services.md).
 
 Heimdeck can talk to an AI of your choice – any server with an OpenAI-compatible interface: self-hosted (**Ollama**, LM Studio, LocalAI …) or a provider (OpenAI, OpenRouter, Mistral …).
 
-**Setting it up** (admins, *Settings → AI*): enter the address (for Ollama e.g. `http://192.168.1.10:11434/v1`), an API key if the provider needs one, click *Load models* and choose one. Optional: a name shown in the chat, *Only admins may ask* (useful with providers that charge per request), and a **SearXNG** address for web search (allow `json` under `search → formats` in SearXNG). The key is stored encrypted and never sent to the browser.
+**Setting it up** (admins, *Settings → AI*): enter the address (for Ollama e.g. `http://192.168.1.10:11434/v1`), an API key if the provider needs one, click *Load models* and choose one. Optional: a name shown in the chat, *Only admins may ask* (useful with providers that charge per request), *Give the AI the dashboard's data* (📋, see below) and a web search (see below). Keys are stored encrypted and never sent to the browser.
 
 **Using it:**
 
 - Open the chat with ✨ in the search field, with `K`, or from the search window: *Ask <name>* (or Shift+Enter) asks about what you just searched – the visible hits from your own services go along as context, and the answer names the service it took something from.
 - **Files**: add them with 📎, by dragging or pasting – text, Markdown, CSV, JSON, PDF, Word (`.docx`) and pictures. Ask the AI to summarize, translate or rewrite them; answers and code blocks can be copied or saved as a file. Scanned PDFs without text go along as pictures of their first pages, which only models that can see understand.
-- **Web** 🌐 (with SearXNG): Heimdeck searches the web for your question and gives the AI the top results; the model itself never goes online.
+- **Dashboard** 📋 (when the admin allows it): the AI gets what your tiles show right now – values, lists, warnings, unreachable services, camera events – and can answer questions like “Is anything down?” or “How much space is left on the NAS?”. Only tiles you can see; no hidden groups, no values you hid on a tile, never settings, keys or addresses. Below the answer it says how many tiles went along.
+- **Web** 🌐: Heimdeck searches the web for your question and gives the AI the top results; the model itself never goes online. If the search fails, the chat says why below the answer.
 - **Earlier chats** are kept in your browser, per account (up to 30, without the pictures).
 - **On the computer** (*Settings → Search → AI chat on the computer*): a large window with the list of chats on the left (default), or a sidebar on the right – the dashboard moves aside and stays usable. On phones the chat always fills the screen.
 
-The AI only sees what the person asking can see anyway, and it never presses buttons (lights, downloads …). With a cloud provider your question and the hits leave your home – for the most privacy, use a local model.
+**Web search** (*Settings → AI → Web search through*) – *Test* runs a real search right away:
+
+| Choice | What you need |
+|---|---|
+| **SearXNG** | your own instance (e.g. a Docker container) with `json` allowed under `search → formats` in its `settings.yml`. Public instances refuse automated searches (429 or a bot check), so they do not work. |
+| **Brave Search API** | an API key from api-dashboard.search.brave.com (with a small free quota) |
+| **Tavily** | an API key (`tvly-…`) from app.tavily.com (with a free monthly quota) |
+| **OpenRouter** | only when the AI address is OpenRouter: it searches by itself along with the answer and charges a little extra per question |
+
+The AI only sees what the person asking can see anyway, and it never presses buttons (lights, downloads …). With a cloud provider your question, the hits and – with 📋 – your dashboard's data leave your home – for the most privacy, use a local model.
 
 ## Notifications
 

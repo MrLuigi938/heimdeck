@@ -140,17 +140,27 @@ Welche Dienste durchsucht werden können, steht unter [Unterstützte Dienste](di
 
 Heimdeck kann mit einer KI deiner Wahl sprechen – jeder Server mit OpenAI-kompatibler Schnittstelle: selbst gehostet (**Ollama**, LM Studio, LocalAI …) oder ein Anbieter (OpenAI, OpenRouter, Mistral …).
 
-**Einrichten** (Admins, *Einstellungen → KI*): Adresse eintragen (bei Ollama z. B. `http://192.168.1.10:11434/v1`), falls nötig einen API-Schlüssel, *Modelle laden* klicken und eines wählen. Optional: ein Name für den Chat, *Nur Admins dürfen fragen* (sinnvoll bei Anbietern, die pro Anfrage kosten) und eine **SearXNG**-Adresse für die Websuche (in SearXNG unter `search → formats` „json“ erlauben). Der Schlüssel wird verschlüsselt gespeichert und nie an den Browser geschickt.
+**Einrichten** (Admins, *Einstellungen → KI*): Adresse eintragen (bei Ollama z. B. `http://192.168.1.10:11434/v1`), falls nötig einen API-Schlüssel, *Modelle laden* klicken und eines wählen. Optional: ein Name für den Chat, *Nur Admins dürfen fragen* (sinnvoll bei Anbietern, die pro Anfrage kosten), *Dashboard-Daten an die KI geben* (📋, siehe unten) und eine Websuche (siehe unten). Schlüssel werden verschlüsselt gespeichert und nie an den Browser geschickt.
 
 **Benutzen:**
 
 - Öffnen mit ✨ im Suchfeld, mit `K` oder aus dem Suchfenster: *Frag <Name>* (oder Shift+Enter) fragt zu dem, was du gerade gesucht hast – die sichtbaren Treffer aus deinen Diensten gehen als Kontext mit, und die Antwort nennt den Dienst, aus dem etwas stammt.
 - **Dateien** per 📎, Ziehen oder Einfügen – Text, Markdown, CSV, JSON, PDF, Word (`.docx`) und Bilder. Die KI fasst zusammen, übersetzt oder schreibt um; Antworten und Codeblöcke lassen sich kopieren oder als Datei speichern. Gescannte PDFs ohne Text gehen als Bilder ihrer ersten Seiten mit – das verstehen nur Modelle, die sehen können.
-- **Web** 🌐 (mit SearXNG): Heimdeck sucht im Web nach deiner Frage und gibt der KI die besten Treffer mit; das Modell selbst geht nie ins Internet.
+- **Dashboard** 📋 (wenn der Admin es erlaubt): Die KI bekommt mit, was deine Kacheln gerade zeigen – Werte, Listen, Warnungen, nicht erreichbare Dienste, Kamera-Ereignisse – und beantwortet Fragen wie „Ist irgendwas ausgefallen?“ oder „Wie viel Platz hat das NAS noch?“. Nur Kacheln, die du siehst; keine versteckten Gruppen, keine Werte, die du auf einer Kachel ausgeblendet hast, nie Einstellungen, Schlüssel oder Adressen. Unter der Antwort steht, wie viele Kacheln mitgingen.
+- **Web** 🌐: Heimdeck sucht im Web nach deiner Frage und gibt der KI die besten Treffer mit; das Modell selbst geht nie ins Internet. Klappt die Suche nicht, steht der Grund unter der Antwort.
 - **Frühere Chats** bleiben in deinem Browser gespeichert, pro Konto (bis zu 30, ohne die Bilder).
 - **Am Computer** (*Einstellungen → Suche → KI-Chat am Computer*): ein großes Fenster mit der Chat-Liste links (Standard) oder eine Seitenleiste rechts – das Dashboard rückt zur Seite und bleibt bedienbar. Auf dem Handy füllt der Chat immer den Bildschirm.
 
-Die KI sieht nur, was die fragende Person ohnehin sieht, und drückt nie Knöpfe (Licht, Downloads …). Bei einem Cloud-Anbieter verlassen Frage und Treffer dein Zuhause – für maximale Privatsphäre ein lokales Modell nehmen.
+**Websuche** (*Einstellungen → KI → Websuche über*) – *Testen* macht sofort eine echte Suche:
+
+| Auswahl | Was du brauchst |
+|---|---|
+| **SearXNG** | eine eigene Instanz (z. B. als Docker-Container), in ihrer `settings.yml` unter `search → formats` „json“ erlaubt. Öffentliche Instanzen lehnen automatische Suchen ab (429 oder Bot-Prüfung) und funktionieren deshalb nicht. |
+| **Brave Search API** | einen API-Schlüssel von api-dashboard.search.brave.com (mit kleinem kostenlosem Kontingent) |
+| **Tavily** | einen API-Schlüssel (`tvly-…`) von app.tavily.com (mit kostenlosem Monatskontingent) |
+| **OpenRouter** | nur wenn die KI-Adresse OpenRouter ist: sucht beim Antworten selbst und berechnet pro Frage etwas zusätzlich |
+
+Die KI sieht nur, was die fragende Person ohnehin sieht, und drückt nie Knöpfe (Licht, Downloads …). Bei einem Cloud-Anbieter verlassen Frage, Treffer und – mit 📋 – die Daten deines Dashboards dein Zuhause – für maximale Privatsphäre ein lokales Modell nehmen.
 
 ## Benachrichtigungen
 
