@@ -10,7 +10,7 @@
   import { toast } from './toast.svelte.js';
   import { renderMarkdown } from './markdown.js';
 
-  // ai: {label, local, web}; start: a first question (from the search) with
+  // ai: {label, local, web, dashboard}; start: a first question (from the search) with
   // the hits that were shown, sent right away.
   let { ai, start = null, layout = 'window', userId = 0, onClose } = $props();
 
@@ -26,6 +26,15 @@
   let files = $state([]); // {name, kind: 'text'|'image', text?, data?}
   let busy = $state(false);
   let web = $state(false);
+  // 📋: the AI gets what the tiles show. Remembered in this browser.
+  let dash = $state(readDash());
+  function readDash() {
+    try { return localStorage.getItem('heimdeck-ai-dashboard') === '1'; } catch { return false; }
+  }
+  function toggleDash() {
+    dash = !dash;
+    try { localStorage.setItem('heimdeck-ai-dashboard', dash ? '1' : '0'); } catch { /* private window */ }
+  }
   let hits = $state([]); // results from the search, sent along with the conversation
   let list;
   let input;
@@ -204,7 +213,7 @@
     });
     text = '';
     files = [];
-    const reply = { role: 'assistant', text: '', web: 0 };
+    const reply = { role: 'assistant', text: '', web: 0, dash: 0 };
     messages.push(reply);
     const msg = messages[messages.length - 1];
     busy = true;
@@ -216,12 +225,13 @@
         headers: { 'Content-Type': 'application/json', 'X-Lang': i18n.lang },
         body: JSON.stringify({
           messages: messages.slice(0, -1).map((m) => ({ role: m.role, text: m.text, images: m.images || [] })),
-          hits, web,
+          hits, web, dashboard: !!(ai.dashboard && dash),
           date: new Date().toLocaleString(i18n.lang === 'de' ? 'de-DE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || t('Fehler {code}', { code: res.status }));
       msg.web = Number(res.headers.get('X-Web-Results')) || 0;
+      msg.dash = Number(res.headers.get('X-Dashboard-Tiles')) || 0;
       msg.webVia = res.headers.get('X-Web-Via') || '';
       const webErr = res.headers.get('X-Web-Error');
       if (webErr) msg.webError = decodeURIComponent(webErr);
@@ -313,6 +323,9 @@
       <span class="title">✨ {ai.label}</span>
       <span class="muted where">{ai.local ? t('läuft bei dir') : t('Cloud-Anbieter')}</span>
       <span class="spacer"></span>
+      {#if ai.dashboard}
+        <button class="small toggle" class:on={dash} aria-pressed={dash} onclick={toggleDash} title={t('Die KI bekommt mit, was deine Kacheln gerade zeigen')}>📋 {t('Dashboard')}</button>
+      {/if}
       {#if ai.web}
         <button class="small toggle" class:on={web} aria-pressed={web} onclick={() => (web = !web)} title={t('Die KI bekommt Ergebnisse aus der Websuche dazu')}>🌐 {t('Web')}</button>
       {/if}
@@ -363,6 +376,7 @@
             {/if}
             {#if m.text && !(busy && i === messages.length - 1)}
               <div class="msg-actions">
+                {#if m.dash}<span class="muted small">{t('📋 {n} Kacheln als Kontext', { n: m.dash })}</span>{/if}
                 {#if m.web}<span class="muted small">🌐 {t('{n} Web-Ergebnisse', { n: m.web })}</span>{/if}
                 {#if m.webVia}<span class="muted small">🌐 {t('mit Websuche über {name}', { name: m.webVia })}</span>{/if}
                 {#if m.webError}<span class="web-error small">⚠ {t('Websuche:')} {m.webError}</span>{/if}

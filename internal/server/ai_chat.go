@@ -46,10 +46,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Messages []chatMessage `json:"messages"`
-		Hits     []aiHit       `json:"hits"`
-		Date     string        `json:"date"`
-		Web      bool          `json:"web"`
+		Messages  []chatMessage `json:"messages"`
+		Hits      []aiHit       `json:"hits"`
+		Date      string        `json:"date"`
+		Web       bool          `json:"web"`
+		Dashboard bool          `json:"dashboard"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 30<<20)).Decode(&body); err != nil || len(body.Messages) == 0 {
 		writeErr(w, 400, errors.New("Frage fehlt"))
@@ -92,6 +93,14 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(hits) > 0 {
 		system += "\n\nResults from the user's own services (from their Heimdeck search) – cite the service in [brackets] when you use one:\n" + strings.Join(hits, "\n")
+	}
+	if body.Dashboard && c.Dashboard {
+		if dash, n := s.dashboardContext(r); n > 0 {
+			w.Header().Set("X-Dashboard-Tiles", strconv.Itoa(n))
+			system += "\n\nThe user's Heimdeck dashboard right now (their tiles by dashboard and group, with live data; " +
+				"\"OFFLINE\" means the service did not answer the last check). Use it to answer questions about their services, " +
+				"name the tile you take something from, and say so when something is not on the dashboard:\n" + dash + "\n\n"
+		}
 	}
 	webUsed := 0
 	var extra map[string]any

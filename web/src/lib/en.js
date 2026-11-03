@@ -835,4 +835,8 @@ export const en = {
   'API-Schlüssel': 'API key',
   'Passt – OpenRouter sucht bei jeder Frage mit 🌐 selbst.': 'Fine – OpenRouter searches by itself for every question with 🌐.',
   'mit Websuche über {name}': 'with web search through {name}',
+  'Dashboard-Daten an die KI geben (📋 im Chat)': 'Give the AI the dashboard\'s data (📋 in the chat)',
+  'Wer 📋 im Chat einschaltet, gibt der KI mit, was die eigenen Kacheln gerade zeigen – Werte, Listen, Warnungen und welche Dienste nicht erreichbar sind. Nur Kacheln, die die Person selbst sieht; nie Einstellungen oder Schlüssel.': 'Switching on 📋 in the chat gives the AI what the person\'s own tiles show right now – values, lists, warnings and which services are unreachable. Only tiles the person can see; never settings or keys.',
+  'Die KI bekommt mit, was deine Kacheln gerade zeigen': 'The AI gets what your tiles show right now',
+  '📋 {n} Kacheln als Kontext': '📋 {n} tiles as context',
 };

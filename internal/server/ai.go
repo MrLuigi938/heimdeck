@@ -38,7 +38,9 @@ type aiConfig struct {
 	// (empty: SearXNG when an address is set, as before there was a choice).
 	WebSearch string `json:"webSearch"`
 	WebKey    string `json:"webKey,omitempty"` // API key for Brave or Tavily, never sent back
-	Insecure  bool   `json:"insecure"`
+	// Dashboard lets people hand the AI what their tiles show (📋 in the chat).
+	Dashboard bool `json:"dashboard"`
+	Insecure  bool `json:"insecure"`
 }
 
 func (s *Server) aiConfig() aiConfig {
@@ -62,7 +64,7 @@ func (s *Server) aiFor(u store.User) map[string]any {
 	if label == "" {
 		label = c.Model
 	}
-	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider())}
+	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider()), "dashboard": c.Dashboard}
 }
 
 // aiIsCloud guesses whether the hits leave the house (for a hint in the window).

@@ -150,6 +150,8 @@
       {#if searxResult}<span class="help" class:ok={searxResult.ok} class:bad={!searxResult.ok}>{searxResult.text}</span>{/if}
       <span class="help">{t(WEB_HELP[cfg.webSearch] || WEB_HELP.none)}</span>
     </div>
+    <label class="check"><input type="checkbox" bind:checked={cfg.dashboard} /> {t('Dashboard-Daten an die KI geben (📋 im Chat)')}</label>
+    <span class="help">{t('Wer 📋 im Chat einschaltet, gibt der KI mit, was die eigenen Kacheln gerade zeigen – Werte, Listen, Warnungen und welche Dienste nicht erreichbar sind. Nur Kacheln, die die Person selbst sieht; nie Einstellungen oder Schlüssel.')}</span>
     <label class="check"><input type="checkbox" bind:checked={cfg.adminsOnly} /> {t('Nur Admins dürfen fragen')}</label>
     <span class="help">{t('Sinnvoll bei Cloud-Anbietern, die pro Anfrage kosten.')}</span>
     <label class="check"><input type="checkbox" bind:checked={cfg.insecure} /> {t('Zertifikat nicht prüfen (selbstsigniert)')}</label>
