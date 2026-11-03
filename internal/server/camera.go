@@ -105,12 +105,19 @@ func (s *Server) handleCameraStill(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, cameraTimeout)
 	defer cancel()
+	// fresh: how old a kept picture may be, in seconds – the tile asks for
+	// about half its refresh time, a click on ⟳ for a new one.
+	fresh, err := strconv.Atoi(r.URL.Query().Get("fresh"))
+	if err != nil || fresh <= 0 {
+		fresh = 30
+	}
+	taken := time.Now()
 	data, ct, err := integrations.CameraSnapshot(ctx, in)
 	codec := ""
 	if errors.Is(err, integrations.ErrNoSnapshot) {
 		var src camera.Source
 		if src, err = integrations.CameraSource(ctx, in); err == nil {
-			data, codec, _, err = camera.Still(ctx, src)
+			data, codec, taken, err = camera.Still(ctx, src, time.Duration(fresh)*time.Second)
 			ct = "video/mp4"
 		}
 	}
@@ -119,6 +126,7 @@ func (s *Server) handleCameraStill(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 502, errors.New(in.T(err.Error())))
 		return
 	}
+	w.Header().Set("X-Taken", taken.UTC().Format(time.RFC3339))
 	writeCameraImage(w, data, ct, codec)
 }
 
@@ -149,6 +157,7 @@ func (s *Server) handleCameraEvent(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, errNotFound)
 		return
 	}
+	w.Header().Set("X-Taken", e.At.UTC().Format(time.RFC3339))
 	writeCameraImage(w, e.Image, e.Type, e.Codec)
 }
 
@@ -230,7 +239,7 @@ func (s *Server) watchCamera(ctx context.Context, t store.Tile) {
 					if data, ct, err := integrations.CameraSnapshot(c, in); err == nil {
 						e.Image, e.Type = data, ct
 					} else if src, err := integrations.CameraSource(c, in); err == nil {
-						if data, codec, _, err := camera.Still(c, src); err == nil {
+						if data, codec, _, err := camera.Still(c, src, 5*time.Second); err == nil {
 							e.Image, e.Type, e.Codec = data, "video/mp4", codec
 						}
 					}

@@ -523,12 +523,15 @@ func waitReady(ctx context.Context, f *feed, ready chan struct{}) error {
 	}
 }
 
-// Still returns a recent key frame as a small fMP4 (init + one picture) and
-// its codec. If none is kept, it opens the camera until one arrives.
-func Still(ctx context.Context, src Source) ([]byte, string, time.Time, error) {
+// Still returns a key frame as a small fMP4 (init + one picture), its codec
+// and when it was taken. A kept one is used if it is younger than maxAge
+// (so a page full of viewers does not wake the camera each time); otherwise
+// it opens the camera until a new one arrives.
+func Still(ctx context.Context, src Source, maxAge time.Duration) ([]byte, string, time.Time, error) {
+	maxAge = min(maxAge, stillMaxAge)
 	f := getFeed(src)
 	f.mu.Lock()
-	if f.still != nil && time.Since(f.stillAt) < stillMaxAge {
+	if f.still != nil && time.Since(f.stillAt) < maxAge {
 		defer f.mu.Unlock()
 		return f.still, f.codec, f.stillAt, nil
 	}
@@ -542,7 +545,7 @@ func Still(ctx context.Context, src Source) ([]byte, string, time.Time, error) {
 	defer deadline.Stop()
 	for {
 		f.mu.Lock()
-		if f.still != nil && time.Since(f.stillAt) < stillMaxAge {
+		if f.still != nil && time.Since(f.stillAt) < maxAge {
 			defer f.mu.Unlock()
 			return f.still, f.codec, f.stillAt, nil
 		}

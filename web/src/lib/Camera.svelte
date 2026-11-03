@@ -6,7 +6,8 @@
   // live stream and the latest events. Pictures come either as the camera's
   // own JPEG or – for cameras with only RTSP – as one H.264/H.265 key frame in
   // a tiny MP4, which the browser decodes and turns into a picture here.
-  let { tileId, view } = $props();
+  // fill: in the free grid the picture takes the tile's height instead of 16:9.
+  let { tileId, view, fill = false } = $props();
 
   let still = $state(''); // object URL of the picture shown
   let stillAt = $state(0);
@@ -30,9 +31,10 @@
       throw new Error(msg);
     }
     const type = res.headers.get('Content-Type') || '';
+    const taken = Date.parse(res.headers.get('X-Taken') || '') || Date.now();
     const data = await res.arrayBuffer();
-    if (type.startsWith('image/')) return URL.createObjectURL(new Blob([data], { type }));
-    return URL.createObjectURL(await frameToImage(data, res.headers.get('X-Codec') || 'avc1.42e01e'));
+    if (type.startsWith('image/')) return { url: URL.createObjectURL(new Blob([data], { type })), taken };
+    return { url: URL.createObjectURL(await frameToImage(data, res.headers.get('X-Codec') || 'avc1.42e01e')), taken };
   }
 
   // Decodes the key frame in an MP4 with the browser's video decoder and
@@ -87,17 +89,23 @@
       : t('Dieser Browser kann das Video der Kamera nicht abspielen.');
   }
 
-  function setStill(url) {
+  function setStill(url, taken = Date.now()) {
     if (still) URL.revokeObjectURL(still);
     still = url;
-    stillAt = Date.now();
+    stillAt = taken;
   }
 
-  async function loadStill() {
+  // loadStill gets a new picture. The server may hand out one it took a
+  // moment ago (fresh = seconds) so several viewers do not each wake the
+  // camera; a click on ⟳ (force) always asks for a new one.
+  async function loadStill(force = false) {
     if (busy || live) return;
     busy = true;
+    const every = Number(view.still) || 60;
+    const fresh = force ? 1 : Math.max(2, Math.floor(every / 2));
     try {
-      setStill(await fetchPicture(base() + '/still'));
+      const p = await fetchPicture(`${base()}/still?fresh=${fresh}`);
+      setStill(p.url, p.taken);
       error = '';
     } catch (e) {
       error = e.message;
@@ -182,7 +190,7 @@
       c.width = video.videoWidth;
       c.height = video.videoHeight;
       c.getContext('2d').drawImage(video, 0, 0);
-      c.toBlob((b) => b && setStill(URL.createObjectURL(b)), 'image/jpeg', 0.88);
+      c.toBlob((b) => b && setStill(URL.createObjectURL(b), Date.now()), 'image/jpeg', 0.88);
     }
     live = false;
     liveWaiting = false;
@@ -201,7 +209,7 @@
     if (shown?.id === e.id) return (shown = null);
     stopLive();
     try {
-      shown = { ...e, url: await fetchPicture(`${base()}/events/${e.id}`) };
+      shown = { ...e, url: (await fetchPicture(`${base()}/events/${e.id}`)).url };
     } catch (err) {
       error = err.message;
     }
@@ -214,9 +222,9 @@
 
   // --- refreshing ---
   let timer = null;
-  function schedule() {
+  function schedule(mode) {
     clearInterval(timer);
-    const every = Number(view.still);
+    const every = Number(mode);
     if (every > 0) {
       timer = setInterval(() => {
         if (document.visibilityState === 'visible') loadStill();
@@ -234,10 +242,11 @@
     if (!started && view) {
       started = true;
       if (view.still !== 'click') loadStill();
-      schedule();
       document.addEventListener('visibilitychange', visible);
     }
   });
+  // The timer follows the tile's setting, also after it was changed.
+  $effect(() => schedule(view?.still));
   onDestroy(() => {
     clearInterval(timer);
     clearInterval(clock);
@@ -256,9 +265,11 @@
     if (s < 86400) return new Date(iso).toLocaleTimeString(i18n.lang, { hour: '2-digit', minute: '2-digit' });
     return new Date(iso).toLocaleString(i18n.lang, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   }
+  // When the picture was taken – the exact time, so each refresh is visible.
   function age(ms) {
-    const s = Math.round((now - ms) / 1000);
-    return s < 60 ? t('Bild von gerade eben') : t('Bild von vor {n} Min.', { n: Math.round(s / 60) });
+    const d = new Date(ms);
+    const time = d.toLocaleTimeString(i18n.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return now - ms < 86400000 ? t('Bild von {time}', { time }) : t('Bild von {time}', { time: d.toLocaleString(i18n.lang, { dateStyle: 'short', timeStyle: 'short' }) });
   }
 
   let events = $derived(view?.events || []);
@@ -266,7 +277,7 @@
   let fresh = $derived(latest && now - new Date(latest.at).getTime() < 10 * 60 * 1000);
 </script>
 
-<div class="cam">
+<div class="cam" class:fill>
   <div class="screen" bind:this={box}>
     <!-- svelte-ignore a11y_media_has_caption -->
     <video bind:this={video} muted playsinline class:on={live}></video>
@@ -278,7 +289,7 @@
       {:else if busy}
         <div class="placeholder"><span class="spin"></span></div>
       {:else}
-        <button class="placeholder load" onclick={loadStill}>📷 {t('Bild laden')}</button>
+        <button class="placeholder load" onclick={() => loadStill(true)}>📷 {t('Bild laden')}</button>
       {/if}
     {/if}
 
@@ -296,13 +307,13 @@
       {#if !live && still && !shown}<span class="age">{age(stillAt)}</span>{/if}
       <span class="grow"></span>
       {#if !live && !shown}
-        <button class="chip" onclick={loadStill} disabled={busy} title={t('Bild aktualisieren')} aria-label={t('Bild aktualisieren')}>⟳</button>
+        <button class="chip" onclick={() => loadStill(true)} disabled={busy} title={t('Bild aktualisieren')} aria-label={t('Bild aktualisieren')}>⟳</button>
       {/if}
       {#if view.hasLive}
         {#if live}
-          <button class="chip" onclick={() => stopLive()} title={t('Livebild beenden')} aria-label={t('Livebild beenden')}>■</button>
+          <button class="chip main" onclick={() => stopLive()} title={t('Livebild beenden')} aria-label={t('Livebild beenden')}>■</button>
         {:else}
-          <button class="chip play" onclick={startLive} title={t('Livebild')} aria-label={t('Livebild')}>▶</button>
+          <button class="chip main play" onclick={startLive} title={t('Livebild')} aria-label={t('Livebild')}>▶</button>
         {/if}
       {/if}
       <button class="chip" onclick={fullscreen} title={t('Vollbild')} aria-label={t('Vollbild')}>⛶</button>
@@ -328,7 +339,14 @@
 
 <style>
   .cam { display: grid; gap: 8px; min-width: 0; }
-  .screen { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: var(--r-sm); overflow: hidden; }
+  .screen { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: var(--r-sm); overflow: hidden; container: screen / size; }
+  /* Free grid: the picture fills the height the tile has (no 16:9 box whose
+     height follows the width – with a scrollbar coming and going that made
+     the tile jump back and forth). The list goes first when space runs out. */
+  .cam.fill { display: flex; flex-direction: column; flex: 1; min-height: 0; container: cam / size; }
+  .cam.fill .screen { flex: 1 1 0; min-height: 0; aspect-ratio: auto; }
+  .cam.fill .events, .cam.fill .quiet, .cam.fill .error { flex: none; }
+  @container cam (max-height: 230px) { .events, .quiet { display: none; } }
   .screen:fullscreen { border-radius: 0; aspect-ratio: auto; }
   .screen img, .screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
   .screen video { visibility: hidden; }
@@ -346,10 +364,29 @@
   .controls { position: absolute; inset: auto 0 0 0; display: flex; align-items: center; gap: 6px; padding: 18px 8px 8px; background: linear-gradient(transparent, rgba(0, 0, 0, .55)); }
   .grow { flex: 1; }
   .age { font-size: 11.5px; color: rgba(255, 255, 255, .85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chip { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 50%; border: 0; color: #fff; background: rgba(0, 0, 0, .5); font-size: 14px; line-height: 1; }
+  .chip { flex: none; box-sizing: border-box; min-width: 0; min-height: 0; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 50%; border: 0; color: #fff; background: rgba(0, 0, 0, .5); font-size: 14px; line-height: 1; }
   .chip:hover:not(:disabled) { background: rgba(0, 0, 0, .75); }
   .chip.play { width: 38px; height: 38px; font-size: 16px; background: var(--accent); color: var(--on-accent, #fff); }
   .chip.close { position: absolute; top: 6px; right: 6px; }
+  /* Small pictures: only the picture – the buttons come on hover (or when
+     tapped/focused), the time and long labels go. */
+  @container screen (max-width: 260px) or (max-height: 150px) {
+    .age { display: none; }
+    .controls { padding: 10px 5px 5px; gap: 4px; }
+    .chip { width: 26px; height: 26px; font-size: 12px; }
+    .chip.play { width: 30px; height: 30px; font-size: 13px; }
+    .tag { font-size: 11px; padding: 2px 6px; left: 5px; }
+    .tag.top { top: 5px; }
+  }
+  @media (hover: hover) {
+    @container screen (max-width: 260px) or (max-height: 150px) {
+      .controls { opacity: 0; transition: opacity .15s; }
+      .screen:hover .controls, .screen:focus-within .controls { opacity: 1; }
+    }
+  }
+  @container screen (max-width: 150px) or (max-height: 90px) {
+    .tag:not(.live), .chip:not(.main) { display: none; }
+  }
   .error { font-size: 12.5px; color: var(--bad); line-height: 1.4; }
   .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .events button { width: 100%; display: flex; gap: 8px; align-items: center; padding: 5px 6px; border: 0; background: none; border-radius: var(--r-xs); font-size: 13px; text-align: left; color: inherit; }

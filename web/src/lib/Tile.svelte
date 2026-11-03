@@ -142,14 +142,14 @@
   {#if def?.hasWidget && tile.showWidget && missing.length > 0 && onEdit}
     <button class="setup" onclick={onEdit}>🔑 {t('{fields} fehlt – jetzt einrichten', { fields: missing.map((f) => f.label).join(', ') })}</button>
   {:else if live}
-    <div class="body">
+    <div class="body" class:fill={free && !!widget?.camera}>
       {#if error}
         <div class="error">{error}</div>
       {:else if !loaded}
         <div class="skeleton"></div>
       {:else}
         {#if widget?.camera}
-          <Camera tileId={tile.id} view={widget.camera} />
+          <Camera tileId={tile.id} view={widget.camera} fill={free} />
         {:else}
           <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} compact={!free} />
         {/if}
@@ -178,6 +178,8 @@
   .dot.unknown { opacity: .4; }
   .edit { flex: none; }
   .body { padding: 0 14px 14px; min-width: 0; }
+  /* A camera in the free grid takes all the height the tile has. */
+  .body.fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .error { font-size: 12.5px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: var(--r-sm); }
   .skeleton { height: 54px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   .setup { margin: 0 14px 14px; font-size: 13px; text-align: left; border-style: dashed; }

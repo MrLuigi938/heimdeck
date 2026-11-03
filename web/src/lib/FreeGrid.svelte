@@ -5,6 +5,8 @@
   const ROW = 29;
   const GAP = 12;
   const MIN_H = 2;
+  // Some tiles need more room: a camera picture with its buttons.
+  const MIN_SIZE = { camera: { w: 2, h: 5 } };
 
   const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -61,6 +63,7 @@
   // opened and edited there, but not moved or resized.
   let { tiles, defs, status, editMode, newTab, local, cols = COLS, dragging = null, findTile, grab, tileDragProps, onEdit, onCommit } = $props();
   let arranging = $derived(editMode && cols === COLS);
+  const minSize = (it) => MIN_SIZE[tiles.find((tl) => tl.id === it.id)?.integration] || { w: 1, h: MIN_H };
 
   // Starting size, close to what the tile takes in rows.
   function size(tile) {
@@ -159,8 +162,9 @@
     if (!resizing) return;
     const { colStep, rowStep } = metrics();
     const { it } = resizing;
-    const w = clamp(it.w + Math.round((e.clientX - resizing.x0) / colStep), 1, COLS - it.x);
-    const h = Math.max(MIN_H, it.h + Math.round((e.clientY - resizing.y0) / rowStep));
+    const m = minSize(it);
+    const w = clamp(it.w + Math.round((e.clientX - resizing.x0) / colStep), m.w, COLS - it.x);
+    const h = Math.max(m.h, it.h + Math.round((e.clientY - resizing.y0) / rowStep));
     const now = byId[it.id];
     if (preview && now.w === w && now.h === h) return;
     preview = settle(items, { ...it, w, h });
@@ -183,8 +187,9 @@
     const d = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[e.key];
     if (!d) return;
     e.preventDefault();
-    const w = clamp(it.w + d[0], 1, COLS - it.x);
-    const h = Math.max(MIN_H, it.h + d[1]);
+    const m = minSize(it);
+    const w = clamp(it.w + d[0], m.w, COLS - it.x);
+    const h = Math.max(m.h, it.h + d[1]);
     if (w !== it.w || h !== it.h) onCommit(positions(settle(items, { ...it, w, h })));
   }
 
@@ -195,7 +200,7 @@
     el.style.height = 'auto';
     const natural = el.getBoundingClientRect().height;
     el.style.height = '';
-    const h = Math.max(MIN_H, Math.ceil((natural + GAP) / (ROW + GAP)));
+    const h = Math.max(minSize(it).h, Math.ceil((natural + GAP) / (ROW + GAP)));
     if (h !== it.h) onCommit(positions(settle(items, { ...it, h })));
   }
 

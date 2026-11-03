@@ -52,7 +52,7 @@ func TestLiveStillAndMotion(t *testing.T) {
 	}
 	live.Close()
 
-	still, codec, _, err := Still(ctx, src)
+	still, codec, _, err := Still(ctx, src, time.Minute)
 	if err != nil || codec == "" || !bytes.Contains(still, []byte("moof")) {
 		t.Fatalf("still: %v %q", err, codec)
 	}
