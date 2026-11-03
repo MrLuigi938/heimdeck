@@ -4,6 +4,7 @@
 
 - [All integrations](#all-integrations)
 - [Info tiles: weather, calendar, RSS, system](#info-tiles-weather-calendar-rss-system)
+- [Connecting a camera](#connecting-a-camera)
 - [Connecting Proxmox](#connecting-proxmox)
 - [Docker tile](#docker-tile)
 - [Custom API tile](#custom-api-tile)
@@ -51,6 +52,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | UniFi (Network API key) | clients, Wi-Fi, devices online, firmware updates | ✓ clients and devices | restart device |
 | FRITZ!Box (TR-064, user + password) | choose: internet (connection, data rate, line, public IP), devices online, call list with missed calls, smart home (DECT sockets and thermostats), Wi-Fi networks | | switch DECT sockets |
 | UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
+| Camera (RTSP and/or ONVIF) | still picture on a timer, live stream, events (motion, person, doorbell …) with a picture of the moment | | |
 | Speedtest Tracker | download, upload, ping, history | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
@@ -95,6 +97,23 @@ ioBroker has no data interface of its own – it comes from an adapter:
 3. Click **Choose** next to “Data points on the tile” to search your data points and tick the ones you want – no need to type IDs. Without a selection the tile shows the status of your adapters.
 
 Home Assistant entities are chosen the same way. Below the selection every entry gets a field for **your own name** – handy when entities are called something like `sensor.0x00158d0001a2b3c4_temperature`. Leave it empty to keep the name from the service.
+
+## Connecting a camera
+
+The **Camera (RTSP/ONVIF)** tile works with almost any IP camera that is reachable in your network – no cloud, no extra software. The video goes through Heimdeck; the browser never gets the camera's address or password.
+
+1. Turn on **RTSP** in the camera's app or web interface (often under *Network*, *Advanced* or *NVR/RTSP*) and note the address, e.g. `rtsp://192.168.1.50:554/live`. Many cameras have a smaller **substream** – it loads faster.
+2. Add the tile *Camera (RTSP/ONVIF)*, enter the RTSP address and the camera account (not the cloud account of the app), and click *Test*.
+3. If the camera speaks **ONVIF**, also enter its address (e.g. `http://192.168.1.50:8000`): Heimdeck then finds the stream and still picture itself and receives the camera's own events (motion, person, vehicle, doorbell …).
+
+On the tile:
+
+- **Still picture**: when the dashboard loads, every 10 or 30 seconds, every minute, every 5 or 15 minutes – or only on click. Without a snapshot address Heimdeck takes the picture from the stream (the newest key frame).
+- **▶ Live**: the stream plays right in the tile, ⛶ makes it full screen. It stops when the tab is in the background and after 30 minutes at the latest. Everyone watching shares one connection to the camera.
+- **Events**: *automatic* uses the camera's ONVIF events. For cameras that only offer RTSP, *detect in the stream* lets Heimdeck notice motion itself (from how much the picture changes, with a sensitivity setting) – the stream then runs all the time. Each event keeps a picture of the moment; the newest show below the picture and the last one as a badge on it. Events are kept in memory (the last 20 per camera) and are gone after a restart.
+- **Notifications**: tick *Notify me about events* – through your channels under *Settings → Notifications*, at most every 5 minutes per camera.
+
+Video is passed on as it comes (no re-encoding, hardly any CPU): **H.264** plays in every browser, **H.265** in Chrome, Edge and Safari but not in Firefox – choose the H.264 substream there. Audio is not played. **Battery cameras**: the live picture, short refresh times and motion detection in the stream keep the camera awake and drain the battery – use *only on click* and ONVIF events there.
 
 ## Connecting Proxmox
 

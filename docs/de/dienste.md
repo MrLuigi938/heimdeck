@@ -4,6 +4,7 @@
 
 - [Alle Integrationen](#alle-integrationen)
 - [Info-Kacheln: Wetter, Kalender, RSS, System](#info-kacheln-wetter-kalender-rss-system)
+- [Kamera verbinden](#kamera-verbinden)
 - [Proxmox verbinden](#proxmox-verbinden)
 - [Docker-Kachel](#docker-kachel)
 - [Eigene API](#eigene-api)
@@ -51,6 +52,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
 | FRITZ!Box (TR-064, Benutzer + Passwort) | wählbar: Internet (Verbindung, Datenrate, Leitung, externe IP), Geräte online, Anrufliste mit verpassten Anrufen, Smart Home (DECT-Steckdosen und Thermostate), WLAN-Netze | | DECT-Steckdosen schalten |
 | UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
+| Kamera (RTSP und/oder ONVIF) | Standbild mit Timer, Livebild, Ereignisse (Bewegung, Person, Klingel …) mit Bild des Moments | | |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
@@ -97,6 +99,23 @@ ioBroker hat keine eigene Daten-Schnittstelle – sie kommt von einem Adapter:
 3. Neben „Datenpunkte auf der Kachel“ auf **Auswählen** klicken, Datenpunkte suchen und anhaken – IDs abtippen ist nicht nötig. Ohne Auswahl zeigt die Kachel den Status deiner Adapter.
 
 Entitäten von Home Assistant wählst du genauso aus. Unter der Auswahl bekommt jeder Eintrag ein Feld für **deinen eigenen Namen** – praktisch, wenn Entitäten z. B. `sensor.0x00158d0001a2b3c4_temperature` heißen. Leer lassen, um den Namen aus dem Dienst zu behalten.
+
+## Kamera verbinden
+
+Die Kachel **Kamera (RTSP/ONVIF)** funktioniert mit fast jeder IP-Kamera im eigenen Netz – ohne Cloud und ohne Zusatzsoftware. Das Video läuft über Heimdeck; der Browser bekommt Adresse und Passwort der Kamera nie zu sehen.
+
+1. In der App oder Weboberfläche der Kamera **RTSP** einschalten (oft unter *Netzwerk*, *Erweitert* oder *NVR/RTSP*) und die Adresse notieren, z. B. `rtsp://192.168.1.50:554/live`. Viele Kameras haben einen kleineren **Substream** – der lädt schneller.
+2. Die Kachel *Kamera (RTSP/ONVIF)* hinzufügen, RTSP-Adresse und das Kamera-Konto eintragen (nicht das Cloud-Konto der App) und *Testen* klicken.
+3. Kann die Kamera **ONVIF**, auch deren Adresse eintragen (z. B. `http://192.168.1.50:8000`): Heimdeck findet Stream und Standbild dann selbst und bekommt die Ereignisse der Kamera (Bewegung, Person, Fahrzeug, Klingel …).
+
+Auf der Kachel:
+
+- **Standbild**: beim Laden des Dashboards, alle 10 oder 30 Sekunden, jede Minute, alle 5 oder 15 Minuten – oder nur auf Klick. Ohne Standbild-Adresse nimmt Heimdeck das Bild aus dem Stream (das neueste Schlüsselbild).
+- **▶ Livebild**: der Stream läuft direkt in der Kachel, ⛶ zeigt ihn im Vollbild. Er stoppt, sobald der Tab im Hintergrund ist, spätestens nach 30 Minuten. Alle Zuschauer teilen sich eine Verbindung zur Kamera.
+- **Ereignisse**: *automatisch* nimmt die ONVIF-Ereignisse der Kamera. Für Kameras, die nur RTSP können, erkennt Heimdeck mit *aus dem Stream erkennen* Bewegung selbst (daran, wie stark sich das Bild ändert, mit einstellbarer Empfindlichkeit) – der Stream läuft dann dauernd. Zu jedem Ereignis bleibt ein Bild des Moments; die neuesten stehen unter dem Bild, das letzte als Hinweis im Bild. Ereignisse liegen im Arbeitsspeicher (die letzten 20 pro Kamera) und sind nach einem Neustart weg.
+- **Benachrichtigungen**: *Bei Ereignissen benachrichtigen* ankreuzen – über deine Kanäle unter *Einstellungen → Benachrichtigungen*, höchstens alle 5 Minuten pro Kamera.
+
+Das Video wird so weitergegeben, wie es kommt (kein Umrechnen, kaum CPU): **H.264** läuft in jedem Browser, **H.265** in Chrome, Edge und Safari, aber nicht in Firefox – dort den H.264-Substream wählen. Ton wird nicht abgespielt. **Akku-Kameras**: Livebild, kurze Aktualisierungszeiten und die Bewegungserkennung im Stream halten die Kamera wach und leeren den Akku – dort besser *nur auf Klick* und ONVIF-Ereignisse nehmen.
 
 ## Proxmox verbinden
 
