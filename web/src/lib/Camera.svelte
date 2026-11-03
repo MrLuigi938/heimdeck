@@ -222,7 +222,13 @@
 
   // --- refreshing ---
   let timer = null;
+  let scheduled = null; // the setting the timer runs with
   function schedule(mode) {
+    // The tile's data comes again every 20 s with a new view object; only a
+    // changed setting restarts the timer (a restart on each reload meant a
+    // timer of 30 s or more never fired).
+    if (mode === scheduled) return;
+    scheduled = mode;
     clearInterval(timer);
     const every = Number(mode);
     if (every > 0) {
