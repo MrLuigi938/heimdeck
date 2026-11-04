@@ -173,6 +173,20 @@ var (
 	camNotify  = map[int64]time.Time{}
 )
 
+// moveCameraLogins cleans tiles saved before logins were taken out of addresses.
+func (s *Server) moveCameraLogins() {
+	tiles, err := s.store.Tiles()
+	if err != nil {
+		return
+	}
+	for i := range tiles {
+		t := &tiles[i]
+		if t.Integration == "camera" && integrations.CameraMoveLogin(t.Config, t.Secrets) {
+			logErr("Kamera-Anmeldung verschieben", s.store.SaveTile(t))
+		}
+	}
+}
+
 // syncCameraWatchers starts and stops the event watchers to match the tiles.
 func (s *Server) syncCameraWatchers(ctx context.Context) {
 	tiles, err := s.store.Tiles()

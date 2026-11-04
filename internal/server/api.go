@@ -544,6 +544,9 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 		}
 	}
 	t.Config, t.Secrets = cfg, sec
+	if t.Integration == "camera" {
+		integrations.CameraMoveLogin(t.Config, t.Secrets)
+	}
 	// Hidden live data parts: a bounded list of short labels.
 	var hide []string
 	for _, h := range t.Hide {

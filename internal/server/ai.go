@@ -71,6 +71,14 @@ func (s *Server) aiFor(u store.User) map[string]any {
 	return map[string]any{"label": label, "model": c.Model, "local": !aiIsCloud(c.URL), "web": c.webReady(), "webVia": webName(c.webProvider()), "dashboard": c.Dashboard, "tools": c.Dashboard && c.Tools}
 }
 
+// sameHost: a stored key is only ever sent to the server it was entered for –
+// otherwise another admin could read it by pointing the address at their own.
+func sameHost(a, b string) bool {
+	pa, err1 := url.Parse(strings.TrimSpace(a))
+	pb, err2 := url.Parse(strings.TrimSpace(b))
+	return err1 == nil && err2 == nil && pa.Host != "" && strings.EqualFold(pa.Host, pb.Host)
+}
+
 // aiIsCloud guesses whether the hits leave the house (for a hint in the window).
 func aiIsCloud(u string) bool {
 	p, err := url.Parse(u)
@@ -129,7 +137,7 @@ func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	old := s.aiConfig()
-	if c.APIKey == "" {
+	if c.APIKey == "" && sameHost(c.URL, old.URL) {
 		c.APIKey = old.APIKey
 	}
 	c.URL, c.Model, c.Label = strings.TrimSpace(c.URL), strings.TrimSpace(c.Model), strings.TrimSpace(c.Label)
@@ -165,7 +173,7 @@ func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("KI-Einstellungen gespeichert", "aktiv", c.Enabled, "adresse", c.URL, "modell", c.Model, "von", s.username(r))
-	writeJSON(w, map[string]bool{"ok": true})
+	writeJSON(w, map[string]bool{"ok": true, "keySet": c.APIKey != ""})
 }
 
 // handleAIModels asks the server which models it offers (to pick one, and to
@@ -176,8 +184,8 @@ func (s *Server) handleAIModels(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if c.APIKey == "" {
-		c.APIKey = s.aiConfig().APIKey
+	if old := s.aiConfig(); c.APIKey == "" && sameHost(c.URL, old.URL) {
+		c.APIKey = old.APIKey
 	}
 	if p, err := url.Parse(strings.TrimSpace(c.URL)); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
 		writeErr(w, 400, errors.New("KI: bitte eine vollständige Adresse mit http:// oder https:// angeben"))

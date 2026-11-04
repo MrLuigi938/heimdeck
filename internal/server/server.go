@@ -159,6 +159,13 @@ func (s *Server) Handler() http.Handler {
 }
 
 // spa serves the built frontend and falls back to index.html for client routes.
+// appCSP: only Heimdeck's own scripts run, whatever a service's data contains.
+// Pictures may come from anywhere (icons, backgrounds); wasm is for pdf.js, and
+// https for the check whether an icon exists.
+const appCSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; " +
+	"media-src 'self' blob:; connect-src 'self' https:; font-src 'self' data:; worker-src 'self' blob:; " +
+	"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+
 func (s *Server) spa() http.Handler {
 	files := http.FileServerFS(s.web)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +180,7 @@ func (s *Server) spa() http.Handler {
 			}
 		}
 		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Content-Security-Policy", appCSP)
 		http.ServeFileFS(w, r, s.web, "index.html")
 	})
 }

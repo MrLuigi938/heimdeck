@@ -57,7 +57,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
 | Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
-| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, Liste der Gäste bzw. Nodes sortiert nach Name, VMID, Status oder Auslastung | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, Liste der Gäste bzw. Nodes sortiert nach Name, VMID, Status, Auslastung oder Node | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | openmediavault (Administrator) | CPU, RAM, Laufzeit, Updates, Dateisysteme, Festplatten-Zustand (S.M.A.R.T.) | | |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter mit eigenen Namen oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |

@@ -57,7 +57,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
 | Docker (mounted socket) | running/stopped containers, optional updates | ✓ containers | optional start, stop, restart |
-| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, list of guests or nodes sorted by name, VMID, status or load | ✓ VMs and containers | start, shut down, reboot |
+| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, list of guests or nodes sorted by name, VMID, status, load or node | ✓ VMs and containers | start, shut down, reboot |
 | openmediavault (admin user) | CPU, RAM, uptime, updates, file systems, disk health (S.M.A.R.T.) | | |
 | **Smart home & energy** | | | |
 | Home Assistant (long-lived access token) | chosen sensors/switches with your own names, or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |

@@ -135,8 +135,10 @@
   // PDFs are read by pdf.js (Mozilla's PDF reader), loaded only when needed.
   // Scanned PDFs have no text: then the first pages go along as pictures.
   async function readPdf(file) {
-    const pdfjs = await import('pdfjs-dist');
-    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+    // The legacy build also works in browsers a few years old (the normal one
+    // needs Chrome 140 or newer); it is only loaded when a PDF is added.
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
     const task = pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false });
     const doc = await task.promise;
     let text = '';
@@ -370,7 +372,7 @@
 {/snippet}
 
 <div class="chat-backdrop {layout}" class:narrow role="presentation" onclick={(e) => e.target === e.currentTarget && layout !== 'side' && onClose()}>
-  <div class="chat card {layout}" class:narrow role="dialog" aria-modal={layout !== 'side'} aria-label={t('KI-Chat')} ondragover={(e) => e.preventDefault()} ondrop={onDrop}>
+  <div class="chat card {layout}" class:narrow role="dialog" tabindex="-1" aria-modal={layout !== 'side'} aria-label={t('KI-Chat')} ondragover={(e) => e.preventDefault()} ondrop={onDrop}>
     {#if layout === 'window' && !narrow}
       <aside class="chats">
         <button class="small primary new" onclick={reset}>＋ {t('Neuer Chat')}</button>

@@ -6,7 +6,6 @@
 package testcam
 
 import (
-	"sync"
 	"time"
 
 	"github.com/bluenviron/gortsplib/v5"
@@ -295,7 +294,6 @@ type Server struct {
 	server *gortsplib.Server
 	stream *gortsplib.ServerStream
 	stop   chan struct{}
-	mu     sync.Mutex
 	// Start moves the camera's clock: the scene at time Start+elapsed.
 	Start time.Time
 }

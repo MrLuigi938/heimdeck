@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,7 +44,15 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("heimdeck"), bcrypt.Defaul
 
 type attempt struct {
 	count int
+	last  time.Time
 	until time.Time
+}
+
+// failureKey: failed logins count per account and address. By address alone,
+// everyone behind a reverse proxy shares one counter, and anyone could lock
+// them all out with a few wrong passwords.
+func failureKey(ip, username string) string {
+	return ip + "|" + strings.ToLower(username)
 }
 
 type ctxKey struct{}
@@ -67,9 +76,9 @@ func clientIP(r *http.Request) string {
 
 // Login checks the credentials and sets the session cookie.
 func (a *Auth) Login(w http.ResponseWriter, r *http.Request, username, password string) error {
-	ip := clientIP(r)
+	key := failureKey(clientIP(r), username)
 	a.mu.Lock()
-	if f := a.failures[ip]; f != nil && time.Now().Before(f.until) {
+	if f := a.failures[key]; f != nil && time.Now().Before(f.until) {
 		a.mu.Unlock()
 		return ErrLocked
 	}
@@ -84,11 +93,21 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request, username, password 
 	}
 	if err != nil {
 		a.mu.Lock()
-		f := a.failures[ip]
-		if f == nil {
-			f = &attempt{}
-			a.failures[ip] = f
+		now := time.Now()
+		// Old entries go, so guessed names cannot fill the memory.
+		if len(a.failures) > 10000 {
+			for k, old := range a.failures {
+				if now.Sub(old.last) > lockout && now.After(old.until) {
+					delete(a.failures, k)
+				}
+			}
 		}
+		f := a.failures[key]
+		if f == nil || now.Sub(f.last) > lockout {
+			f = &attempt{}
+			a.failures[key] = f
+		}
+		f.last = now
 		f.count++
 		if f.count >= maxFailures {
 			f.count = 0
@@ -98,7 +117,7 @@ func (a *Auth) Login(w http.ResponseWriter, r *http.Request, username, password 
 		return ErrInvalid
 	}
 	a.mu.Lock()
-	delete(a.failures, ip)
+	delete(a.failures, key)
 	a.mu.Unlock()
 	if u, err := a.store.User(id); err != nil || u.Disabled {
 		return ErrDisabled

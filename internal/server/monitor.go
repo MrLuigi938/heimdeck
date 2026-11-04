@@ -37,6 +37,7 @@ type Check struct {
 // Monitor checks every tile once a minute and stores the results, so the
 // dashboard can show the current status and the uptime history.
 func (s *Server) Monitor(ctx context.Context) {
+	s.moveCameraLogins()
 	// Give containers started together with Heimdeck a moment to come up.
 	select {
 	case <-ctx.Done():

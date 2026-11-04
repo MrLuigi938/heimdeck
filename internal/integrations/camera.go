@@ -147,7 +147,7 @@ func (c cameraTile) onvifInfo(ctx context.Context, in *Instance) (camera.ONVIFIn
 	if o == nil {
 		return camera.ONVIFInfo{}, nil
 	}
-	return remember(in, "onvif\x00"+in.V("onvif")+"\x00"+in.V("username"), time.Hour, func() (camera.ONVIFInfo, error) {
+	return remember(in, "onvif\x00"+in.V("onvif")+"\x00"+in.V("username")+"\x00"+in.Values["password"], time.Hour, func() (camera.ONVIFInfo, error) {
 		return o.Info(ctx)
 	})
 }
@@ -173,7 +173,11 @@ func CameraSource(ctx context.Context, in *Instance) (camera.Source, error) {
 	if u.User == nil && in.V("username") != "" {
 		u.User = url.UserPassword(in.V("username"), in.Values["password"])
 	}
-	return camera.Source{URL: u.String(), Dial: DialerFor(in.PublicOnly)}, nil
+	scope := ""
+	if in.PublicOnly {
+		scope = "public"
+	}
+	return camera.Source{URL: u.String(), Scope: scope, Dial: DialerFor(in.PublicOnly)}, nil
 }
 
 // CameraSnapshot loads the camera's own JPEG, when it has a snapshot address
@@ -197,6 +201,29 @@ func CameraSnapshot(ctx context.Context, in *Instance) ([]byte, string, error) {
 		return nil, "", CameraError(in, err)
 	}
 	return data, ct, nil
+}
+
+// CameraMoveLogin takes a login written into an address (rtsp://user:pw@…) out
+// of it and into the tile's user and password fields: addresses are stored and
+// exported as plain text, secrets encrypted and never exported.
+func CameraMoveLogin(config, secrets map[string]string) bool {
+	moved := false
+	for _, key := range []string{"rtsp", "snapshot", "onvif"} {
+		u, err := url.Parse(config[key])
+		if err != nil || u.User == nil {
+			continue
+		}
+		if name := u.User.Username(); name != "" && (key == "rtsp" || config["username"] == "") {
+			config["username"] = name
+		}
+		if pw, ok := u.User.Password(); ok && (key == "rtsp" || secrets["password"] == "") {
+			secrets["password"] = pw
+		}
+		u.User = nil
+		config[key] = u.String()
+		moved = true
+	}
+	return moved
 }
 
 // CameraError is a camera error as the browser may see it, in the user's

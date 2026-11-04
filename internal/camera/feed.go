@@ -28,8 +28,9 @@ import (
 
 // Source is where a camera's stream comes from.
 type Source struct {
-	URL  string // rtsp://user:pass@host:554/path
-	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+	URL   string // rtsp://user:pass@host:554/path
+	Dial  func(ctx context.Context, network, address string) (net.Conn, error)
+	Scope string // who may use it: connections are not shared across scopes
 }
 
 // Frame is one picture as it went to the viewers, for the motion detection.
@@ -79,10 +80,13 @@ var (
 func getFeed(src Source) *feed {
 	feedsMu.Lock()
 	defer feedsMu.Unlock()
-	f := feeds[src.URL]
+	// Never across scopes: an account limited to public addresses must not get
+	// a stream or a kept picture that another account's connection brought in.
+	key := src.Scope + "\x00" + src.URL
+	f := feeds[key]
 	if f == nil {
-		f = &feed{key: src.URL, src: src, viewers: map[chan []byte]bool{}, watchers: map[chan Frame]struct{}{}}
-		feeds[src.URL] = f
+		f = &feed{key: key, src: src, viewers: map[chan []byte]bool{}, watchers: map[chan Frame]struct{}{}}
+		feeds[key] = f
 	} else {
 		f.mu.Lock()
 		f.src.Dial = src.Dial
@@ -103,6 +107,7 @@ func (f *feed) startLocked() {
 	f.running = true
 	f.ready = make(chan struct{})
 	f.readyErr = nil
+	f.init = nil // of an earlier connection
 	ctx, cancel := context.WithCancel(context.Background())
 	f.cancel = cancel
 	go f.run(ctx)
@@ -134,6 +139,13 @@ func (f *feed) run(ctx context.Context) {
 		}
 		f.mu.Lock()
 		f.lastErr = err
+		// Whoever comes now is told, until the camera is back (writeInit).
+		f.init = nil
+		select {
+		case <-f.ready:
+			f.ready = make(chan struct{}) // the camera was there: a new round for readyErr
+		default: // someone may be waiting on this one
+		}
 		f.failReadyLocked(err)
 		f.dropViewersLocked()
 		f.mu.Unlock()
@@ -208,8 +220,7 @@ func (f *feed) session(ctx context.Context) error {
 			return err
 		}
 		decode = dec.Decode
-		sps, pps := h264f.SafeParams()
-		m.setParams(nil, sps, pps)
+		m.setParams(nil, h264f.SPS, h264f.PPS)
 		c.OnPacketRTP(medi, h264f, func(pkt *rtp.Packet) { m.packet(c, medi, pkt, decode) })
 	} else {
 		m.h265 = true
@@ -218,8 +229,7 @@ func (f *feed) session(ctx context.Context) error {
 			return err
 		}
 		decode = dec.Decode
-		vps, sps, pps := h265f.SafeParams()
-		m.setParams(vps, sps, pps)
+		m.setParams(h265f.VPS, h265f.SPS, h265f.PPS)
 		c.OnPacketRTP(medi, h265f, func(pkt *rtp.Packet) { m.packet(c, medi, pkt, decode) })
 	}
 	if _, err := c.Play(nil); err != nil {
@@ -377,6 +387,7 @@ func (m *muxer) writeInit() error {
 	f.init = buf.Bytes()
 	f.codec = name
 	f.lastErr = nil
+	f.readyErr = nil
 	select {
 	case <-f.ready:
 	default:
@@ -397,16 +408,11 @@ func (m *muxer) flush(next *pending) {
 	if next != nil && next.pts > p.pts {
 		dur = uint32(min(next.pts-p.pts, 90000))
 	}
-	var sample *fmp4.Sample
-	var err error
-	if m.h265 {
-		sample, err = fmp4.NewSampleH265(0, p.au)
-	} else {
-		sample, err = fmp4.NewSampleH264(0, p.au)
-	}
-	if err != nil || len(sample.Payload) > maxFrameSize {
+	payload, err := h264.AVCC(p.au).Marshal() // the same length-prefixed form for H.265
+	if err != nil || len(payload) > maxFrameSize {
 		return
 	}
+	sample := &fmp4.Sample{Payload: payload, IsNonSyncSample: !p.key}
 	sample.Duration = dur
 	m.seq++
 	part := fmp4.Part{SequenceNumber: m.seq, Tracks: []*fmp4.PartTrack{{ID: 1, BaseTime: uint64(p.pts - m.base), Samples: []*fmp4.Sample{sample}}}}

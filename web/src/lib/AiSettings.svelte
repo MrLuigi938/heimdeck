@@ -116,11 +116,10 @@
     saving = true;
     const sentKey = key, sentWebKey = webKey;
     try {
-      await put('/ai', { ...$state.snapshot(cfg), apiKey: sentKey, webKey: sentWebKey });
-      if (sentKey) {
-        keySet = true;
-        if (key === sentKey) key = '';
-      }
+      const res = await put('/ai', { ...$state.snapshot(cfg), apiKey: sentKey, webKey: sentWebKey });
+      // A key stays only with its server: another address needs it entered again.
+      keySet = !!res.keySet;
+      if (sentKey && key === sentKey) key = '';
       if (sentWebKey) {
         webKeySet = true;
         webSaved = cfg.webSearch;
