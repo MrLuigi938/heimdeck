@@ -35,8 +35,8 @@ func (proxmox) Def() Definition {
 		},
 		Fields: []Field{{Key: "token", Label: "API-Token", Type: "password", Required: true, Secret: true,
 			Help: "Eingeben als benutzer@pam!name=geheimnis. Rolle PVEAuditor genügt zum Anzeigen, für Start/Stopp zusätzlich PVEVMUser."},
-			{Key: "sort", Label: "Sortierung", Type: "select", Options: []string{"Name", "VMID", "Status", "Auslastung"}, Display: true,
-				Help: "Reihenfolge der VMs und Container. „Status“: laufende zuerst, „Auslastung“: die am meisten arbeiten zuerst."}},
+			{Key: "sort", Label: "Sortierung", Type: "select", Options: []string{"Name", "VMID", "Status", "Auslastung", "Node"}, Display: true,
+				Help: "Reihenfolge der VMs und Container. „Status“: laufende zuerst, „Auslastung“: die am meisten arbeiten zuerst, „Node“: nach Server, darin nach Name."}},
 		HasWidget: true, HasSearch: true, Port: 8006,
 	}
 }
@@ -460,6 +460,11 @@ func sortGuests(g []pveResource, by string) []pveResource {
 		switch by {
 		case "VMID":
 			return a.VMID < b.VMID
+		case "Node":
+			if a.Node != b.Node {
+				return a.Node < b.Node
+			}
+			return name(a, b)
 		case "Status":
 			if (a.Status == "running") != (b.Status == "running") {
 				return a.Status == "running"

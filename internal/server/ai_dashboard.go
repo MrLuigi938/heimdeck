@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/logging"
 	"github.com/heimdeck/heimdeck/internal/store"
 )
 
@@ -120,21 +120,6 @@ func (s *Server) dashboardContext(r *http.Request) (string, int) {
 	return strings.TrimSpace(b.String()), n
 }
 
-// Addresses in error texts may carry keys (…?apikey=…) and say how the home
-// network is built – neither goes to the AI.
-var addressRe = regexp.MustCompile(`"?\b[a-z][a-z0-9+.-]*://[^\s"]+"?|\b\d{1,3}(\.\d{1,3}){3}(:\d+)?\b`)
-
-func withoutAddresses(s string) string {
-	s = addressRe.ReplaceAllString(s, "…")
-	for _, verb := range []string{"Get …: ", "Post …: "} {
-		s = strings.ReplaceAll(s, verb, "")
-	}
-	if i := strings.Index(s, "dial tcp"); i >= 0 {
-		s = strings.TrimSpace(strings.TrimSpace(s[:i]) + " not reachable")
-	}
-	return s
-}
-
 // tileSummary is one tile as a few lines of text.
 func (s *Server) tileSummary(t store.Tile, lang string) string {
 	return s.tileDetail(t, lang, dashItems, dashTileChars)
@@ -167,7 +152,7 @@ func (s *Server) tileDetail(t store.Tile, lang string, items, chars int) string 
 	case pending:
 		b.WriteString("  (live data still loading)\n")
 	case err != nil:
-		b.WriteString("  error: " + clip(withoutAddresses(i18n.T(lang, err.Error())), 160) + "\n")
+		b.WriteString("  error: " + clip(i18n.T(lang, logging.Public(err.Error())), 160) + "\n")
 	case w != nil:
 		w = hideParts(w, t.Hide, lang)
 		var parts []string

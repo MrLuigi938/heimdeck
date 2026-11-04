@@ -89,3 +89,14 @@ func TestMatchName(t *testing.T) {
 		}
 	}
 }
+
+func TestSortGuestsByNode(t *testing.T) {
+	got := sortGuests([]pveResource{{Name: "b", Node: "pve2"}, {Name: "z", Node: "pve1"}, {Name: "a", Node: "pve2"}, {Name: "c", Node: "pve1"}}, "Node")
+	order := ""
+	for _, g := range got {
+		order += g.Node + "/" + g.Name + " "
+	}
+	if order != "pve1/c pve1/z pve2/a pve2/b " {
+		t.Fatal(order)
+	}
+}

@@ -70,6 +70,25 @@ func Redact(s string) string {
 	return userInfo.ReplaceAllString(s, "${1}***@")
 }
 
+// address matches URLs of any kind and IP addresses with an optional port.
+var address = regexp.MustCompile(`"?\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s"]+"?|\b\d{1,3}(\.\d{1,3}){3}(:\d+)?\b`)
+
+// connection errors of Go's network code, which say little to the user.
+var netError = regexp.MustCompile(`\b(dial|read|write) (tcp|udp)\b|connectex|wsarecv|wsasend|connection reset|broken pipe|no route to host|network is unreachable|^(Get|Post|Put|Delete|Head|Patch) …`)
+
+// Public makes a text safe for the browser. Error texts of HTTP clients quote
+// the whole address, which may hold a key under any name and says how the home
+// network is built – so addresses go altogether, and a bare network error
+// becomes a plain sentence (translated by the caller).
+func Public(s string) string {
+	s = Redact(s)
+	s = address.ReplaceAllString(s, "…")
+	if netError.MatchString(s) {
+		return "Dienst nicht erreichbar – läuft er, und stimmt die Adresse?"
+	}
+	return s
+}
+
 // Recover, deferred at the top of a goroutine, logs a panic with its stack
 // instead of letting it end the whole program.
 func Recover(what string, attrs ...any) {

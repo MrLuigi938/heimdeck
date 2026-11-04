@@ -721,7 +721,7 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := s.buildTile(in, uid(r))
 	if err != nil {
-		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, map[string]any{"ok": false, "error": tr(r, logging.Public(err.Error()))})
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -757,7 +757,7 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 		widget = safeWidget(widget)
 	}
 	if err != nil {
-		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		writeJSON(w, map[string]any{"ok": false, "error": tr(r, logging.Public(err.Error()))})
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "ms": time.Since(start).Milliseconds(), "widget": widget})
@@ -906,8 +906,11 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case pending:
 		writeJSON(w, map[string]any{"pending": true})
+	case err != nil && !acc.Own:
+		// Someone a dashboard is shared with learns nothing about how it is set up.
+		writeJSON(w, map[string]any{"error": tr(r, "Dieser Dienst ist gerade nicht verfügbar")})
 	case err != nil:
-		writeJSON(w, map[string]any{"error": tr(r, err.Error())})
+		writeJSON(w, map[string]any{"error": tr(r, logging.Public(err.Error()))})
 	default:
 		data = hideParts(data, t.Hide, langOf(r))
 		if !acc.Act {
@@ -1109,7 +1112,11 @@ func (s *Server) searchTiles(ctx context.Context, lang string, tiles []store.Til
 			}
 			g := searchGroup{TileID: t.ID, Name: t.Name, Icon: t.Icon, Items: items}
 			if err != nil {
-				g.Error = err.Error()
+				g.Error = logging.Public(err.Error())
+				if !groups[t.GroupID].Own {
+					g.Error = "Dieser Dienst ist gerade nicht verfügbar"
+				}
+				g.Error = i18n.T(lang, g.Error)
 				slog.Warn("Suche in einem Dienst fehlgeschlagen", "kachel", t.Name, "dienst", t.Integration, "dauer", time.Since(start).Round(time.Millisecond), "fehler", logging.Redact(err.Error()))
 			} else {
 				slog.Debug("Suche in einem Dienst", "kachel", t.Name, "dienst", t.Integration, "treffer", len(items), "dauer", time.Since(start).Round(time.Millisecond))

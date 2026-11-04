@@ -257,7 +257,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 func writeErr(w http.ResponseWriter, code int, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": translate(w, err.Error())})
+	json.NewEncoder(w).Encode(map[string]string{"error": translate(w, logging.Public(err.Error()))})
 }
 
 func readJSON(r *http.Request, v any) error {
