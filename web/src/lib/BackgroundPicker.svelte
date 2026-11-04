@@ -19,6 +19,7 @@
   let albumTile = $state(0);
   let albums = $state(null);
   let album = $state('');
+  let checking = $state(false);
 
   const save = (list) => onChange?.(joinBackgrounds(list));
   const remove = (i) => save(entries.filter((_, j) => j !== i));
@@ -63,9 +64,23 @@
     }
   }
 
-  function addAlbum() {
+  // Checked before it is added: a background without pictures would just stay empty.
+  async function addAlbum() {
     const a = albums?.find((x) => x.id === album);
     if (!a) return;
+    checking = true;
+    try {
+      const { images = [] } = await get(`/tiles/${albumTile}/albums/${encodeURIComponent(a.id)}`);
+      if (!images.length) {
+        toast(t('In diesem Album sind keine Bilder (Videos werden nicht gezeigt)'), 'bad');
+        return;
+      }
+    } catch (err) {
+      toast(err.message, 'bad');
+      return;
+    } finally {
+      checking = false;
+    }
     save([...entries, { kind: 'album', tile: albumTile, album: a.id, name: a.name }]);
     adding = '';
     album = '';
@@ -108,14 +123,17 @@
       </select>
       {#if albumTile}
         <select bind:value={album} disabled={!albums} aria-label={t('Album')}>
-          <option value="">{albums ? t('Album wählen …') : t('Lade …')}</option>
+          <option value="">{!albums ? t('Lade …') : albums.length ? t('Album wählen …') : t('Keine Alben gefunden')}</option>
           {#each albums || [] as a (a.id)}<option value={a.id}>{a.name} ({a.value})</option>{/each}
         </select>
-        <button type="button" class="small primary" disabled={!album} onclick={addAlbum}>{t('Hinzufügen')}</button>
+        <button type="button" class="small primary" disabled={!album || checking} onclick={addAlbum}>{t('Hinzufügen')}</button>
       {/if}
     </div>
   {/if}
   <span class="help">{t('Große Bilder werden beim Hochladen verkleinert. Mehrere Bilder oder ein Album wechseln sich ab.')}</span>
+  {#if !photoTiles.length}
+    <span class="help">{t('Für Fotoalben braucht es eine eigene Immich- oder PhotoPrism-Kachel mit API-Key.')}</span>
+  {/if}
 </div>
 
 <style>

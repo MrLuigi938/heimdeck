@@ -46,14 +46,28 @@ func (i immich) AlbumImages(ctx context.Context, in *Instance, album string) ([]
 		return nil, in.Errorf("nicht gefunden")
 	}
 	return remember(in, "immich-album\x00"+in.BaseURL+"\x00"+album, 10*time.Minute, func() ([]string, error) {
+		type asset struct {
+			ID   string `json:"id"`
+			Type string `json:"type"`
+		}
 		var a struct {
-			Assets []struct {
-				ID   string `json:"id"`
-				Type string `json:"type"`
-			} `json:"assets"`
+			Assets []asset `json:"assets"`
 		}
 		if err := i.call(ctx, in, "GET", "/albums/"+album, nil, nil, &a); err != nil {
 			return nil, err
+		}
+		// Since Immich 3 an album no longer lists its pictures, the search does.
+		if a.Assets == nil {
+			var res struct {
+				Assets struct {
+					Items []asset `json:"items"`
+				} `json:"assets"`
+			}
+			body := map[string]any{"albumIds": []string{album}, "type": "IMAGE", "size": maxAlbumImages}
+			if err := i.call(ctx, in, "POST", "/search/metadata", nil, body, &res); err != nil {
+				return nil, err
+			}
+			a.Assets = res.Assets.Items
 		}
 		out := []string{}
 		for _, asset := range a.Assets {

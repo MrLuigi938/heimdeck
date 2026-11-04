@@ -154,6 +154,25 @@ func TestAlbumBackgrounds(t *testing.T) {
 	}
 }
 
+// Since Immich 3 an album no longer lists its pictures: they come from the search.
+func TestAlbumBackgroundsImmich3(t *testing.T) {
+	const album = "3f1c2b8e-0000-4000-8000-000000000002"
+	f := newFake(t, map[string]any{
+		"GET /api/albums/" + album: obj{"id": album, "albumName": "Urlaub", "assetCount": 2},
+		"POST /api/search/metadata": obj{"assets": obj{"items": []obj{
+			{"id": "aaaaaaaa-0000-4000-8000-000000000001", "type": "IMAGE"},
+			{"id": "aaaaaaaa-0000-4000-8000-000000000002", "type": "VIDEO"},
+		}}},
+	}, nil)
+	images, err := immich{}.AlbumImages(context.Background(), f.instance(map[string]string{"apiKey": "k"}), album)
+	if err != nil || len(images) != 1 || !strings.Contains(images[0], "size%3Dpreview") {
+		t.Fatalf("%v %v", images, err)
+	}
+	if body := f.bodies["POST /api/search/metadata"]; !strings.Contains(body, album) {
+		t.Fatalf("search not limited to the album: %s", body)
+	}
+}
+
 // With an empty queue the Tubesy tile shows what finished last.
 func TestTubesyRecentDownloads(t *testing.T) {
 	f := newFake(t, map[string]any{
