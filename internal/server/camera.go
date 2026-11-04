@@ -61,7 +61,7 @@ func (s *Server) handleCameraLive(w http.ResponseWriter, r *http.Request) {
 	live, err := camera.Watch(r.Context(), src)
 	if err != nil {
 		slog.Debug("Kamera-Livebild", "kachel", t.Name, "fehler", camera.RedactURL(err.Error()))
-		writeErr(w, 502, errors.New(in.T(err.Error())))
+		writeErr(w, 502, integrations.CameraError(in, err))
 		return
 	}
 	defer live.Close()
@@ -123,7 +123,7 @@ func (s *Server) handleCameraStill(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Debug("Kamera-Standbild", "kachel", t.Name, "fehler", camera.RedactURL(err.Error()))
-		writeErr(w, 502, errors.New(in.T(err.Error())))
+		writeErr(w, 502, integrations.CameraError(in, err))
 		return
 	}
 	w.Header().Set("X-Taken", taken.UTC().Format(time.RFC3339))

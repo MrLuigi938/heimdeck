@@ -96,7 +96,7 @@ func (c cameraTile) Test(ctx context.Context, in *Instance) error {
 	if o := CameraONVIF(in); o != nil {
 		info, err := o.Info(ctx)
 		if err != nil {
-			return errors.New(in.T(err.Error()))
+			return CameraError(in, err)
 		}
 		if in.V("rtsp") == "" && info.StreamURI == "" && in.V("snapshot") == "" && info.SnapshotURI == "" {
 			return in.Errorf("Die Kamera nennt über ONVIF keinen Stream – bitte die RTSP-Adresse eintragen")
@@ -108,7 +108,7 @@ func (c cameraTile) Test(ctx context.Context, in *Instance) error {
 			return err
 		}
 		if _, err := camera.Probe(ctx, src); err != nil {
-			return errors.New(in.T(err.Error()))
+			return CameraError(in, err)
 		}
 		return nil
 	}
@@ -159,16 +159,16 @@ func CameraSource(ctx context.Context, in *Instance) (camera.Source, error) {
 	if addr == "" {
 		info, err := cameraTile{}.onvifInfo(ctx, in)
 		if err != nil {
-			return camera.Source{}, errors.New(in.T(err.Error()))
+			return camera.Source{}, CameraError(in, err)
 		}
 		addr = info.StreamURI
 	}
 	if addr == "" {
-		return camera.Source{}, in.Errorf("Keine RTSP-Adresse eingetragen")
+		return camera.Source{}, camera.Shown(in.T("Keine RTSP-Adresse eingetragen"))
 	}
 	u, err := url.Parse(addr)
 	if err != nil || (u.Scheme != "rtsp" && u.Scheme != "rtsps") || u.Host == "" {
-		return camera.Source{}, in.Errorf("Die RTSP-Adresse muss mit rtsp:// beginnen")
+		return camera.Source{}, camera.Shown(in.T("Die RTSP-Adresse muss mit rtsp:// beginnen"))
 	}
 	if u.User == nil && in.V("username") != "" {
 		u.User = url.UserPassword(in.V("username"), in.Values["password"])
@@ -190,13 +190,26 @@ func CameraSnapshot(ctx context.Context, in *Instance) ([]byte, string, error) {
 		return nil, "", ErrNoSnapshot
 	}
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		return nil, "", in.Errorf("Die Standbild-Adresse muss mit http:// oder https:// beginnen")
+		return nil, "", camera.Shown(in.T("Die Standbild-Adresse muss mit http:// oder https:// beginnen"))
 	}
 	data, ct, err := camera.Snapshot(ctx, in.Client, addr, in.V("username"), in.Values["password"])
 	if err != nil {
-		return nil, "", errors.New(in.T(err.Error()))
+		return nil, "", CameraError(in, err)
 	}
 	return data, ct, nil
+}
+
+// CameraError is a camera error as the browser may see it, in the user's
+// language: without the camera's address, which viewers of a shared tile must
+// not learn. The details are in the debug log.
+func CameraError(in *Instance, err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), ErrHomeNetwork.Error()) {
+		return camera.Shown(in.T(ErrHomeNetwork.Error()))
+	}
+	return camera.Shown(in.T(camera.Public(err).Error()))
 }
 
 // ErrNoSnapshot: the camera has no snapshot address; take a picture from the stream.

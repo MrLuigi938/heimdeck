@@ -7,7 +7,6 @@ package camera
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -49,7 +48,7 @@ const (
 )
 
 // ErrNoVideo is returned when the stream has no H.264/H.265 video.
-var ErrNoVideo = errors.New("Der Stream enthält kein H.264- oder H.265-Video")
+var ErrNoVideo = shown("Der Stream enthält kein H.264- oder H.265-Video")
 
 type feed struct {
 	key string
@@ -170,7 +169,7 @@ func (f *feed) dropViewersLocked() {
 func (f *feed) session(ctx context.Context) error {
 	u, err := base.ParseURL(f.src.URL)
 	if err != nil {
-		return errors.New("Ungültige RTSP-Adresse")
+		return shown("Ungültige RTSP-Adresse")
 	}
 	tcp := gortsplib.ProtocolTCP // works through Docker and firewalls
 	c := &gortsplib.Client{Scheme: u.Scheme, Host: u.Host, Protocol: &tcp, DialContext: f.src.Dial,
@@ -508,7 +507,7 @@ func waitReady(ctx context.Context, f *feed, ready chan struct{}) error {
 			if f.readyErr != nil {
 				return f.readyErr
 			}
-			return errors.New("Die Kamera schickt kein Bild")
+			return shown("Die Kamera schickt kein Bild")
 		}
 		return nil
 	case <-t.C:
@@ -517,7 +516,7 @@ func waitReady(ctx context.Context, f *feed, ready chan struct{}) error {
 		if f.lastErr != nil {
 			return f.lastErr
 		}
-		return errors.New("Die Kamera antwortet nicht rechtzeitig")
+		return shown("Die Kamera antwortet nicht rechtzeitig")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -553,10 +552,10 @@ func Still(ctx context.Context, src Source, maxAge time.Duration) ([]byte, strin
 		select {
 		case _, ok := <-l.Frames:
 			if !ok {
-				return nil, "", time.Time{}, errors.New("Die Kamera hat die Verbindung beendet")
+				return nil, "", time.Time{}, shown("Die Kamera hat die Verbindung beendet")
 			}
 		case <-deadline.C:
-			return nil, "", time.Time{}, errors.New("Die Kamera schickt kein Bild")
+			return nil, "", time.Time{}, shown("Die Kamera schickt kein Bild")
 		case <-ctx.Done():
 			return nil, "", time.Time{}, ctx.Err()
 		}
@@ -601,15 +600,17 @@ func friendly(err error) error {
 		return nil
 	}
 	s := err.Error()
+	slog.Debug("Kamera-Verbindung", "fehler", RedactURL(s))
 	switch {
+	// Connection errors first: their address may contain "401" or "404" (a port).
+	case strings.Contains(s, "connection refused"), strings.Contains(s, "connectex"):
+		return shown("Die Kamera nimmt keine RTSP-Verbindung an – ist RTSP eingeschaltet und der Port richtig (meist 554)?")
+	case isNetworkError(s):
+		return errUnreachable
 	case strings.Contains(s, "401"), strings.Contains(s, "authentication"), strings.Contains(s, "Unauthorized"):
-		return errors.New("Die Kamera lehnt die Anmeldung ab – Benutzer und Passwort prüfen")
+		return shown("Die Kamera lehnt die Anmeldung ab – Benutzer und Passwort prüfen")
 	case strings.Contains(s, "404"):
-		return errors.New("Diesen Stream kennt die Kamera nicht – den Pfad der RTSP-Adresse prüfen")
-	case strings.Contains(s, "connection refused"):
-		return errors.New("Die Kamera nimmt keine RTSP-Verbindung an – ist RTSP eingeschaltet und der Port richtig (meist 554)?")
-	case strings.Contains(s, "i/o timeout"), strings.Contains(s, "no route"), strings.Contains(s, "deadline"):
-		return errors.New("Die Kamera ist nicht erreichbar – Adresse prüfen")
+		return shown("Diesen Stream kennt die Kamera nicht – den Pfad der RTSP-Adresse prüfen")
 	}
 	return err
 }

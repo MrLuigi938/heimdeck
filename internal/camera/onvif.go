@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,7 +75,7 @@ func (o *ONVIF) soap(ctx context.Context, addr, action, body string, out any, au
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode == 401 || bytes.Contains(data, []byte("NotAuthorized")) {
-		return errors.New("Die Kamera lehnt die ONVIF-Anmeldung ab – Benutzer und Passwort prüfen (bei manchen Kameras ist es ein eigenes ONVIF-Konto)")
+		return shown("Die Kamera lehnt die ONVIF-Anmeldung ab – Benutzer und Passwort prüfen (bei manchen Kameras ist es ein eigenes ONVIF-Konto)")
 	}
 	if resp.StatusCode >= 400 {
 		reason := between(string(data), "Text", "</")
@@ -224,8 +223,8 @@ func (o *ONVIF) fixHost(addr string) string {
 func onvifFriendly(err error) error {
 	s := err.Error()
 	switch {
-	case strings.Contains(s, "connection refused"), strings.Contains(s, "timeout"), strings.Contains(s, "no route"):
-		return errors.New("ONVIF antwortet nicht – Adresse und Port prüfen (oft 80, 8000 oder 2020) und ob ONVIF in der Kamera eingeschaltet ist")
+	case isNetworkError(s), strings.Contains(s, "timeout"):
+		return shown("ONVIF antwortet nicht – Adresse und Port prüfen (oft 80, 8000 oder 2020) und ob ONVIF in der Kamera eingeschaltet ist")
 	}
 	return err
 }
@@ -286,7 +285,7 @@ func (o *ONVIF) PullEvents(ctx context.Context, on func(kind string)) error {
 		addr = o.events
 		o.mu.Unlock()
 		if addr == "" {
-			return errors.New("Die Kamera bietet über ONVIF keine Ereignisse an")
+			return shown("Die Kamera bietet über ONVIF keine Ereignisse an")
 		}
 	}
 	var sub struct {
@@ -364,7 +363,7 @@ func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string)
 		chal := resp.Header.Get("WWW-Authenticate")
 		resp.Body.Close()
 		if !strings.HasPrefix(strings.ToLower(chal), "digest") {
-			return nil, "", errors.New("Die Kamera lehnt die Anmeldung für das Standbild ab")
+			return nil, "", shown("Die Kamera lehnt die Anmeldung für das Standbild ab")
 		}
 		u, _ := url.Parse(addr)
 		resp, err = get(digestAuth(chal, user, pass, "GET", u.RequestURI()))
@@ -374,7 +373,7 @@ func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, "", fmt.Errorf("Standbild: Status %d", resp.StatusCode)
+		return nil, "", shown(fmt.Sprintf("Standbild: Status %d", resp.StatusCode))
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
@@ -382,7 +381,7 @@ func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string)
 	}
 	ct := http.DetectContentType(data)
 	if !strings.HasPrefix(ct, "image/") {
-		return nil, "", errors.New("Die Standbild-Adresse liefert kein Bild")
+		return nil, "", shown("Die Standbild-Adresse liefert kein Bild")
 	}
 	return data, ct, nil
 }

@@ -69,5 +69,11 @@ func DialerFor(external bool) func(ctx context.Context, network, address string)
 	if external {
 		d.Control = publicOnly
 	}
-	return d.DialContext
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		c, err := d.DialContext(ctx, network, address)
+		if HomeNetworkBlocked(err) {
+			return nil, ErrHomeNetwork // the same text for every address, without naming it
+		}
+		return c, err
+	}
 }

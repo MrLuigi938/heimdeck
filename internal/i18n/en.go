@@ -992,4 +992,5 @@ var en = map[string]string{
 	"Die Websuche über OpenRouter geht nur, wenn die KI-Adresse OpenRouter ist":         "The web search through OpenRouter only works when the AI address is OpenRouter",
 	"Unbekannte Websuche":                                                               "Unknown web search",
 	"Die KI antwortet mit %s – Details im Protokoll":                                    "The AI answers with %s – details in the log",
+	"Die Kamera meldet einen Fehler – Details zeigt der Debug-Modus":                    "The camera reports an error – debug mode shows the details",
 }
