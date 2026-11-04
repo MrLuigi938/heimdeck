@@ -107,7 +107,48 @@ export function applyTheme(settings, boardTheme = '') {
   const accent = settings?.accent || theme.accent || '#5b8cff';
   root.style.setProperty('--accent', accent);
   root.style.setProperty('--on-accent', onColor(accent));
+  setReadableColors(root, accent);
   return theme;
+}
+
+const parseColor = (s) => {
+  let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(s);
+  if (m) return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16), 1];
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+))?\s*\)$/.exec(s);
+  return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
+};
+const mix = (a, b, t) => [0, 1, 2].map((i) => a[i] * (1 - t) + b[i] * t);
+const luminance = (c) => {
+  const [r, g, b] = c.slice(0, 3).map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+};
+
+// Accent and status colours are also used as text, on all sorts of surfaces.
+// Each gets a text version: the colour itself where it is readable (WCAG AA,
+// 4.5:1), otherwise moved just far enough towards the theme's text colour – so
+// neon stays neon, and an accent the user picked stays readable as well.
+function setReadableColors(root, accent) {
+  const css = getComputedStyle(root);
+  const read = (name) => parseColor(css.getPropertyValue(name).trim());
+  const text = read('--text');
+  const solid = read('--surface-solid');
+  const raised = read('--surface-2');
+  const acc = parseColor(accent);
+  if (!text || !solid) return;
+  // The surfaces such text is on: panels, buttons, and the tint of a selected item.
+  const surfaces = [solid];
+  if (raised) surfaces.push(mix(solid, raised, raised[3]));
+  if (acc) surfaces.push(mix(surfaces[surfaces.length - 1], acc, 0.3));
+  for (const [name, value] of [['accent', acc], ['bad', read('--bad')], ['warn', read('--warn')], ['ok', read('--ok')]]) {
+    if (!value) continue;
+    let color = value;
+    for (let t = 0.1; t <= 1 && surfaces.some((s) => contrast(color, s) < 4.5); t += 0.1) color = mix(value, text, t);
+    root.style.setProperty(`--${name}-text`, `rgb(${color.slice(0, 3).map(Math.round).join(' ')})`);
+  }
 }
 
 // Text colour for a surface in the given colour: white or near-black,

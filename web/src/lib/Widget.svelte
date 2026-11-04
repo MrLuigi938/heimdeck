@@ -153,7 +153,7 @@
   .stat { background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; min-width: 0; container-type: inline-size; }
   .value { font-size: clamp(11px, calc(100cqi / (var(--n, 4) * 0.6)), 17px); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .label { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .alerts { margin: 0; padding: 8px 10px; list-style: none; font-size: 12.5px; line-height: 1.4; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: var(--r-sm); display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+  .alerts { margin: 0; padding: 8px 10px; list-style: none; font-size: 12.5px; line-height: 1.4; color: var(--warn-text); background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: var(--r-sm); display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
   .alerts.clamped li { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
   .items-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
@@ -162,7 +162,7 @@
   .item-main { flex: 1 1 160px; min-width: 0; }
   .item-head { display: flex; gap: 6px; align-items: center; min-width: 0; }
   .item-title { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  a.item-title:hover { color: var(--accent); }
+  a.item-title:hover { color: var(--accent-text); }
   .item-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .badge { font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--muted); white-space: nowrap; flex: none; }
   .bar { height: 4px; background: var(--surface-2); border-radius: 4px; margin-top: 5px; overflow: hidden; }
@@ -174,5 +174,5 @@
   .thumb-caption { position: absolute; inset: auto 0 0 0; padding: 14px 7px 4px; font-size: 11.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     background: linear-gradient(transparent, rgba(0, 0, 0, .65)); }
   .fold { justify-self: start; background: none; border: 0; padding: 0; font-size: 12.5px; color: var(--muted); }
-  .fold:hover { color: var(--accent); }
+  .fold:hover { color: var(--accent-text); }
 </style>

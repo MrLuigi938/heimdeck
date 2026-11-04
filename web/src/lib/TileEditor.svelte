@@ -570,7 +570,7 @@
   .picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .pick { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; background: var(--surface-2); }
   .pick-name { font-size: 13.5px; text-align: center; }
-  .tag { font-size: 10.5px; color: var(--accent); }
+  .tag { font-size: 10.5px; color: var(--accent-text); }
   /* The developer's own tools: a glowing frame, a "✨ New" badge and, on hover, a note with the project link. */
   .pick-wrap { position: relative; display: grid; }
   .pick-wrap .pick { width: 100%; }
@@ -590,7 +590,7 @@
     opacity: 0; visibility: hidden; transition: opacity .15s .6s, visibility 0s .75s;
   }
   .own-note::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 12px; }
-  .own-note a { color: var(--accent); font-weight: 600; }
+  .own-note a { color: var(--accent-text); font-weight: 600; }
   .own:hover .own-note, .own:focus-within .own-note { opacity: 1; visibility: visible; transition: opacity .15s, visibility 0s; }
   /* Touch screens have no hover: the link sits under the card instead. */
   @media (hover: none) {
@@ -604,7 +604,7 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
   .more { justify-self: start; color: var(--muted); padding-left: 0; }
   .advanced { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-md); }
-  .help a { color: var(--accent); }
+  .help a { color: var(--accent-text); }
   .check-help { display: block; margin: -4px 0 4px 26px; }
   textarea { width: 100%; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5; }
   .setup { background: var(--surface-2); border-radius: var(--r-md); padding: 10px 14px; font-size: 13.5px; }
@@ -633,13 +633,13 @@
   .cname > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--muted); }
   .cval { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
-  .bad { color: var(--bad); }
-  .help.ok { color: var(--ok); }
+  .bad { color: var(--bad-text); }
+  .help.ok { color: var(--ok-text); }
   .app .row { flex-wrap: wrap; }
   .app .row input { min-width: 180px; }
   .test { padding: 12px; border-radius: var(--r-md); font-size: 14px; }
-  .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
-  .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+  .pass { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok-text); }
+  .fail { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad-text); }
   .preview { margin-top: 10px; color: var(--text); }
   @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
   .check.indent { margin: -6px 0 0 26px; font-size: 13.5px; }

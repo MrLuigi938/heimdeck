@@ -898,9 +898,9 @@
   @keyframes sheet { from { transform: translateY(40%); opacity: 0; } }
   .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 8px; }
   .sheet-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; background: none; text-align: left; padding: 12px 10px; border-radius: var(--r-sm); font-size: 15px; }
-  .sheet-item.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .sheet-item.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); }
   .sheet-item .muted { font-size: 12.5px; }
-  .group.flash .group-head h2 { color: var(--accent); transition: color .2s; }
+  .group.flash .group-head h2 { color: var(--accent-text); transition: color .2s; }
   .group.flash .group-head::before { content: ''; width: 4px; height: 18px; border-radius: 2px; background: var(--accent); animation: flash 1.6s ease-out; }
   .locked.flash { border-color: var(--accent); }
   @keyframes flash { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
@@ -913,7 +913,7 @@
   .locked input { width: 180px; padding: 6px 10px; }
   .lock-hint { flex-basis: 100%; }
   .net { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
-  .manual { color: var(--accent); }
+  .manual { color: var(--accent-text); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }
   /* Uniform: every tile one column of the same width; tiles in a row share the tallest one's height. */
   .grid.uniform { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: stretch; }

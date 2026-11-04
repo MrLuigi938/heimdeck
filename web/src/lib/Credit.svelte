@@ -26,10 +26,10 @@
   .version { margin-left: 6px; font-variant-numeric: tabular-nums; }
   .heart { color: #e5484d; }
   a { color: inherit; font-weight: 600; text-decoration: none; border-bottom: 1px dotted currentColor; }
-  a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  a:hover { color: var(--accent-text); border-bottom-color: var(--accent); }
   .update {
     border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px; padding: 3px 12px;
-    color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 13px;
+    color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 13px;
   }
   .update:hover { border-color: var(--accent); }
 </style>

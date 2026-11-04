@@ -202,10 +202,9 @@
   .row { display: flex; gap: 8px; align-items: center; }
   .row input, .row select { flex: 1; min-width: 0; }
   .web { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-  .spacer { flex: 1; }
-  .help.ok { color: var(--ok); }
-  .help.warn { color: var(--warn); }
+  .help.ok { color: var(--ok-text); }
+  .help.warn { color: var(--warn-text); }
   .sub { margin-left: 26px; }
-  .help.bad { color: var(--bad); }
-  .link { border: 0; background: none; padding: 0; color: var(--accent); font-size: inherit; text-decoration: underline; cursor: pointer; }
+  .help.bad { color: var(--bad-text); }
+  .link { border: 0; background: none; padding: 0; color: var(--accent-text); font-size: inherit; text-decoration: underline; cursor: pointer; }
 </style>

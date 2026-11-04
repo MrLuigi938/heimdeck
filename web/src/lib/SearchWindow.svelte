@@ -334,7 +334,7 @@
   kbd { font-family: ui-monospace, monospace; font-size: 11px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 5px; color: var(--muted); }
   .chips { display: flex; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); overflow-x: auto; align-items: center; scrollbar-width: none; }
   .chip { border-radius: 999px; padding: 4px 12px; font-size: 13px; white-space: nowrap; background: var(--surface-2); border: 1px solid var(--border); }
-  .chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
+  .chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent-text); }
   .ai-chip { border-style: dashed; }
   .spacer { flex: 1; }
   .n { color: var(--muted); font-size: 12px; margin-left: 2px; }
@@ -370,8 +370,8 @@
   .rchip { display: inline-flex; align-items: center; }
   .rchip .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
   .forget { border-radius: 0 999px 999px 0; padding: 4px 9px 4px 6px; font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
-  .forget:hover { color: var(--bad); }
-  .jump { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 700; }
+  .forget:hover { color: var(--bad-text); }
+  .jump { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-weight: 700; }
   .jump.big { width: 64px; height: 64px; font-size: 30px; border-radius: var(--r-md); }
   .hint { display: grid; gap: 6px; padding: 8px 2px; }
   .hint p { margin: 0; }
@@ -392,6 +392,6 @@
     .sheet-close { display: inline-grid; align-self: flex-end; }
     .p-image { max-height: 170px; }
     .keys, .close kbd { display: none; }
-    .close-text { display: inline; font-size: 14px; color: var(--accent); }
+    .close-text { display: inline; font-size: 14px; color: var(--accent-text); }
   }
 </style>

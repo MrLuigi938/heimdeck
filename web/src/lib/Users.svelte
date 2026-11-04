@@ -191,14 +191,14 @@
   .users { display: grid; gap: 6px; }
   .user { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
   .user.off { opacity: .65; }
-  .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-text); }
   .who { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
   .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
-  .tag.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
-  .tag.ext { color: var(--warn, #d9a400); border-color: color-mix(in srgb, var(--warn, #d9a400) 45%, transparent); }
+  .tag.bad { color: var(--bad-text); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .tag.ext { color: var(--warn-text); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
   button.on { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
-  .tag.main { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .tag.main { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .user select { font-size: 13px; padding: 4px 8px; }
   .acts { display: flex; gap: 4px; }
   .small { font-size: 12px; }

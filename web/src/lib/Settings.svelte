@@ -858,7 +858,7 @@
   .find { margin: 2px 0 8px; padding: 7px 10px; font-size: 13px; }
   .nav { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 8px 10px; text-align: left; border-radius: var(--r-sm); font-size: 14px; }
   .nav:hover { background: var(--surface-2); }
-  .nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 500; }
+  .nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); font-weight: 500; }
   .nav-icon { width: 20px; text-align: center; flex: none; }
   .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Festive themes: options above the cards, an "automatically" switch under each card. */
@@ -866,7 +866,7 @@
   .opt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-left: 26px; font-size: 13px; }
   .seg2 { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border-strong); border-radius: var(--r-sm); overflow: hidden; }
   .seg2 button { border: 0; border-radius: 0; background: transparent; padding: 5px 11px; font-size: 13px; }
-  .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 500; }
+  .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); font-weight: 500; }
   .theme-cell { display: grid; gap: 4px; align-content: start; }
   .theme-when { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding-left: 4px; cursor: pointer; }
@@ -878,9 +878,9 @@
   .v-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .v-label { width: 82px; font-size: 13px; color: var(--muted); }
   .v-num { font-size: 18px; font-variant-numeric: tabular-nums; }
-  .v-num.accent { color: var(--accent); }
+  .v-num.accent { color: var(--accent-text); }
   .v-chan { font-size: 12.5px; color: var(--muted); }
-  .ok-line { color: var(--ok); margin: 0; }
+  .ok-line { color: var(--ok-text); margin: 0; }
   a.button { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
   a.button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
   a.button.small { padding: 4px 10px; font-size: 13px; border-radius: var(--r-xs); }
@@ -891,12 +891,12 @@
   .chev { display: none; color: var(--muted); font-size: 18px; }
   .nothing { padding: 4px 10px; }
   .saved { margin: auto 0 0; padding: 12px 4px 0; font-size: 12px; color: var(--muted); transition: color .2s; }
-  .saved.show { color: var(--ok); }
+  .saved.show { color: var(--ok-text); }
   .pane { overflow-y: auto; overscroll-behavior: contain; padding: 4px 22px 22px; min-height: 0; }
   section { display: grid; gap: 12px; align-content: start; }
   section[hidden] { display: none; }
   h3 { margin: 4px 0 0; font-size: 16px; }
-  section h3 + h3, section > h3:not(:first-child) { margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
+  section > h3:not(:first-child) { margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
   .back { display: none; }
   /* Phones: the list of areas first; an area opens full-width with a back arrow. */
   @media (max-width: 640px) {
@@ -907,7 +907,7 @@
     .nav.on { background: none; color: inherit; font-weight: 400; }
     .chev { display: inline; }
     .pane { padding: 0 16px 18px; }
-    .back { display: inline-flex; justify-self: start; border: 0; background: none; padding: 2px 0 10px; color: var(--accent); font-size: 14px; }
+    .back { display: inline-flex; justify-self: start; border: 0; background: none; padding: 2px 0 10px; color: var(--accent-text); font-size: 14px; }
   }
   .field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
   .wrap { flex-wrap: wrap; }

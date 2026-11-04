@@ -105,9 +105,9 @@
   .dim { opacity: .55; }
   .grow { flex: 1; min-width: 0; }
   .help { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
   .tag.muted { background: var(--surface-2); color: var(--muted); }
   .state { font-size: 12px; color: var(--muted); }
-  .state.running { color: var(--ok); }
+  .state.running { color: var(--ok-text); }
   .small-warn { font-size: 12.5px; margin: 0 0 8px; }
 </style>

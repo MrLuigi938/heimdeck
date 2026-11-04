@@ -267,12 +267,12 @@
   .group-list { display: flex; flex-wrap: wrap; gap: 6px 16px; }
   .group-pick .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .group-pick select { width: auto; }
-  .on { border-color: var(--accent); color: var(--accent); }
+  .on { border-color: var(--accent); color: var(--accent-text); }
   .b-icon { width: 22px; text-align: center; }
   .share { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 4px 0; }
   .share.in { grid-template-columns: 30px minmax(0, 1fr) auto; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
   .share.in.pending { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
-  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-text); }
   .what { display: grid; min-width: 0; }
   .what b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .what .help { font-size: 12.5px; }

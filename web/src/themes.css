@@ -13,7 +13,7 @@
   --border: rgba(236, 239, 244, 0.08);
   --border-strong: rgba(236, 239, 244, 0.18);
   --text: #eceff4;
-  --muted: #a7b1c2;
+  --muted: #bcc5d3;
   --ok: #a3be8c;
   --warn: #ebcb8b;
   --bad: #bf616a;
@@ -43,7 +43,7 @@
   --border: rgba(235, 219, 178, 0.09);
   --border-strong: rgba(235, 219, 178, 0.2);
   --text: #ebdbb2;
-  --muted: #a89984;
+  --muted: #c2b49a;
   --ok: #b8bb26;
   --warn: #fabd2f;
   --bad: #fb4934;
@@ -58,7 +58,7 @@
   --border: rgba(248, 248, 242, 0.08);
   --border-strong: rgba(248, 248, 242, 0.17);
   --text: #f8f8f2;
-  --muted: #a4abcc;
+  --muted: #bcc2dc;
   --ok: #50fa7b;
   --warn: #f1fa8c;
   --bad: #ff5555;
@@ -73,7 +73,7 @@
   --border: rgba(7, 54, 66, 0.1);
   --border-strong: rgba(7, 54, 66, 0.22);
   --text: #073642;
-  --muted: #586e75;
+  --muted: #4a5f66;
   --ok: #859900;
   --warn: #b58900;
   --bad: #dc322f;
@@ -149,7 +149,7 @@
 :root[data-skin='neon'] .tile.card { border-left: 3px solid var(--warn); }
 :root[data-skin='neon'] .tile:hover { border-color: var(--border-strong); border-left-color: var(--warn); }
 :root[data-skin='neon'] .tile .name { text-transform: uppercase; letter-spacing: 0.08em; }
-:root[data-skin='neon'] .tile .name::before { content: '// '; color: var(--warn); }
+:root[data-skin='neon'] .tile .name::before { content: '// '; color: var(--warn-text); }
 :root[data-skin='neon'] .stat { background: rgba(0, 240, 255, 0.04); border-left: 2px solid var(--border-strong); }
 :root[data-skin='neon'] .stat:nth-child(3n + 1) { border-left-color: var(--warn); }
 :root[data-skin='neon'] .stat:nth-child(3n + 2) { border-left-color: #00f0ff; }
@@ -208,7 +208,7 @@
   border: 1px solid #003c74; border-radius: 3px; color: #000;
 }
 :root[data-skin='xp'] button:hover { border-color: #e5a01a; box-shadow: inset 0 0 0 1px #f8d07a; }
-:root[data-skin='xp'] button.primary { background: linear-gradient(#5fbf4a, #3a9a2a 60%, #2e8a20); border-color: #1e5e14; color: #fff; font-weight: 700; }
+:root[data-skin='xp'] button.primary { background: linear-gradient(#2f8423, #2a7a1e 60%, #216817); border-color: #1e5e14; color: #fff; font-weight: 700; }
 :root[data-skin='xp'] button.ghost { background: transparent; border-color: transparent; }
 :root[data-skin='xp'] .on-bg { background: #ece9d8; border: 1px solid #7f9db9; border-radius: 6px; box-shadow: var(--shadow); }
 :root[data-skin='xp'] .brand.on-bg { padding: 8px 14px; justify-self: start; }
@@ -225,10 +225,12 @@
   --border: rgba(255, 255, 255, 0.5);
   --border-strong: rgba(255, 255, 255, 0.8);
   --text: #ffffff;
-  --muted: #d4e6f6;
+  --muted: #e6f1fb;
   --ok: #5ee05e;
   --warn: #ffd34d;
   --bad: #ff6b5e;
+  --menu-bg: #ffffff;
+  --menu-text: #1e2b38;
   --shadow: 0 6px 24px rgba(0, 20, 50, 0.45);
   --font: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
   --radius: 8px; --r-md: 4px; --r-sm: 4px; --r-xs: 3px;
@@ -246,19 +248,27 @@
 :root[data-skin='aero'] .tile .body {
   --text: #1e2b38; --muted: #546576; --surface-2: #e8eff6; --border: #d5e0ea;
   --ok: #1d8a1d; --warn: #a66b00; --bad: #c0352a;
+  --accent-text: #15609f; --ok-text: #1d7a1d; --warn-text: #8f5c00; --bad-text: #c0352a;
   color: var(--text); background: rgba(247, 250, 253, 0.94);
   margin: 0 8px 8px; padding: 10px; border: 1px solid #8aa6c1; border-radius: 4px;
 }
 :root[data-skin='aero'] button {
-  background: linear-gradient(#f6f6f6, #e3e3e3 49%, #d4d4d4 50%, #e9e9e9);
-  border: 1px solid #707070; border-radius: 3px; color: #1e2b38;
+  background: linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08) 49%, rgba(255, 255, 255, 0.03) 50%, rgba(255, 255, 255, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 3px; color: #fff;
 }
-:root[data-skin='aero'] button:hover { background: linear-gradient(#eaf6fd, #d9f0fc 49%, #bee6fd 50%, #a7d9f5); border-color: #3c7fb1; }
-:root[data-skin='aero'] button.primary { background: linear-gradient(#7cc1f2, #4aa3e8 49%, #2b8ad8 50%, #4fa7ec); border-color: #1f5f99; color: #fff; }
+:root[data-skin='aero'] button:hover { background: linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18) 49%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.22)); border-color: #fff; }
+/* The classic light buttons on the tiles' light pane. */
+:root[data-skin='aero'] .tile .body button:not(.primary):not(.ghost):not(.chip) {
+  background: linear-gradient(#f6f6f6, #e3e3e3 49%, #d4d4d4 50%, #e9e9e9);
+  border: 1px solid #707070; color: #1e2b38;
+}
+:root[data-skin='aero'] .tile .body button:not(.primary):not(.ghost):not(.chip):hover { background: linear-gradient(#eaf6fd, #d9f0fc 49%, #bee6fd 50%, #a7d9f5); border-color: #3c7fb1; }
+:root[data-skin='aero'] .tile .body button.ghost { color: var(--text); }
+:root[data-skin='aero'] button.primary { background: linear-gradient(#7cc1f2, #4aa3e8 49%, #2b8ad8 50%, #4fa7ec); border-color: #1f5f99; color: #04223a; }
 :root[data-skin='aero'] button.ghost { background: transparent; border-color: transparent; color: #fff; }
 :root[data-skin='aero'] .modal { --surface: rgba(28, 74, 115, 0.92); }
 :root[data-skin='aero'] input, :root[data-skin='aero'] select, :root[data-skin='aero'] textarea { background: rgba(255, 255, 255, 0.92); color: #1e2b38; border-color: #8aa6c1; }
-:root[data-skin='aero'] input::placeholder { color: #6b7c8c; }
+:root[data-skin='aero'] input::placeholder, :root[data-skin='aero'] textarea::placeholder { color: #566879; }
 
 /* ---------- Hexer (dark fantasy) ---------- */
 
@@ -290,10 +300,10 @@
 :root[data-skin='hexer'] body { font-variant-numeric: lining-nums; }
 :root[data-skin='hexer'] .tile .name { font-variant: small-caps; letter-spacing: 0.06em; font-weight: 600; }
 :root[data-skin='hexer'] .items-title { font-variant: small-caps; text-transform: none; letter-spacing: 0.08em; }
-:root[data-skin='hexer'] .items-title::before { content: '✦ '; color: var(--accent); }
+:root[data-skin='hexer'] .items-title::before { content: '✦ '; color: var(--accent-text); }
 :root[data-skin='hexer'] .stat { background: transparent; border-bottom: 1px solid var(--border); border-radius: 0; }
 :root[data-skin='hexer'] .bar > div { background: linear-gradient(90deg, #7a1c14, var(--bad)); }
-:root[data-skin='hexer'] button { background: transparent; border-color: var(--border-strong); color: var(--accent); }
+:root[data-skin='hexer'] button { background: transparent; border-color: var(--border-strong); color: var(--accent-text); }
 :root[data-skin='hexer'] button.primary { background: var(--accent); color: #14110d; }
 :root[data-skin='hexer'] .dot.up { box-shadow: 0 0 6px var(--ok); }
 
@@ -307,7 +317,7 @@
   --border: rgba(200, 162, 74, 0.55);
   --border-strong: #e8c66a;
   --text: #f2e7c9;
-  --muted: #9fb0c0;
+  --muted: #b4c2cf;
   --ok: #1eff00;
   --warn: #ffd36b;
   --bad: #ff4040;
@@ -442,6 +452,8 @@
   --ok: #30d158;
   --warn: #ffd60a;
   --bad: #ff453a;
+  --menu-bg: #2b2160;
+  --menu-text: #ffffff;
   --shadow: 0 14px 40px rgba(10, 5, 40, 0.35);
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'Segoe UI', Roboto, sans-serif;
   --radius: 28px; --r-md: 20px; --r-sm: 18px; --r-xs: 14px;
@@ -457,7 +469,11 @@
   backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 0 -1px 0 rgba(255, 255, 255, 0.12), var(--shadow);
 }
-:root[data-skin='glass'] .modal, :root[data-skin='glass'] .board-menu, :root[data-skin='glass'] .search .panel { --surface-solid: rgba(43, 33, 96, 0.92); }
+:root[data-skin='glass'] .modal, :root[data-skin='glass'] .board-menu, :root[data-skin='glass'] .search .panel {
+  --surface-solid: rgba(43, 33, 96, 0.92);
+  /* Windows and menus carry a lot of small text: darker glass, whatever is behind it. */
+  background: linear-gradient(135deg, rgba(43, 33, 96, 0.88), rgba(43, 33, 96, 0.76));
+}
 :root[data-skin='glass'] .stat { border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.12); }
 :root[data-skin='glass'] button {
   border-radius: 999px; background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.45);
@@ -466,7 +482,7 @@
 :root[data-skin='glass'] button.ghost { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-skin='glass'] button.primary { background: rgba(100, 210, 255, 0.85); border-color: rgba(255, 255, 255, 0.6); color: #04223a; }
 :root[data-skin='glass'] input, :root[data-skin='glass'] select, :root[data-skin='glass'] textarea { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.35); color: #fff; }
-:root[data-skin='glass'] input::placeholder { color: rgba(255, 255, 255, 0.75); }
+:root[data-skin='glass'] input::placeholder, :root[data-skin='glass'] textarea::placeholder { color: rgba(255, 255, 255, 0.82); }
 :root[data-skin='glass'] .alerts { color: #fff3b0; background: rgba(40, 20, 0, 0.25); }
 :root[data-skin='glass'] .dot.up { box-shadow: 0 0 8px var(--ok); }
 /* Icon tiles look like apps in a dock. */
@@ -611,7 +627,7 @@
   background: transparent; border: 0; border-radius: 0; box-shadow: none; text-shadow: none; filter: none; color: var(--text);
   padding: 5px 11px; text-transform: none; letter-spacing: normal; font-weight: 400;
 }
-:root[data-skin] .settings .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+:root[data-skin] .settings .seg2 button.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-text); }
 :root[data-skin] .settings button.theme.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 
 /* Menus and lists made of buttons stay menus: the dashboard switcher, the
@@ -627,14 +643,14 @@
 :root[data-skin] .win button.entry.web { color: var(--muted); border-top: 1px solid var(--border); }
 /* Filter chips in the search window stay pills. */
 :root[data-skin] .win button.chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; box-shadow: none; text-shadow: none; filter: none; color: var(--text); padding: 4px 12px; text-transform: none; letter-spacing: normal; }
-:root[data-skin] .win button.chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
+:root[data-skin] .win button.chip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent-text); }
 :root[data-skin] .settings button.nav, :root[data-skin] .settings button.back {
   background: none; border: 0; box-shadow: none; text-shadow: none; filter: none; color: var(--text);
   text-transform: none; letter-spacing: normal;
 }
-:root[data-skin] .settings button.back { color: var(--accent); }
+:root[data-skin] .settings button.back { color: var(--accent-text); }
 :root[data-skin] .settings button.nav:hover { background: var(--surface-2); }
-:root[data-skin] .settings button.nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+:root[data-skin] .settings button.nav.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); }
 /* ---------- Style options (independent of the theme, so last: they win) ---------- */
 
 :root[data-corners='square'] { --radius: 4px; --r-md: 3px; --r-sm: 3px; --r-xs: 2px; }

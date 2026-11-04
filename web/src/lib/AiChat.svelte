@@ -379,10 +379,11 @@
       </aside>
     {/if}
     <div class="main">
-    <header>
+    <header class:compact={layout !== 'window' || narrow}>
       <span class="title">✨ {ai.label}</span>
       <span class="muted where">{ai.local ? t('läuft bei dir') : t('Cloud-Anbieter')}</span>
       <span class="spacer"></span>
+      <div class="actions">
       {#if ai.dashboard}
         <button class="small toggle" class:on={dash} aria-pressed={dash} onclick={toggleDash} title={t('Die KI bekommt mit, was deine Kacheln gerade zeigen')}>📋 {t('Dashboard')}</button>
       {/if}
@@ -394,8 +395,9 @@
           <button class="small" class:on={history} onclick={() => (history = !history)} aria-expanded={history} title={t('Frühere Chats')}>🕘</button>
           {#if history}<div class="hist-menu card">{@render chatList()}</div>{/if}
         </div>
-        <button class="small" onclick={reset} disabled={!messages.length}>＋ {t('Neuer Chat')}</button>
+        <button class="small new" onclick={reset} disabled={!messages.length} title={t('Neuer Chat')} aria-label={t('Neuer Chat')}>＋<span class="new-label"> {t('Neuer Chat')}</span></button>
       {/if}
+      </div>
       <button class="ghost small close" onclick={onClose} aria-label={t('Schließen')}>✕</button>
     </header>
 
@@ -511,10 +513,27 @@
   .chat.side:not(.narrow) { pointer-events: auto; width: 440px; height: 100vh; border-radius: 0; border-top: 0; border-bottom: 0; border-right: 0; }
   :global(body.chat-docked) { padding-right: 440px; }
   header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  header .title, header .where { white-space: nowrap; }
+  header .where { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .actions { display: flex; align-items: center; gap: 8px; }
+  .actions button { white-space: nowrap; }
+  /* Narrow (phone, sidebar): name and ✕ on top, the buttons in one even row below. */
+  header.compact { flex-wrap: wrap; }
+  header.compact .actions { order: 3; flex: 1 0 100%; position: relative; gap: 6px; }
+  header.compact .actions > button, header.compact .hist > button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+  header.compact .toggle { flex: 1 1 0; min-width: 0; }
+  header.compact .new { flex: 0 0 auto; margin-left: auto; }
+  header.compact .hist { position: static; }
+  header.compact .hist-menu { left: 0; right: 0; width: auto; }
+  @media (max-width: 480px) {
+    .new-label { display: none; }
+    header.compact .new { min-width: 44px; }
+    header.compact .hist > button { min-width: 44px; }
+  }
   .title { font-weight: 600; }
   .where { font-size: 12px; }
   .spacer { flex: 1; }
-  .toggle.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
+  .toggle.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent-text); }
   .close { width: 32px; height: 32px; padding: 0; justify-content: center; }
   .messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
   .empty { margin: auto; text-align: center; max-width: 380px; display: grid; gap: 6px; }
@@ -529,7 +548,7 @@
   .md :global(p.h) { font-weight: 700; margin-top: 4px; }
   .md :global(ul), .md :global(ol) { margin: 4px 0; padding-left: 20px; }
   .md :global(code) { font-family: ui-monospace, monospace; font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
-  .md :global(a) { color: var(--accent); }
+  .md :global(a) { color: var(--accent-text); }
   .code { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; margin: 4px 0; }
   .code-bar { display: flex; align-items: center; gap: 4px; padding: 2px 6px 2px 10px; background: var(--surface-2); font-size: 12px; color: var(--muted); }
   pre { margin: 0; padding: 10px; overflow-x: auto; font-size: 12.5px; max-height: 360px; }
@@ -543,7 +562,7 @@
   .attach { font-size: 18px; width: 38px; height: 38px; padding: 0; justify-content: center; }
   .tiny { font-size: 11.5px; margin: 0; }
   .small { font-size: 12.5px; }
-  .web-error { color: var(--warn); line-height: 1.4; }
+  .web-error { color: var(--warn-text); line-height: 1.4; }
   .tools { margin: 0 0 6px; }
   .proposals { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
   .ptile { opacity: .75; font-weight: 400; }

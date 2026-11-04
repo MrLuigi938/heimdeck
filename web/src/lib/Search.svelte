@@ -390,7 +390,7 @@
   .remote-item img { width: 32px; height: 48px; object-fit: cover; border-radius: 4px; flex: none; }
   .grow { flex: 1; min-width: 0; }
   .none { font-size: 12.5px; color: var(--muted); padding: 8px 8px 2px; }
-  .err { font-size: 12.5px; color: var(--bad); padding: 0 8px 6px; }
-  .jump { width: 24px; text-align: center; color: var(--accent); font-weight: 700; }
+  .err { font-size: 12.5px; color: var(--bad-text); padding: 0 8px 6px; }
+  .jump { width: 24px; text-align: center; color: var(--accent-text); font-weight: 700; }
   .hit .count { margin-left: auto; }
 </style>

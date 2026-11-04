@@ -167,7 +167,7 @@
   .tile:hover { border-color: var(--border-strong); }
   .tile.editing { cursor: grab; outline: 1px dashed var(--border-strong); outline-offset: 2px; }
   .head { display: flex; align-items: center; gap: 12px; padding: 14px; min-width: 0; }
-  .tile:not(.editing) .head[href]:hover .name { color: var(--accent); }
+  .tile:not(.editing) .head[href]:hover .name { color: var(--accent-text); }
   .titles { flex: 1; min-width: 0; }
   .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .desc { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -180,7 +180,7 @@
   .body { padding: 0 14px 14px; min-width: 0; }
   /* A camera in the free grid takes all the height the tile has. */
   .body.fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .error { font-size: 12.5px; color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: var(--r-sm); }
+  .error { font-size: 12.5px; color: var(--bad-text); background: color-mix(in srgb, var(--bad) 10%, transparent); padding: 8px 10px; border-radius: var(--r-sm); }
   .skeleton { height: 54px; border-radius: var(--r-sm); background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   .setup { margin: 0 14px 14px; font-size: 13px; text-align: left; border-style: dashed; }
   @keyframes shimmer { to { background-position: -200% 0; } }
@@ -197,7 +197,7 @@
     text-align: center; overflow-wrap: anywhere; hyphens: auto;
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
   }
-  .tile.compact:not(.editing) .square[href]:hover .cname { color: var(--accent); }
+  .tile.compact:not(.editing) .square[href]:hover .cname { color: var(--accent-text); }
   .icons-hover .cname {
     position: absolute; left: 6px; right: 6px; bottom: 8px; text-align: center; opacity: 0; transform: translateY(4px);
     transition: opacity .15s, transform .15s; pointer-events: none; color: var(--text);

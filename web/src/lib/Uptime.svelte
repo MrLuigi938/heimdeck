@@ -170,7 +170,7 @@
   .sum { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; padding: 1px 8px; border-radius: var(--r-xs); background: var(--surface-2); }
   .bell { width: 30px; height: 30px; padding: 0; color: var(--muted); flex: none; margin-left: auto; }
   .seg + .bell { margin-left: 0; }
-  .bell:hover { color: var(--accent); }
+  .bell:hover { color: var(--accent-text); }
   .seg { margin-left: auto; display: flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
   .seg button { border: 0; border-radius: 0; padding: 4px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
   .seg button.on { background: var(--surface-2); color: var(--text); }

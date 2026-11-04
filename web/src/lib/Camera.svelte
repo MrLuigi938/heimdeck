@@ -454,7 +454,7 @@
   @container screen (max-width: 150px) or (max-height: 90px) {
     .tag:not(.live), .chip:not(.main) { display: none; }
   }
-  .error { font-size: 12.5px; color: var(--bad); line-height: 1.4; }
+  .error { font-size: 12.5px; color: var(--bad-text); line-height: 1.4; }
   .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .events button { width: 100%; display: flex; gap: 8px; align-items: center; padding: 5px 6px; border: 0; background: none; border-radius: var(--r-xs); font-size: 13px; text-align: left; color: inherit; }
   .events button:hover:not(:disabled), .events button.active { background: var(--surface-2); }

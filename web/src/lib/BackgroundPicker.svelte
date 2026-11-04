@@ -126,9 +126,9 @@
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .album { display: grid; place-items: center; height: 100%; font-size: 18px; line-height: 1.1; text-align: center; padding: 2px; }
   .album small { font-size: 10.5px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; justify-content: center; font-size: 11px; background: rgba(0, 0, 0, .55); color: #fff; border-radius: 50%; }
+  .x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; padding: 0; justify-content: center; font-size: 11px; background: rgba(0, 0, 0, .55) !important; /* on a picture, in every theme */ color: #fff; border-radius: 50%; }
   .row { display: flex; gap: 8px; align-items: center; }
   .row input { flex: 1; min-width: 0; }
   .wrap { flex-wrap: wrap; }
-  .on { border-color: var(--accent); color: var(--accent); }
+  .on { border-color: var(--accent); color: var(--accent-text); }
 </style>
