@@ -102,6 +102,9 @@ Entitäten von Home Assistant wählst du genauso aus. Unter der Auswahl bekommt 
 
 ## Kamera verbinden
 
+![Die Kamera-Kachel mit ihren letzten Ereignissen](../images/camera.webp)
+<sub>Demo-Daten mit gezeichnetem Bild</sub>
+
 Die Kachel **Kamera (RTSP/ONVIF)** funktioniert mit fast jeder IP-Kamera im eigenen Netz – ohne Cloud und ohne Zusatzsoftware. Das Video läuft über Heimdeck; der Browser bekommt Adresse und Passwort der Kamera nie zu sehen.
 
 1. In der App oder Weboberfläche der Kamera **RTSP** einschalten (oft unter *Netzwerk*, *Erweitert* oder *NVR/RTSP*) und die Adresse notieren, z. B. `rtsp://192.168.1.50:554/live`. Viele Kameras haben einen kleineren **Substream** – der lädt schneller.

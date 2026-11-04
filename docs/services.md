@@ -100,6 +100,9 @@ Home Assistant entities are chosen the same way. Below the selection every entry
 
 ## Connecting a camera
 
+![The camera tile with its latest events](images/camera.webp)
+<sub>Demo data with a drawn picture</sub>
+
 The **Camera (RTSP/ONVIF)** tile works with almost any IP camera that is reachable in your network – no cloud, no extra software. The video goes through Heimdeck; the browser never gets the camera's address or password.
 
 1. Turn on **RTSP** in the camera's app or web interface (often under *Network*, *Advanced* or *NVR/RTSP*) and note the address, e.g. `rtsp://192.168.1.50:554/live`. Many cameras have a smaller **substream** – it loads faster.

@@ -152,6 +152,9 @@ Heimdeck can talk to an AI of your choice – any server with an OpenAI-compatib
 - **Earlier chats** are kept in your browser, per account (up to 30, without the pictures).
 - **On the computer** (*Settings → Search → AI chat on the computer*): a large window with the list of chats on the left (default), or a sidebar on the right – the dashboard moves aside and stays usable. On phones the chat always fills the screen.
 
+![The AI reads tiles and proposes an action as a button](images/ai-tools.webp)
+<sub>Demo data</sub>
+
 **Web search** (*Settings → AI → Web search through*) – *Test* runs a real search right away:
 
 | Choice | What you need |

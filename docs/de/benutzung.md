@@ -152,6 +152,9 @@ Heimdeck kann mit einer KI deiner Wahl sprechen – jeder Server mit OpenAI-komp
 - **Frühere Chats** bleiben in deinem Browser gespeichert, pro Konto (bis zu 30, ohne die Bilder).
 - **Am Computer** (*Einstellungen → Suche → KI-Chat am Computer*): ein großes Fenster mit der Chat-Liste links (Standard) oder eine Seitenleiste rechts – das Dashboard rückt zur Seite und bleibt bedienbar. Auf dem Handy füllt der Chat immer den Bildschirm.
 
+![Die KI liest Kacheln und schlägt eine Aktion als Knopf vor](../images/ai-tools.webp)
+<sub>Demo-Daten</sub>
+
 **Websuche** (*Einstellungen → KI → Websuche über*) – *Testen* macht sofort eine echte Suche:
 
 | Auswahl | Was du brauchst |
