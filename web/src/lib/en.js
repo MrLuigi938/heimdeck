@@ -864,5 +864,4 @@ export const en = {
   'Der Bildschirm bleibt an.': 'The screen stays on.',
   'Der Bildschirm kann ausgehen: wach halten geht nur über HTTPS.': 'The screen may turn off: keeping it on needs HTTPS.',
   'Seite {a} / {b}': 'Page {a} / {b}',
-  'viel größer': 'much larger',
 };

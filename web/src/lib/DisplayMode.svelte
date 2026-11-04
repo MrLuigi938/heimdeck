@@ -358,7 +358,6 @@
           <option value="0.8">{t('kleiner')}</option>
           <option value="1">{t('automatisch')}</option>
           <option value="1.25">{t('größer')}</option>
-          <option value="1.5">{t('viel größer')}</option>
         </select>
       </label>
       <p class="note">{awake ? t('Der Bildschirm bleibt an.') : t('Der Bildschirm kann ausgehen: wach halten geht nur über HTTPS.')}</p>
