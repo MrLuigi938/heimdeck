@@ -851,8 +851,6 @@ export const en = {
   'Wird gespeichert, sobald die SearXNG-Adresse eingetragen ist.': 'Saved as soon as the SearXNG address is entered.',
   'Wird gespeichert, sobald der API-Schlüssel eingetragen ist.': 'Saved as soon as the API key is entered.',
   'Geht nur, wenn oben OpenRouter als Adresse eingetragen ist.': 'Only works when OpenRouter is entered as the address above.',
-  'Anzeigeansicht (für ein Wandtablet)': 'Display view (for a wall tablet)',
-  'Anzeigeansicht an/aus': 'Display view on/off',
   '{n} nicht erreichbar': '{n} not reachable',
   'Alle {n} Dienste erreichbar': 'All {n} services reachable',
   'Keine Verbindung zu Heimdeck – die Daten sind nicht aktuell': 'No connection to Heimdeck – the data is not up to date',
@@ -866,4 +864,5 @@ export const en = {
   'Der Bildschirm bleibt an.': 'The screen stays on.',
   'Der Bildschirm kann ausgehen: wach halten geht nur über HTTPS.': 'The screen may turn off: keeping it on needs HTTPS.',
   'Seite {a} / {b}': 'Page {a} / {b}',
+  'viel größer': 'much larger',
 };

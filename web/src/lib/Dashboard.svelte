@@ -42,18 +42,14 @@
   let showHidden = $state(readHidden());
   let boardMenu = $state(false);
 
-  // The display view for a wall tablet; ?display keeps it across reloads.
+  // The display view for a wall tablet: only with ?display in the address.
   let display = $state(new URLSearchParams(location.search).has('display'));
   let pageEl = $state();
-  function setDisplay(on, fromClick = false) {
-    display = on;
-    editMode = false;
+  function leaveDisplay() {
+    display = false;
     const url = new URL(location.href);
-    if (on) url.searchParams.set('display', '1');
-    else url.searchParams.delete('display');
+    url.searchParams.delete('display');
     history.replaceState(null, '', url);
-    // A browser only goes full screen right after a click or a key.
-    if (on && fromClick) document.documentElement.requestFullscreen?.().catch(() => {});
   }
   // In the display view a tap stays here: links would leave the screen for good.
   function keepOnDisplay(e) {
@@ -404,7 +400,7 @@
   let shortcutsOn = $derived(settings.shortcutsOff !== 'true');
   function onShortcut(e) {
     if (!data || !shortcutsOn || blocked(e)) return;
-    if (display && e.key !== keys.display) return;
+    if (display) return;
     if (isBoardKey(e.key)) {
       const b = boards[Number(e.key) - 1];
       if (b) {
@@ -429,7 +425,6 @@
       prevBoard: () => step(-1),
       nextBoard: () => step(1),
       ai: () => data.ai && openChat(),
-      display: () => setDisplay(!display, true),
       help: () => (showKeys = true),
     })[action]?.();
   }
@@ -648,9 +643,6 @@
         {#if (data.docker || data.proxmox) && !readOnly}
           <button class="ghost icon" title={t('Dienste automatisch finden')} aria-label={t('Dienste automatisch finden')} onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'}</button>
         {/if}
-        <button class="ghost icon" title={t('Anzeigeansicht (für ein Wandtablet)')} aria-label={t('Anzeigeansicht (für ein Wandtablet)')} onclick={() => setDisplay(true, true)}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
-        </button>
         {#if !readOnly}
           <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
@@ -817,7 +809,7 @@
 
   {#if display && pageEl}
     <DisplayMode page={pageEl} boards={displayBoards} {board} tiles={allTiles} weatherTile={displayWeather} {status}
-      onSwitch={switchBoard} onExit={() => setDisplay(false)} onReconnect={() => { load(); loadStatus(); }} />
+      onSwitch={switchBoard} onExit={leaveDisplay} onReconnect={() => { load(); loadStatus(); }} />
   {/if}
   {#if showJumpButton && !display}
     <!-- Phones only (CSS): appears once you scrolled down, opens the groups from below. -->
@@ -879,6 +871,12 @@
   .page.display :global(.group) { gap: 6px; }
   .page.display :global(a) { cursor: default; }
   :global(.page.fading) { opacity: 0; }
+  /* Little to show: in the middle of the screen. */
+  :global(.page.display.centered) { align-content: center; }
+  :global(.page.display.centered .group-head) { justify-content: center; }
+  :global(.page.display.centered .grid) { justify-content: center; grid-template-columns: repeat(auto-fit, minmax(210px, 320px)); }
+  :global(.page.display.centered .grid.uniform) { grid-template-columns: repeat(auto-fit, minmax(300px, 420px)); }
+  :global(.page.display.centered .grid.compact) { grid-template-columns: repeat(auto-fit, minmax(104px, 160px)); }
   /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
   /* Title and icons keep their width, the search gives way (also next to the AI sidebar). */
   .top { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(240px, 620px) minmax(max-content, 1fr); gap: 16px; align-items: center; position: relative; z-index: 30; }

@@ -3,6 +3,8 @@
   import { get } from './api.js';
   import { t, locale } from './i18n.svelte.js';
 
+  // Not offered anywhere yet: it opens only with ?display=1 in the address, until
+  // it can build on freely arranged dashboards.
   // The display view for a wall tablet: a large clock, the state of the services
   // and the dashboard's tiles, scaled to fill the screen without scrolling.
   // Nothing to operate until the screen is touched. The choices belong to the
@@ -51,28 +53,48 @@
     const barH = bar.offsetHeight;
     const available = innerHeight;
     page.style.paddingBottom = '';
+    page.style.minHeight = '';
+    page.classList.remove('centered');
     const heightAt = (z) => {
       page.style.zoom = z;
       page.style.paddingTop = `${barH / z}px`;
       return page.getBoundingClientRect().height;
     };
     let lo = MIN_ZOOM;
-    let hi = MAX_ZOOM * prefs.size;
-    let fits = heightAt(lo) <= available;
-    if (fits) {
+    let hi = MAX_ZOOM;
+    if (heightAt(lo) <= available) {
       for (let i = 0; i < 7; i++) {
         const mid = (lo + hi) / 2;
         if (heightAt(mid) <= available) lo = mid;
         else hi = mid;
       }
     }
-    heightAt(lo);
-    appliedZoom = lo;
+    // The chosen size works on top of what fits: larger may mean more screenfuls.
+    // But a single tile is never larger than a screenful, it would be cut off.
+    const floor = Math.min(lo, lo * prefs.size);
+    const room = available - barH - 8;
+    let zoom = lo * prefs.size;
+    let height = heightAt(zoom);
+    for (let i = 0; i < 8 && zoom > floor; i++) {
+      const heading = page.querySelector('.group-head')?.getBoundingClientRect().height || 0;
+      const tallest = Math.max(0, ...[...page.querySelectorAll('.tile')].map((e) => e.getBoundingClientRect().height));
+      const needed = tallest + heading + 30 * zoom; // with the gaps around it
+      if (needed <= room) break;
+      zoom = Math.max(floor, zoom * Math.max(room / needed, 0.9));
+      height = heightAt(zoom);
+    }
+    const fits = height <= available;
+    appliedZoom = zoom;
     lastFit = performance.now();
+    // Little on the screen: it sits in the middle instead of the top left corner.
+    if (fits && available - height > available * 0.15) {
+      page.classList.add('centered');
+      page.style.minHeight = `${available / zoom}px`;
+    }
     // Too much for one screen at a readable size: several screenfuls, which
     // take turns like a notice board. They start at a tile, never in one.
     // Room to scroll the last screenful up to the clock.
-    page.style.paddingBottom = fits ? '' : `${innerHeight / lo}px`;
+    page.style.paddingBottom = fits ? '' : `${innerHeight / zoom}px`;
     pages = fits ? [0] : findPages(barH);
     if (pageIndex >= pages.length) pageIndex = 0;
     showPage();
@@ -271,8 +293,8 @@
     document.documentElement.classList.remove('display-mode');
     lock?.release().catch(() => {});
     if (page) {
-      for (const p of ['zoom', 'paddingTop', 'paddingBottom', 'translate']) page.style[p] = '';
-      page.classList.remove('fading');
+      for (const p of ['zoom', 'paddingTop', 'paddingBottom', 'minHeight', 'translate']) page.style[p] = '';
+      page.classList.remove('fading', 'centered');
       page.querySelectorAll('.tile, .group-head').forEach((e) => (e.style.visibility = ''));
     }
     if (document.fullscreenElement) document.exitFullscreen?.();
@@ -336,6 +358,7 @@
           <option value="0.8">{t('kleiner')}</option>
           <option value="1">{t('automatisch')}</option>
           <option value="1.25">{t('größer')}</option>
+          <option value="1.5">{t('viel größer')}</option>
         </select>
       </label>
       <p class="note">{awake ? t('Der Bildschirm bleibt an.') : t('Der Bildschirm kann ausgehen: wach halten geht nur über HTTPS.')}</p>

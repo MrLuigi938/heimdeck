@@ -11,7 +11,6 @@ export const ACTIONS = [
   { id: 'prevBoard', label: 'Vorheriges Dashboard', key: '[' },
   { id: 'nextBoard', label: 'Nächstes Dashboard', key: ']' },
   { id: 'ai', label: 'KI-Chat öffnen', key: 'k' },
-  { id: 'display', label: 'Anzeigeansicht an/aus', key: 'd' },
   { id: 'help', label: 'Tastenkürzel anzeigen', key: '?' },
 ];
 
