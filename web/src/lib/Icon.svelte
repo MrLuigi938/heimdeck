@@ -15,6 +15,48 @@
   } catch {
     misses = {};
   }
+  // Some icons are plain white (or plain black) and vanish on a tile of the
+  // same colour. Each picture is measured once: "light" or "dark" when it is
+  // almost one colour without hue, otherwise "". The CSS below then inverts
+  // a light icon in light themes and a dark one in dark themes – coloured
+  // logos stay as they are. Pictures from other sites that do not allow
+  // reading them (no CORS) are simply left alone.
+  const tones = new Map();
+  function toneOf(url) {
+    if (!tones.has(url)) tones.set(url, measure(url).catch(() => ''));
+    return tones.get(url);
+  }
+  async function measure(url) {
+    const img = new Image();
+    if (!url.startsWith('/') && !url.startsWith('data:')) img.crossOrigin = 'anonymous';
+    img.src = url;
+    await img.decode();
+    const n = 32;
+    const c = document.createElement('canvas');
+    c.width = c.height = n;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0, n, n);
+    const d = x.getImageData(0, 0, n, n).data; // throws for pictures without CORS
+    let count = 0, lum = 0, sat = 0, light = 0, dark = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 100) continue; // transparent: the tile shows through
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      count++;
+      lum += l;
+      sat += Math.max(r, g, b) - Math.min(r, g, b);
+      if (l > 0.8) light++;
+      if (l < 0.2) dark++;
+    }
+    // A picture that fills its whole square (a photo, an app icon with its own
+    // background) can be seen on any tile.
+    if (count < 16 || count > n * n * 0.92) return '';
+    if (sat / count > 0.18) return ''; // coloured
+    if (light / count > 0.85 && lum / count > 0.8) return 'light';
+    if (dark / count > 0.85 && lum / count < 0.2) return 'dark';
+    return '';
+  }
+
   async function checkMiss(url) {
     // Only addresses of the icon collection; Heimdeck's own favicon route may work again any time.
     if (!url.startsWith('https://')) return;
@@ -69,6 +111,12 @@
   let loadedSrc = $state('');
   let src = $derived(sources.find((s) => !failed[s]) || '');
   let loaded = $derived(src !== '' && loadedSrc === src);
+  let tone = $state('');
+  $effect(() => {
+    const s = src;
+    tone = '';
+    if (s) toneOf(s).then((t) => s === src && (tone = t));
+  });
 
   // Catches images that were already complete when they were inserted.
   function checkComplete(img) {
@@ -88,7 +136,7 @@
     {/if}
     {#if src}
       {#key src}
-        <img {src} alt="" class:hidden={!loaded} use:checkComplete
+        <img {src} alt="" class:hidden={!loaded} class:tone-light={tone === 'light'} class:tone-dark={tone === 'dark'} use:checkComplete
           onload={() => (loadedSrc = src)} onerror={(e) => {
             // The address of the image that failed – `src` already points to the next one afterwards.
             const bad = e.currentTarget.getAttribute('src');
@@ -112,5 +160,9 @@
   .icon > * { grid-area: 1 / 1; }
   img { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; }
   img.hidden { visibility: hidden; }
+  /* A white icon on a light theme, a black one on a dark theme: inverted, so
+     it can be seen (hue-rotate keeps a slight tint as it was). */
+  :global(html[data-theme='light']) img.tone-light,
+  :global(html[data-theme='dark']) img.tone-dark { filter: invert(1) hue-rotate(180deg); }
   .letter { width: 100%; height: 100%; border-radius: 25%; display: grid; place-items: center; color: #fff; font-weight: 700; }
 </style>
