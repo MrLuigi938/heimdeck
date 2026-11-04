@@ -21,6 +21,7 @@
   import { backgroundImages, pickBackground } from './backgrounds.js';
   import AiChat from './AiChat.svelte';
   import SeasonFx from './SeasonFx.svelte';
+  import DisplayMode from './DisplayMode.svelte';
 
   let data = $state(null);
   let status = $state({});
@@ -40,6 +41,27 @@
   let unlockPw = $state({});
   let showHidden = $state(readHidden());
   let boardMenu = $state(false);
+
+  // The display view for a wall tablet; ?display keeps it across reloads.
+  let display = $state(new URLSearchParams(location.search).has('display'));
+  let pageEl = $state();
+  function setDisplay(on, fromClick = false) {
+    display = on;
+    editMode = false;
+    const url = new URL(location.href);
+    if (on) url.searchParams.set('display', '1');
+    else url.searchParams.delete('display');
+    history.replaceState(null, '', url);
+    // A browser only goes full screen right after a click or a key.
+    if (on && fromClick) document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+  // In the display view a tap stays here: links would leave the screen for good.
+  function keepOnDisplay(e) {
+    if (display && e.target.closest?.('a')) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
 
   // The open dashboard: ?board=<id> in the address wins (for bookmarks),
   // otherwise the one last used in this browser.
@@ -96,6 +118,9 @@
   let sharedBoards = $derived(boards.filter((b) => b.shared));
   let boardGroups = $derived((data?.groups || []).filter((g) => g.boardId === board?.id));
   let allTiles = $derived(boardGroups.flatMap((g) => g.tiles));
+  // Dashboards to take turns on the display, and the first weather tile for its clock.
+  let displayBoards = $derived(ownBoards.filter((b) => (data?.groups || []).some((g) => g.boardId === b.id && g.tiles.length)));
+  let displayWeather = $derived((data?.groups || []).flatMap((g) => g.tiles).find((x) => x.integration === 'weather') || null);
   let newTab = $derived(settings.openInNewTab !== 'false');
   let hasSearchServices = $derived(allTiles.some((t) => defs[t.integration]?.hasSearch));
   // Groups a tile can be moved to; with several dashboards labelled "Dashboard › Group", current one first.
@@ -379,6 +404,7 @@
   let shortcutsOn = $derived(settings.shortcutsOff !== 'true');
   function onShortcut(e) {
     if (!data || !shortcutsOn || blocked(e)) return;
+    if (display && e.key !== keys.display) return;
     if (isBoardKey(e.key)) {
       const b = boards[Number(e.key) - 1];
       if (b) {
@@ -403,6 +429,7 @@
       prevBoard: () => step(-1),
       nextBoard: () => step(1),
       ai: () => data.ai && openChat(),
+      display: () => setDisplay(!display, true),
       help: () => (showKeys = true),
     })[action]?.();
   }
@@ -571,7 +598,7 @@
 <svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} onkeydown={onShortcut} onscroll={onPageScroll} onresize={onPageScroll} />
 
 {#if data}
-  <div class="page" style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
+  <div class="page" class:display bind:this={pageEl} onclickcapture={keepOnDisplay} style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
     <header class="top">
       <div class="brand on-bg">
         <div class="title-row">
@@ -621,6 +648,9 @@
         {#if (data.docker || data.proxmox) && !readOnly}
           <button class="ghost icon" title={t('Dienste automatisch finden')} aria-label={t('Dienste automatisch finden')} onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'}</button>
         {/if}
+        <button class="ghost icon" title={t('Anzeigeansicht (für ein Wandtablet)')} aria-label={t('Anzeigeansicht (für ein Wandtablet)')} onclick={() => setDisplay(true, true)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+        </button>
         {#if !readOnly}
           <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
@@ -726,7 +756,7 @@
           {#if editMode}<span class="help lock-hint">{t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')}</span>{/if}
         </form>
       {:else if group.visibility !== 'hidden' || showHidden || editMode}
-        <section class="group" id="group-{group.id}" class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
+        <section class="group" id="group-{group.id}" class:hidden-group={group.visibility === 'hidden'} class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2 class="on-bg">{group.name}</h2>
             {#if group.visibility === 'hidden'}<span class="vis on-bg" title={t('Ausgeblendete Gruppe')}>👁 {t('ausgeblendet')}</span>{/if}
@@ -785,7 +815,11 @@
     <Credit app version={data.version} update={data.update} />
   </div>
 
-  {#if showJumpButton}
+  {#if display && pageEl}
+    <DisplayMode page={pageEl} boards={displayBoards} {board} tiles={allTiles} weatherTile={displayWeather} {status}
+      onSwitch={switchBoard} onExit={() => setDisplay(false)} onReconnect={() => { load(); loadStatus(); }} />
+  {/if}
+  {#if showJumpButton && !display}
     <!-- Phones only (CSS): appears once you scrolled down, opens the groups from below. -->
     <button class="jump-fab" class:show={scrolledDown && !jumpSheet} onclick={() => (jumpSheet = true)} aria-label={t('Zu einer Gruppe springen')} title={t('Zu einer Gruppe springen')}>
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6h.01M4 12h.01M4 18h.01" /></svg>
@@ -838,6 +872,13 @@
 <style>
   /* Its own layer above the seasonal effects, which run behind the tiles. */
   .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; position: relative; z-index: 1; }
+  /* The display view shows only the tiles; DisplayMode sets the top padding and the zoom. */
+  .page.display { max-width: none; padding: 0 18px 12px; gap: 12px; align-content: start; transition: opacity .35s; }
+  .page.display > :global(:not(.group):not(.empty)), .page.display > :global(.hidden-group), .page.display > :global(.group:not(:has(.tile))) { display: none; }
+  .page.display :global(.empty .row), .page.display :global(.empty .help) { display: none; }
+  .page.display :global(.group) { gap: 6px; }
+  .page.display :global(a) { cursor: default; }
+  :global(.page.fading) { opacity: 0; }
   /* z-index lifts the header (and its dropdowns) above the cards below, which form their own layers. */
   /* Title and icons keep their width, the search gives way (also next to the AI sidebar). */
   .top { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(240px, 620px) minmax(max-content, 1fr); gap: 16px; align-items: center; position: relative; z-index: 30; }
