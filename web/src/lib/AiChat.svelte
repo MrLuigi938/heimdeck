@@ -209,6 +209,13 @@
     }
   }
 
+  // The situation report: a fixed question with 📋 on.
+  function report() {
+    if (!dash) toggleDash();
+    text = t('Gib mir einen kurzen Lagebericht: Was braucht Aufmerksamkeit, was steht heute an, was läuft gerade?');
+    send();
+  }
+
   async function send() {
     const q = text.trim();
     if ((!q && !files.length) || busy) return;
@@ -297,7 +304,7 @@
     }
   }
   const toolText = (x) =>
-    x.tool === 'list' ? t('Kacheln angesehen') : x.tool === 'read' ? t('{name} gelesen', { name: x.arg }) : t('gesucht: „{q}“', { q: x.arg });
+    x.tool === 'list' ? t('Kacheln angesehen') : x.tool === 'read' ? t('{name} gelesen', { name: x.arg }) : x.tool === 'remember' ? '🧠 ' + t('gemerkt: {text}', { text: x.arg }) : t('gesucht: „{q}“', { q: x.arg });
 
   // A proposed action runs only when clicked – through the tile's normal
   // action, with the same rights as its buttons on the dashboard.
@@ -409,6 +416,9 @@
           <p class="big">✨</p>
           <p>{t('Frag etwas – oder gib der KI eine Datei, die sie zusammenfassen, übersetzen oder umschreiben soll.')}</p>
           <p class="muted small">{t('Dateien per 📎, Ziehen oder Einfügen. Text, Markdown, CSV, JSON, PDF, Word (.docx) und Bilder.')}{ai.web ? ' ' + t('🌐 holt Ergebnisse aus dem Web dazu.') : ''}</p>
+          {#if ai.dashboard}
+            <p><button class="small" onclick={report} disabled={busy}>📋 {t('Lagebericht')}</button></p>
+          {/if}
         </div>
       {/if}
       {#each messages as m, i (i)}

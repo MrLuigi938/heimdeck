@@ -11,6 +11,7 @@
 - [Search](#search)
 - [AI chat](#ai-chat)
 - [Notifications](#notifications)
+- [Automations](#automations)
 - [Docker labels](#docker-labels)
 - [Icons](#icons)
 - [Background pictures](#background-pictures)
@@ -151,6 +152,9 @@ Heimdeck can talk to an AI of your choice – any server with an OpenAI-compatib
 - **Web** 🌐: Heimdeck searches the web for your question and gives the AI the top results; the model itself never goes online. If the search fails, the chat says why below the answer.
 - **Earlier chats** are kept in your browser, per account (up to 30, without the pictures).
 - **On the computer** (*Settings → Search → AI chat on the computer*): a large window with the list of chats on the left (default), or a sidebar on the right – the dashboard moves aside and stays usable. On phones the chat always fills the screen.
+- **In Telegram**: with *The AI answers in this Telegram chat* (*Settings → Notifications*, below the Telegram fields) the bot that sends your notifications also answers questions – in the same chat, with the same AI, tiles and rights as the chat window. You can also send it photos and files (a letter to summarize, a text or Word file – pictures need a model that can see). `/status` gives a situation report, `/camera` sends a current camera picture, `/web question` searches the web, `/remember text` and `/forget` manage what it remembers, `/new` starts a new conversation. Actions come as a button; when the tile asks for a confirmation, the bot asks first. In a group, ask with `/ask question` or reply to one of the bot's messages (a plain `@yourbot` only reaches it when its group privacy is turned off at BotFather), and only admins of the group can tap buttons. Channels do not work (nobody can write to a bot there). Heimdeck fetches the messages from Telegram itself, so nothing has to be reachable from the internet – but questions and answers go through Telegram's servers.
+- **Situation report** (📋 needed): *📋 Situation report* in the empty chat, or `/status` in Telegram – what needs attention, what is on today, what is going on. With a time under *Morning report in Telegram* (*Settings → Notifications*) it comes every morning; the server's time counts (Docker: set `TZ`).
+- **Memory**: under *Settings → Search → What the AI remembers* you see and delete the facts the AI keeps for you (e.g. “My NAS is called tank”) and add new ones. They go along with every question. With tools the AI saves one when you ask it to (“Remember …”), in Telegram `/remember text` does the same.
 
 ![The AI reads tiles and proposes an action as a button](images/ai-tools.webp)
 <sub>Demo data</sub>
@@ -180,7 +184,24 @@ Settings → Notifications:
   5. **Save** and try it with **Send test**.
 - **Browser**: can be enabled per browser. Works as long as a Heimdeck tab is open, and only via HTTPS or `localhost`.
 
-You get a message when a service hasn't answered for the configured time (default 2 minutes) and when it is back. Only tiles with a status check are monitored.
+You get a message when a service hasn't answered for the configured time (default 2 minutes) and when it is back. Only tiles with a status check are monitored. Several services failing at once come as one message. With *The AI adds a likely cause to outage notifications* (when the AI may see the dashboard) the message also says what the AI finds on your dashboard – a stopped VM, other services on the same host down, the internet connection.
+
+## Automations
+
+*Settings → Automations*: workflows of the form “when …, only if …, then …”. Heimdeck checks them every half minute and runs them with the rights of your account. The AI can draft one from a sentence – only what you save yourself is saved and run.
+
+- **When** (any one of up to 5 triggers): a time (with days of the week), a service stops answering for some minutes, a service is reachable again, a value of a tile goes above or below a limit – e.g. *NAS · Used above 90 %* or *Free space below 100 GB* (sizes like GB and TB are converted) –, a camera reports an event (any, or e.g. only the doorbell), a message reaches a webhook tile (any, or only one containing a text such as *failed*), or *I start it* – a scene.
+- **Only if** (optional, all must hold): a value of another tile (*Jellyfin · Streams equal to 0*), or whether a service answers. While a condition does not hold, the trigger keeps waiting and the workflow runs as soon as it does. Also optional: a time window (also over midnight) and days of the week.
+- **Then**, one after another (up to 20 steps): send a message to your notification channels (optionally with the AI’s situation report and a camera’s current picture in Telegram), press a button of a tile – a whole tile’s button (pause downloads) or one of an entry (a switch like *Garden lights*) –, start a scene, **wait** (1 minute to 24 hours), or **if … then … else** with its own steps for both cases.
+- **Two views**: *List* shows the workflow as blocks one below the other; *Flow* draws it from top to bottom, with “if” splitting into “then” and “else” – tap a block to edit it, “+” adds one in that place. Both edit the same workflow; the choice is remembered in your browser.
+- **✨ Describe it to the AI** (when the AI is set up): e.g. “When the NAS is over 90 % full and nobody streams, pause SABnzbd and send me a message”. The draft fills the editor; check it and save it. When editing a saved workflow, *Change it* adapts that one. The AI only gets the names, values and buttons of your tiles.
+- **🧪 Dry run** shows what the workflow would do right now – which conditions hold, which branch of an “if” it takes, which buttons it would press – without doing anything.
+- A workflow fires once when its trigger becomes true; it fires again only after the trigger stopped holding in between and the waiting time (*Not again before*, default 1 hour) has passed. While a workflow waits, further starts are skipped.
+- **Scenes** are workflows with the trigger *I start it – a scene*, e.g. “Movie night”: pause the downloads, switch the lights. Start one with 🎬 *Start* in the list, with `/scene` in Telegram (also without the AI there; in a group only its admins), with a **Scene** tile on the dashboard, or from another workflow. Starting a scene counts as the confirmation of its buttons.
+- **Buttons that ask** on the dashboard (restart, delete …) ask here too: the workflow sends you a Telegram message with *✅ Run / Cancel*, waits for your tap (up to an hour) and then goes on – in a group only its admins can tap. Tick *Run without asking* to skip that.
+- The **log** below the list shows what ran, when and why. Rules from before workflows are taken over unchanged.
+
+Times are the server’s time (Docker: set `TZ`). Only tiles you see and whose buttons you may use can be chosen. A workflow that waits does not survive a restart of Heimdeck.
 
 ## Docker labels
 

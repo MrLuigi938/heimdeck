@@ -380,13 +380,16 @@ var allowedSettings = map[string]bool{
 	"columns": true, "searchEngine": true, "searchUrl": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
-	"debug": true, "telegramChat": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
+	"debug": true, "telegramChat": true, "telegramAI": true, "telegramReport": true, "notifyAI": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
 	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true,
 }
 
 // checkSettings checks the addresses among the settings – from the settings
 // page or from a backup – and tidies them up.
 func checkSettings(m map[string]string) error {
+	if v, ok := m["telegramReport"]; ok && v != "" && !reportTimeRe.MatchString(v) {
+		return errors.New("Bitte eine Uhrzeit wie 07:00 angeben")
+	}
 	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {
 		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" || len(strings.Trim(p.Path, "/")) == 0 {
 			return errors.New("ntfy: bitte die vollständige Themen-Adresse angeben, z. B. https://ntfy.sh/mein-thema")
@@ -434,6 +437,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := m["updateCheck"]; ok && s.version != "" && s.version != "dev" {
 		go s.checkUpdate(context.Background()) // show or hide the hint right away
+	}
+	if _, ok := m["telegramAI"]; ok || m["telegramChat"] != "" || m["language"] != "" {
+		s.kickBots()
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

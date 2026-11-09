@@ -196,6 +196,12 @@ func (a *Auth) UserID(r *http.Request) int64 {
 	return id
 }
 
+// NewContext marks ctx as acting for the user – for work that runs without a
+// request, like the Telegram bot answering in the user's name.
+func NewContext(ctx context.Context, id int64) context.Context {
+	return context.WithValue(ctx, ctxKey{}, id)
+}
+
 // FromContext returns the user that Require let through.
 func FromContext(ctx context.Context) int64 {
 	id, _ := ctx.Value(ctxKey{}).(int64)

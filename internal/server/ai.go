@@ -173,6 +173,7 @@ func (s *Server) handleSaveAI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("KI-Einstellungen gespeichert", "aktiv", c.Enabled, "adresse", c.URL, "modell", c.Model, "von", s.username(r))
+	s.kickBots() // the AI may have been switched on or off for the Telegram bots
 	writeJSON(w, map[string]bool{"ok": true, "keySet": c.APIKey != ""})
 }
 

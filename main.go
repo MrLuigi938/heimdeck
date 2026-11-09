@@ -86,6 +86,8 @@ func main() {
 	go app.Monitor(ctx)
 	go app.Watch(ctx)
 	go app.CheckUpdates(ctx)
+	go app.TelegramBots(ctx)
+	go app.Automations(ctx)
 	go func() {
 		slog.Info("Heimdeck läuft", "adresse", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

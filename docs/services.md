@@ -67,6 +67,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Shelly (local, Gen1 to Gen4) | power, energy, temperature, humidity, battery, Wi-Fi, firmware updates | | switch relays and lights, open/stop/close covers |
 | **Other** | | | |
 | Custom API | any values, list and buttons from a JSON response | ✓ if configured | custom buttons |
+| Scene | the steps of a scene from *Settings → Automations*, when it last ran | | a button that starts the scene |
 | Webhook | messages other services post to the tile's own address (JSON, form, text, Uptime Kuma) | | buttons that call webhooks (Shelly, Home Assistant, Node-RED, IFTTT …) |
 | Weather | current weather and a 3–7 day forecast for any place (Open-Meteo, no key), storm and UV hints | | |
 | Calendar | upcoming events from iCal links (Nextcloud, Google, Outlook, Proton …), repeating ones too, plus new episodes and films from your Sonarr and Radarr tiles | | |

@@ -18,6 +18,7 @@
   import Users from './Users.svelte';
   import AiSettings from './AiSettings.svelte';
   import Shares from './Shares.svelte';
+  import Rules from './Rules.svelte';
 
   // section: the area to open first, e.g. "notify".
   let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, ai = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
@@ -86,6 +87,7 @@
     { id: 'search', label: 'Suche', icon: '🔍' },
     { id: 'network', label: 'Netzwerk und Docker', icon: '🏠', admin: true },
     { id: 'notify', label: 'Benachrichtigungen', icon: '🔔' },
+    { id: 'auto', label: 'Automationen', icon: '⚡' },
     { id: 'keys', label: 'Tastenkürzel', icon: '⌨️' },
     { id: 'users', label: 'Benutzerverwaltung', icon: '👥', admin: true },
     { id: 'ai', label: 'KI', icon: '✨', admin: true },
@@ -294,6 +296,41 @@
   // Asks Telegram which chats wrote to the bot and fills in the chat ID.
   let findingChats = $state(false);
   let chatChoices = $state([]);
+  // Morning report times; a time set otherwise stays selectable.
+  const reportTimes = (cur) => {
+    const list = [];
+    for (let h = 5; h <= 10; h++) list.push(`${String(h).padStart(2, '0')}:00`, `${String(h).padStart(2, '0')}:30`);
+    if (cur && !list.includes(cur)) list.push(cur);
+    return list.sort();
+  };
+
+  // What the AI remembers for this account.
+  let memory = $state([]);
+  let memText = $state('');
+  $effect(() => {
+    if (ai) get('/ai/memory').then((m) => (memory = m)).catch(() => {});
+  });
+  async function addMemory() {
+    const text = memText.trim();
+    if (!text) return;
+    try {
+      const item = await post('/ai/memory', { text });
+      if (!memory.some((m) => m.id === item.id)) memory = [...memory, item];
+      memText = '';
+      flash();
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+  async function forgetMemory(id) {
+    try {
+      await del(`/ai/memory/${id}`);
+      memory = memory.filter((m) => m.id !== id);
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+
   async function findChats() {
     findingChats = true;
     try {
@@ -587,6 +624,21 @@
             </select>
             <span class="help">{t('Auf dem Handy öffnet sich der Chat immer als ganzer Bildschirm.')}</span>
           </label>
+          <div class="field">
+            <span>🧠 {t('Das merkt sich die KI')}</span>
+            {#if memory.length}
+              <ul class="memory">
+                {#each memory as m (m.id)}
+                  <li><span>{m.text}</span><button class="ghost small" onclick={() => forgetMemory(m.id)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button></li>
+                {/each}
+              </ul>
+            {/if}
+            <div class="secret-row">
+              <input bind:value={memText} placeholder={t('z. B. Mein NAS heißt tank')} maxlength="300" onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addMemory())} />
+              <button class="small" onclick={addMemory} disabled={!memText.trim()}>{t('Hinzufügen')}</button>
+            </div>
+            <span class="help">{t('Diese Punkte bekommt die KI bei jeder Frage mit – im Chat, in Telegram und in Berichten. Sie merkt sich selbst etwas, wenn du sie darum bittest („Merk dir …“, braucht die Werkzeuge), in Telegram mit /merken.')}</span>
+          </div>
         {/if}
         <label class="field">
           <span>{t('Darstellung der Ergebnisse')}</span>
@@ -712,6 +764,23 @@
             {/each}
           </div>
         {/if}
+        {#if ai}
+          <label class="check">
+            <input type="checkbox" checked={s.telegramAI === 'true'} onchange={setFlag('telegramAI')} disabled={!nf.telegramSet || !s.telegramChat} />
+            {t('Die KI antwortet in diesem Telegram-Chat')}
+          </label>
+          <span class="help">{t('Schreib deinem Bot eine Frage, schick ein Foto oder eine Datei – er antwortet mit {label} und deinen Kacheln, so wie der KI-Chat hier. /lage gibt einen Lagebericht, /kamera ein aktuelles Kamerabild, /hilfe zeigt alles. Aktionen schlägt er nur als Knopf vor. In einer Gruppe fragt man mit /ki Frage oder antwortet auf seine Nachricht, und Knöpfe dürfen nur Gruppen-Admins drücken. Kanäle gehen nicht. Fragen und Antworten laufen über die Server von Telegram.', { label: ai.label })}</span>
+          {#if ai.dashboard}
+            <label class="field">
+              <span>☀️ {t('Morgenbericht in Telegram')}</span>
+              <select value={s.telegramReport || ''} onchange={(e) => { s.telegramReport = e.currentTarget.value; saveSetting({ telegramReport: s.telegramReport }); }} disabled={!nf.telegramSet || !s.telegramChat}>
+                <option value="">{t('aus')}</option>
+                {#each reportTimes(s.telegramReport) as tm (tm)}<option value={tm}>{tm}</option>{/each}
+              </select>
+              <span class="help">{t('Jeden Tag zu dieser Uhrzeit ein kurzer Lagebericht in den Telegram-Chat – auch ohne den Schalter oben. Es gilt die Uhrzeit des Servers (bei Docker: TZ setzen).')}</span>
+            </label>
+          {/if}
+        {/if}
         <label class="field">
           <span>{t('Melden, wenn ein Dienst so lange nicht antwortet')}</span>
           <select bind:value={s.notifyAfter} onchange={() => saveSetting({ notifyAfter: s.notifyAfter })}>
@@ -724,6 +793,10 @@
         </label>
         <label class="check"><input type="checkbox" checked={s.notifyRecovery !== 'false'} onchange={setFlag('notifyRecovery')} /> {t('Melden, wenn der Dienst wieder erreichbar ist')}</label>
         <label class="check"><input type="checkbox" checked={s.notifyExternal !== 'false'} onchange={setFlag('notifyExternal')} /> {t('Auch Ausfälle der öffentlichen Adressen melden')}</label>
+        {#if ai?.dashboard}
+          <label class="check"><input type="checkbox" checked={s.notifyAI === 'true'} onchange={setFlag('notifyAI')} /> ✨ {t('Die KI ergänzt Ausfallmeldungen um eine mögliche Ursache')}</label>
+          <span class="help">{t('Sie schaut auf deinem Dashboard nach, z. B. ob eine VM gestoppt ist oder andere Dienste auf demselben Host auch ausfallen. Die Meldung kommt dann ein paar Sekunden später.')}</span>
+        {/if}
         <label class="check">
           <input type="checkbox" checked={browserNotify.on} onchange={toggleBrowser} disabled={!notifySupported()} />
           {t('Browser-Benachrichtigungen in diesem Browser')}
@@ -756,6 +829,11 @@
           </div>
           <div class="row"><span class="spacer"></span><button class="small" onclick={resetKeys}>{t('Standard wiederherstellen')}</button></div>
         {/if}
+      </section>
+
+      <section hidden={current !== 'auto'} bind:this={sectionEls.auto}>
+        <h3>{t('Automationen')}</h3>
+        <Rules active={current === 'auto'} {ai} />
       </section>
 
       <section hidden={current !== 'account'} bind:this={sectionEls.account}>
@@ -952,4 +1030,7 @@
     .board-actions button { flex: 1; }
   }
   @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+  .memory { list-style: none; margin: 2px 0; padding: 0; display: grid; gap: 4px; }
+  .memory li { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 10px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 13px; }
+  .memory li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 </style>

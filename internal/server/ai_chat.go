@@ -80,6 +80,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if body.Date != "" {
 		system += " The user's current local date and time: " + clip(body.Date, 60) + "."
 	}
+	system += memoryPrompt(s.memoryOf(u.ID))
 	var hits []string
 	for i, h := range body.Hits {
 		if i == 60 {
@@ -103,9 +104,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			return system
 		}
 		w.Header().Set("X-Dashboard-Tiles", strconv.Itoa(n))
-		return system + "\n\nThe user's Heimdeck dashboard right now (their tiles by dashboard and group, with live data; " +
-			"\"OFFLINE\" means the service did not answer the last check). Use it to answer questions about their services, " +
-			"name the tile you take something from, and say so when something is not on the dashboard:\n" + dash + "\n\n"
+		return system + dashboardPrompt(dash)
 	}
 	if body.Dashboard && c.Dashboard && !useTools {
 		system = withDashboard(system)
@@ -138,13 +137,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		system += " You have no internet access; if asked, say that web search can be switched on in the chat (when the admin set it up)."
 	}
 
-	toolPrompt := "\n\nYou can look at the user's Heimdeck dashboard with tools: list_tiles (which services they have), read_tile (what a tile shows now, " +
-		"and its actions), search_services (search their media, documents, smart home …). Use them whenever a question is about their services or home – " +
-		"do not guess, and name the tile you take something from. You never run actions yourself: when the user wants something done (pause, switch, request …), " +
-		"read the tile or search to get the action key, call propose_action, and tell them to click the button."
 	sys := system
 	if useTools {
-		sys += toolPrompt
+		sys += aiToolPrompt
 	}
 	msgs := []any{map[string]string{"role": "system", "content": sys}}
 	for _, m := range body.Messages {
@@ -180,6 +175,20 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		msgs[0] = map[string]string{"role": "system", "content": withDashboard(system)}
 	}
 	s.streamChat(w, r, c, u, msgs, len(hits), extra)
+}
+
+// aiToolPrompt tells the model about its tools (chat window and Telegram).
+const aiToolPrompt = "\n\nYou can look at the user's Heimdeck dashboard with tools: list_tiles (which services they have), read_tile (what a tile shows now, " +
+	"and its actions), search_services (search their media, documents, smart home …). Use them whenever a question is about their services or home – " +
+	"do not guess, and name the tile you take something from. You never run actions yourself: when the user wants something done (pause, switch, request …), " +
+	"read the tile or search to get the action key, call propose_action, and tell them to click the button. " +
+	"When the user asks you to remember something, call remember if you have that tool."
+
+// dashboardPrompt hands the model the whole dashboard (📋 without tools).
+func dashboardPrompt(dash string) string {
+	return "\n\nThe user's Heimdeck dashboard right now (their tiles by dashboard and group, with live data; " +
+		"\"OFFLINE\" means the service did not answer the last check). Use it to answer questions about their services, " +
+		"name the tile you take something from, and say so when something is not on the dashboard:\n" + dash + "\n\n"
 }
 
 // handleExtract returns the text of a Word document (.docx) for the chat;

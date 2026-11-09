@@ -44,6 +44,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 	}
 	integrations.ReceiveHook(key, m)
 	s.forget(tileID) // the tile shows the message with its next refresh
+	go s.hookRules(tileID, m)
 	slog.Debug("Webhook empfangen", "kachel", tileID, "titel", m.Title)
 	writeJSON(w, map[string]bool{"ok": true})
 }

@@ -46,6 +46,8 @@ type Server struct {
 	// updateChecked is when GitHub last answered; started when the server came up.
 	updateChecked time.Time
 	started       time.Time
+	tg            tgBots     // the AI answering in Telegram
+	rules         ruleEngine // automations
 }
 
 type cached[T any] struct {
@@ -63,8 +65,11 @@ const (
 func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 	srv := &Server{store: s, auth: a, docker: d, updates: docker.NewUpdates(), web: web,
 		widgets: map[string]cached[*integrations.Widget]{}, fetching: map[string]chan struct{}{}, widgetGen: map[string]int{}, favicons: map[string]favicon{}, faviconFetch: map[string]chan struct{}{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
-		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now()}
+		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now(),
+		tg:    tgBots{bots: map[string]*tgBot{}, kick: make(chan struct{}, 1)},
+		rules: ruleEngine{state: map[string]*ruleState{}, pending: map[string]*ruleAsk{}, running: map[string]bool{}}}
 	integrations.Register(dockerTile{srv})
+	integrations.Register(sceneTile{srv})
 	srv.migrateSettings()
 	return srv
 }
@@ -138,6 +143,17 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/ai", s.adminOnly(s.handleSaveAI))
 	api.HandleFunc("POST /api/ai/models", s.adminOnly(s.handleAIModels))
 	api.HandleFunc("POST /api/ai/websearch", s.adminOnly(s.handleWebTest))
+	api.HandleFunc("GET /api/ai/memory", s.handleGetMemory)
+	api.HandleFunc("GET /api/rules", s.handleRules)
+	api.HandleFunc("GET /api/rules/tiles", s.handleRuleTiles)
+	api.HandleFunc("POST /api/rules", s.handleSaveRule)
+	api.HandleFunc("PUT /api/rules/{id}", s.handleSaveRule)
+	api.HandleFunc("DELETE /api/rules/{id}", s.handleDeleteRule)
+	api.HandleFunc("POST /api/rules/{id}/run", s.handleRunRule)
+	api.HandleFunc("POST /api/rules/dryrun", s.handleDryRun)
+	api.HandleFunc("POST /api/rules/draft", s.handleDraftRule)
+	api.HandleFunc("POST /api/ai/memory", s.handleAddMemory)
+	api.HandleFunc("DELETE /api/ai/memory/{id}", s.handleDeleteMemory)
 	api.HandleFunc("POST /api/ai/ask", s.handleAsk)
 	api.HandleFunc("POST /api/ai/chat", s.handleChat)
 	api.HandleFunc("POST /api/ai/extract", s.handleExtract)

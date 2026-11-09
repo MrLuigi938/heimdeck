@@ -67,6 +67,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Shelly (lokal, Gen1 bis Gen4) | Leistung, Energie, Temperatur, Luftfeuchte, Akku, WLAN, Firmware-Updates | | Relais und Lichter schalten, Rollläden öffnen/stoppen/schließen |
 | **Sonstige** | | | |
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
+| Szene | die Schritte einer Szene aus *Einstellungen → Automationen*, wann sie zuletzt lief | | ein Knopf, der die Szene startet |
 | Webhook | Meldungen, die andere Dienste an die eigene Adresse der Kachel schicken (JSON, Formular, Text, Uptime Kuma) | | Knöpfe, die Webhooks aufrufen (Shelly, Home Assistant, Node-RED, IFTTT …) |
 | Wetter | aktuelles Wetter und 3–7 Tage Vorhersage für jeden Ort (Open-Meteo, ohne Key), Hinweise zu Sturm und UV | | |
 | Kalender | anstehende Termine aus iCal-Links (Nextcloud, Google, Outlook, Proton …), auch wiederkehrende, dazu neue Folgen und Filme aus deinen Sonarr- und Radarr-Kacheln | | |

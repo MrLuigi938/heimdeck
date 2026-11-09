@@ -11,6 +11,7 @@
 - [Suche](#suche)
 - [KI-Chat](#ki-chat)
 - [Benachrichtigungen](#benachrichtigungen)
+- [Automationen](#automationen)
 - [Docker-Labels](#docker-labels)
 - [Icons](#icons)
 - [Hintergrundbilder](#hintergrundbilder)
@@ -151,6 +152,9 @@ Heimdeck kann mit einer KI deiner Wahl sprechen – jeder Server mit OpenAI-komp
 - **Web** 🌐: Heimdeck sucht im Web nach deiner Frage und gibt der KI die besten Treffer mit; das Modell selbst geht nie ins Internet. Klappt die Suche nicht, steht der Grund unter der Antwort.
 - **Frühere Chats** bleiben in deinem Browser gespeichert, pro Konto (bis zu 30, ohne die Bilder).
 - **Am Computer** (*Einstellungen → Suche → KI-Chat am Computer*): ein großes Fenster mit der Chat-Liste links (Standard) oder eine Seitenleiste rechts – das Dashboard rückt zur Seite und bleibt bedienbar. Auf dem Handy füllt der Chat immer den Bildschirm.
+- **In Telegram**: Mit *Die KI antwortet in diesem Telegram-Chat* (*Einstellungen → Benachrichtigungen*, unter den Telegram-Feldern) beantwortet der Bot, der deine Meldungen schickt, auch Fragen – im selben Chat, mit derselben KI, denselben Kacheln und Rechten wie im Chatfenster. Du kannst ihm auch Fotos und Dateien schicken (einen Brief zum Zusammenfassen, eine Text- oder Word-Datei – Bilder brauchen ein Modell mit Bildverständnis). `/lage` gibt einen Lagebericht, `/kamera` schickt ein aktuelles Kamerabild, `/web Frage` sucht im Web, `/merken Text` und `/vergessen` verwalten, was er sich merkt, `/neu` beginnt ein neues Gespräch. Aktionen kommen als Knopf; verlangt die Kachel eine Bestätigung, fragt der Bot vorher nach. In einer Gruppe fragt man mit `/ki Frage` oder antwortet auf eine Nachricht des Bots (ein bloßes `@deinbot` erreicht ihn nur, wenn bei BotFather sein Gruppen-Datenschutz ausgeschaltet ist), und Knöpfe dürfen nur Admins der Gruppe drücken. Kanäle gehen nicht (dort kann man einem Bot nicht schreiben). Heimdeck holt die Nachrichten selbst bei Telegram ab, von außen muss also nichts erreichbar sein – Fragen und Antworten laufen aber über die Server von Telegram.
+- **Lagebericht** (📋 nötig): *📋 Lagebericht* im leeren Chat oder `/lage` in Telegram – was Aufmerksamkeit braucht, was heute ansteht, was gerade läuft. Mit einer Uhrzeit bei *Morgenbericht in Telegram* (*Einstellungen → Benachrichtigungen*) kommt er jeden Morgen; es gilt die Uhrzeit des Servers (Docker: `TZ` setzen).
+- **Gedächtnis**: Unter *Einstellungen → Suche → Das merkt sich die KI* siehst und löschst du, was sich die KI für dich merkt (z. B. „Mein NAS heißt tank“), und trägst Neues ein. Es geht bei jeder Frage mit. Mit Werkzeugen merkt sich die KI selbst etwas, wenn du sie darum bittest („Merk dir …“), in Telegram geht es mit `/merken Text`.
 
 ![Die KI liest Kacheln und schlägt eine Aktion als Knopf vor](../images/ai-tools.webp)
 <sub>Demo-Daten</sub>
@@ -180,7 +184,24 @@ Einstellungen → Benachrichtigungen:
   5. **Speichern** und mit **Test senden** ausprobieren.
 - **Browser**: Pro Browser einschaltbar. Funktioniert, solange ein Heimdeck-Tab offen ist, und nur über HTTPS oder `localhost`.
 
-Gemeldet wird, wenn ein Dienst die eingestellte Zeit (Standard 2 Minuten) nicht antwortet, und wenn er wieder erreichbar ist. Nur Kacheln mit Statusprüfung.
+Gemeldet wird, wenn ein Dienst die eingestellte Zeit (Standard 2 Minuten) nicht antwortet, und wenn er wieder erreichbar ist. Nur Kacheln mit Statusprüfung. Fallen mehrere Dienste gleichzeitig aus, kommt eine gemeinsame Meldung. Mit *Die KI ergänzt Ausfallmeldungen um eine mögliche Ursache* (wenn die KI das Dashboard sehen darf) steht in der Meldung auch, was die KI auf deinem Dashboard findet – eine gestoppte VM, weitere Ausfälle auf demselben Host, die Internetverbindung.
+
+## Automationen
+
+*Einstellungen → Automationen*: Workflows der Form „Wenn …, nur wenn …, dann …“. Heimdeck prüft sie jede halbe Minute und führt sie mit den Rechten deines Kontos aus. Die KI kann einen aus einem Satz entwerfen – gespeichert und ausgeführt wird nur, was du selbst speicherst.
+
+- **Wenn** (einer von bis zu 5 Auslösern reicht): eine Uhrzeit (mit Wochentagen), ein Dienst antwortet einige Minuten nicht, ein Dienst ist wieder erreichbar, ein Wert einer Kachel über- oder unterschreitet eine Grenze – z. B. *NAS · Belegt über 90 %* oder *Freier Speicher unter 100 GB* (Größen wie GB und TB werden umgerechnet) –, eine Kamera meldet ein Ereignis (jedes oder z. B. nur die Klingel), an eine Webhook-Kachel kommt eine Meldung (jede oder nur eine mit einem Text wie *failed*), oder *ich sie starte* – eine Szene.
+- **Nur wenn** (optional, alle müssen gelten): ein Wert einer anderen Kachel (*Jellyfin · Streams gleich 0*) oder ob ein Dienst antwortet. Gilt eine Bedingung gerade nicht, wartet der Auslöser weiter, und der Workflow läuft, sobald sie gilt. Ebenfalls optional: ein Zeitfenster (auch über Mitternacht) und Wochentage.
+- **Dann**, der Reihe nach (bis zu 20 Schritte): eine Nachricht an deine Benachrichtigungs-Kanäle (auf Wunsch mit dem Lagebericht der KI und dem aktuellen Bild einer Kamera in Telegram), einen Knopf einer Kachel drücken – einen der ganzen Kachel (Downloads pausieren) oder einen eines Eintrags (einen Schalter wie *Garden lights*) –, eine Szene starten, **warten** (1 Minute bis 24 Stunden) oder **Wenn … dann … sonst** mit eigenen Schritten für beide Fälle.
+- **Zwei Ansichten**: *Liste* zeigt den Workflow als Blöcke untereinander; *Fluss* zeichnet ihn von oben nach unten, ein „Wenn“ teilt sich in „dann“ und „sonst“ – ein Tipp auf einen Block öffnet ihn, „+“ fügt an der Stelle einen ein. Beide bearbeiten denselben Workflow; die Wahl merkt sich dein Browser.
+- **✨ Mit KI beschreiben** (wenn die KI eingerichtet ist): z. B. „Wenn der NAS über 90 % voll ist und niemand streamt, pausiere SABnzbd und schick mir eine Nachricht“. Der Entwurf füllt den Editor; du prüfst ihn und speicherst ihn. Bei einem gespeicherten Workflow passt *Ändern lassen* diesen an. Die KI bekommt nur die Namen, Werte und Knöpfe deiner Kacheln.
+- **🧪 Probelauf** zeigt, was der Workflow jetzt tun würde – welche Bedingungen gelten, welchen Zweig ein „Wenn“ nimmt, welche Knöpfe er drücken würde –, ohne etwas auszuführen.
+- Ein Workflow startet einmal, wenn sein Auslöser eintritt; wieder erst, wenn der Auslöser zwischendurch nicht mehr galt und die Wartezeit (*Frühestens wieder nach*, Standard 1 Stunde) vorbei ist. Solange ein Workflow wartet, werden weitere Starts ausgelassen.
+- **Szenen** sind Workflows mit dem Auslöser *ich sie starte – eine Szene*, z. B. „Filmabend“: Downloads pausieren, Licht schalten. Starten kannst du sie mit 🎬 *Starten* in der Liste, mit `/szene` in Telegram (auch ohne die KI dort; in einer Gruppe nur deren Admins), mit einer **Szene**-Kachel auf dem Dashboard oder aus einem anderen Workflow. Der Start einer Szene zählt als Bestätigung ihrer Knöpfe.
+- **Knöpfe, die nachfragen** (Neustart, Löschen …), fragen auch hier: Der Workflow schickt dir in Telegram *✅ Ausführen / Abbrechen*, wartet auf dein Tippen (bis zu einer Stunde) und macht dann weiter – in einer Gruppe dürfen das nur deren Admins. Mit *Ohne Nachfrage ausführen* entfällt das.
+- Das **Protokoll** unter der Liste zeigt, was wann und warum lief. Regeln von vor den Workflows werden unverändert übernommen.
+
+Es gilt die Uhrzeit des Servers (Docker: `TZ` setzen). Wählbar sind nur Kacheln, die du siehst und deren Knöpfe du benutzen darfst. Ein wartender Workflow übersteht keinen Neustart von Heimdeck.
 
 ## Docker-Labels
 

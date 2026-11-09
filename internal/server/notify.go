@@ -166,6 +166,7 @@ type notification struct {
 	Title, Body, URL string
 	Down             bool
 	Camera           bool // an event of a camera tile
+	Rule             bool // a message of an automation
 }
 
 func where(lang, kind string) string {
@@ -202,6 +203,19 @@ func recoveredMsg(lang string, t store.Tile, kind string, d time.Duration) notif
 // send delivers the messages to all channels the user set up.
 func (s *Server) send(user int64, settings map[string]string, msgs []notification) {
 	defer logging.Recover("Benachrichtigung")
+	lang := i18n.Normalize(settings["language"])
+	// With notifyAI the AI looks at the dashboard for a likely cause.
+	why := ""
+	if settings["notifyAI"] == "true" {
+		why = s.explainOutages(user, lang, msgs)
+	}
+	msgs = bundleNotifications(lang, msgs)
+	for i := range msgs {
+		if why != "" && msgs[i].Down && !msgs[i].Camera {
+			msgs[i].Body += "\n💡 " + why
+			break
+		}
+	}
 	sec := s.notifySecrets(user)
 	ctx, cancel := context.WithTimeout(s.notifyContext(user), 20*time.Second)
 	defer cancel()
@@ -241,6 +255,9 @@ func sendTelegram(ctx context.Context, token, chat string, m notification) error
 	}
 	if m.Camera {
 		icon = "📹"
+	}
+	if m.Rule {
+		icon = "⚙️"
 	}
 	text := icon + " <b>" + html.EscapeString(m.Title) + "</b>\n" + html.EscapeString(m.Body)
 	if strings.HasPrefix(m.URL, "http") {
@@ -305,6 +322,9 @@ func sendDiscord(ctx context.Context, webhook string, m notification) error {
 	if m.Camera {
 		color, icon = 0xf5a524, "📹"
 	}
+	if m.Rule {
+		color, icon = 0x6e7bff, "⚙️"
+	}
 	embed := map[string]any{"title": icon + " " + m.Title, "description": m.Body, "color": color,
 		"footer": map[string]string{"text": "Heimdeck"}, "timestamp": time.Now().UTC().Format(time.RFC3339)}
 	if strings.HasPrefix(m.URL, "http") {
@@ -321,6 +341,9 @@ func sendNtfy(ctx context.Context, topicURL, token string, m notification) error
 	}
 	if m.Camera {
 		h["Tags"], h["Priority"] = "video_camera", "high"
+	}
+	if m.Rule {
+		h["Tags"] = "gear"
 	}
 	if strings.HasPrefix(m.URL, "http") {
 		h["Click"] = m.URL
@@ -407,6 +430,7 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	s.kickBots()
 	writeJSON(w, ns.status())
 }
 
@@ -435,6 +459,12 @@ func (s *Server) handleTelegramChats(w http.ResponseWriter, r *http.Request) {
 	}
 	if !telegramTokenRe.MatchString(token) {
 		writeErr(w, 400, errors.New("Bitte zuerst den Bot-Token eintragen"))
+		return
+	}
+	// While the AI answers through this bot, Heimdeck itself receives its
+	// messages – Telegram does not hand them out a second time.
+	if chats, ok := s.botChats(token); ok {
+		writeJSON(w, map[string]any{"chats": chats})
 		return
 	}
 	ctx, cancel := timeout(r, 15*time.Second)

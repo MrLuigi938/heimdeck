@@ -43,7 +43,7 @@ const (
 var errNoTools = errors.New("the model does not support tools")
 
 // toolDefs are the tools in the OpenAI function-calling format.
-func toolDefs() []any {
+func toolDefs(memory bool) []any {
 	fn := func(name, desc string, props map[string]any, required ...string) map[string]any {
 		params := map[string]any{"type": "object", "properties": props}
 		if len(required) > 0 {
@@ -52,7 +52,7 @@ func toolDefs() []any {
 		return map[string]any{"type": "function", "function": map[string]any{"name": name, "description": desc, "parameters": params}}
 	}
 	str := func(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
-	return []any{
+	defs := []any{
 		fn("list_tiles", "List the tiles on the user's Heimdeck dashboard: name, service, group and whether it is reachable. Use it to find out which services the user has.", map[string]any{}),
 		fn("read_tile", "Read what one tile shows right now: its live values, lists and warnings, and the actions the user could run on it (each with a key like a1).",
 			map[string]any{"name": str("The tile's name as listed, or the service, e.g. \"Sonarr\"")}, "name"),
@@ -61,6 +61,11 @@ func toolDefs() []any {
 		fn("propose_action", "Propose an action to the user as a button in the chat (e.g. pause downloads, switch a light). You cannot run actions yourself – the user decides by clicking. Only use keys you got from read_tile or search_services in this conversation turn.",
 			map[string]any{"action": str("The action key, e.g. a1"), "reason": str("One short sentence why")}, "action"),
 	}
+	if memory {
+		defs = append(defs, fn("remember", "Save a short fact or preference for later conversations (e.g. what a device is called). Only when the user explicitly asks you to remember something (\"remember that …\", \"merk dir …\").",
+			map[string]any{"text": str("The fact in one short sentence, in the user's words")}, "text"))
+	}
+	return defs
 }
 
 // proposal is an action offered to the user as a button.
@@ -83,12 +88,14 @@ type toolRun struct {
 	groups  map[int64]aiGroup
 	access  map[int64]boardAccess
 	actions map[string]proposal
+	user    int64
+	memory  bool // the remember tool may be used
 }
 
 func (s *Server) newToolRun(ctx context.Context, r *http.Request) *toolRun {
 	tiles, groups := s.aiTiles(r)
 	access, _ := s.groupsFor(uid(r))
-	return &toolRun{s: s, ctx: ctx, lang: langOf(r), tiles: tiles, groups: groups, access: access, actions: map[string]proposal{}}
+	return &toolRun{s: s, ctx: ctx, lang: langOf(r), tiles: tiles, groups: groups, access: access, actions: map[string]proposal{}, user: uid(r)}
 }
 
 // canAct says whether the user may press this tile's buttons.
@@ -120,6 +127,7 @@ func (tr *toolRun) call(name, args string) (string, map[string]any) {
 		Query  string `json:"query"`
 		Action string `json:"action"`
 		Reason string `json:"reason"`
+		Text   string `json:"text"`
 	}
 	if args != "" && json.Unmarshal([]byte(args), &in) != nil {
 		return "error: the arguments are not valid JSON", nil
@@ -131,6 +139,15 @@ func (tr *toolRun) call(name, args string) (string, map[string]any) {
 		return tr.readTile(in.Name), map[string]any{"tool": "read", "arg": clip(in.Name, 60)}
 	case "search_services":
 		return tr.search(in.Query), map[string]any{"tool": "search", "arg": clip(in.Query, 80)}
+	case "remember":
+		if !tr.memory {
+			return "error: remembering is not available here", nil
+		}
+		item, err := tr.s.addMemory(tr.user, in.Text, tr.lang)
+		if err != nil {
+			return "error: " + err.Error(), nil
+		}
+		return "Saved for later conversations: " + item.Text, map[string]any{"tool": "remember", "arg": clip(item.Text, 80)}
 	case "propose_action":
 		p, ok := tr.actions[strings.TrimSpace(in.Action)]
 		if !ok {
@@ -303,12 +320,13 @@ func (s *Server) chatWithTools(w http.ResponseWriter, r *http.Request, c aiConfi
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Minute)
 	defer cancel()
 	run := s.newToolRun(ctx, r)
+	run.memory = true
 	rc := http.NewResponseController(w)
 	started := false
 	start := time.Now()
 	used := 0
 	for round := 0; round < toolRounds; round++ {
-		body := map[string]any{"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages, "tools": toolDefs()}
+		body := map[string]any{"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages, "tools": toolDefs(true)}
 		if round == toolRounds-1 {
 			body["tool_choice"] = "none" // enough looking around – answer now
 		}
