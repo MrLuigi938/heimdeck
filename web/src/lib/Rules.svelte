@@ -370,7 +370,7 @@
           <button class="small" onclick={() => start(r)} disabled={starting === r.id || !r.on && isManual(r)} title={t('Die Schritte jetzt ausführen – zählt als Bestätigung')}>{isManual(r) ? '🎬 ' + t('Starten') : '▶ ' + t('Jetzt')}</button>
           <button class="small" onclick={() => edit(r)}>{t('Bearbeiten')}</button>
           <button class="small ghost" onclick={() => duplicate(r)} title={t('Als neuen Workflow kopieren')}>⧉ {t('Kopieren')}</button>
-          <button class="small ghost" onclick={() => share(r)} title={t('Als Datei herunterladen – zum Teilen oder für ein anderes Heimdeck')}>⤓ {t('Teilen')}</button>
+          <button class="small ghost" onclick={() => share(r)} title={t('Als Datei herunterladen – zum Teilen oder für ein anderes Heimdeck')}>{t('⤓ Teilen')}</button>
           <button class="small ghost" onclick={() => remove(r)} aria-label={t('Löschen')} title={t('Löschen')}>✕</button>
         </div>
       </div>
