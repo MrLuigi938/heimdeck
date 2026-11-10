@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -165,8 +166,13 @@ func (s *Server) trackOutages(tiles []store.Tile, latest map[int64]TileStatus, n
 type notification struct {
 	Title, Body, URL string
 	Down             bool
-	Camera           bool // an event of a camera tile
-	Rule             bool // a message of an automation
+	Camera           bool     // an event of a camera tile
+	Rule             bool     // a message of an automation
+	Only             []string // only these channels (telegram, discord, ntfy); none = all
+}
+
+func (m notification) to(channel string) bool {
+	return len(m.Only) == 0 || slices.Contains(m.Only, channel)
 }
 
 func where(lang, kind string) string {
@@ -227,13 +233,13 @@ func (s *Server) send(user int64, settings map[string]string, msgs []notificatio
 				sent = append(sent, channel)
 			}
 		}
-		if sec.DiscordWebhook != "" {
+		if sec.DiscordWebhook != "" && m.to("discord") {
 			deliver("Discord", sendDiscord(ctx, sec.DiscordWebhook, m))
 		}
-		if u := strings.TrimSpace(settings["ntfyUrl"]); u != "" {
+		if u := strings.TrimSpace(settings["ntfyUrl"]); u != "" && m.to("ntfy") {
 			deliver("ntfy", sendNtfy(ctx, u, sec.NtfyToken, m))
 		}
-		if chat := strings.TrimSpace(settings["telegramChat"]); sec.TelegramToken != "" && chat != "" {
+		if chat := strings.TrimSpace(settings["telegramChat"]); sec.TelegramToken != "" && chat != "" && m.to("telegram") {
 			deliver("Telegram", sendTelegram(ctx, sec.TelegramToken, chat, m))
 		}
 		if len(sent) > 0 {

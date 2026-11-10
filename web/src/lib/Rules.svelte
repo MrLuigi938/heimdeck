@@ -226,6 +226,56 @@
     }
   }
 
+  // Copy, share as a file, bring one in, start from a template.
+  function duplicate(r) {
+    const c = $state.snapshot(r);
+    edit({ ...c, id: '', name: (c.name + ' ' + t('(Kopie)')).slice(0, 80) });
+  }
+  async function share(r) {
+    try {
+      const data = await get(`/rules/${r.id}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'workflow-' + (r.name.normalize('NFKD').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') || 'heimdeck') + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  }
+  let importInput = $state();
+  async function importFile(e) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    try {
+      const res = await post('/rules/import', JSON.parse(await file.text()));
+      edit(res.rule);
+      if (res.problem) toast(t('Übernommen – noch zu prüfen: {p}', { p: res.problem }), 'bad');
+      else toast(t('Übernommen – prüf ihn und speichere ihn dann.'));
+    } catch (err) {
+      toast(err instanceof SyntaxError ? t('Das ist keine Workflow-Datei von Heimdeck') : err.message, 'bad');
+    }
+  }
+  let templates = $state(null);
+  let showTemplates = $state(false);
+  async function openTemplates() {
+    showTemplates = !showTemplates;
+    if (showTemplates && !templates) {
+      try {
+        templates = await get('/rules/templates');
+      } catch (e) {
+        toast(e.message, 'bad');
+        showTemplates = false;
+      }
+    }
+  }
+  function fromTemplate(tpl) {
+    showTemplates = false;
+    edit(tpl.workflow);
+  }
+
   async function start(r) {
     starting = r.id;
     try {
@@ -319,13 +369,30 @@
         <div class="row">
           <button class="small" onclick={() => start(r)} disabled={starting === r.id || !r.on && isManual(r)} title={t('Die Schritte jetzt ausführen – zählt als Bestätigung')}>{isManual(r) ? '🎬 ' + t('Starten') : '▶ ' + t('Jetzt')}</button>
           <button class="small" onclick={() => edit(r)}>{t('Bearbeiten')}</button>
+          <button class="small ghost" onclick={() => duplicate(r)} title={t('Als neuen Workflow kopieren')}>⧉ {t('Kopieren')}</button>
+          <button class="small ghost" onclick={() => share(r)} title={t('Als Datei herunterladen – zum Teilen oder für ein anderes Heimdeck')}>⤓ {t('Teilen')}</button>
           <button class="small ghost" onclick={() => remove(r)} aria-label={t('Löschen')} title={t('Löschen')}>✕</button>
         </div>
       </div>
     {:else}
       <p class="muted">{t('Noch keine Workflows. Zum Beispiel: Wenn der NAS-Speicher über 90 % ist und niemand streamt, Downloads pausieren und mir schreiben – oder eine Szene „Filmabend“ zum Starten von Hand.')}</p>
     {/each}
-    <button class="primary small" onclick={() => edit(null)} disabled={rules.length >= 50}>＋ {t('Neuer Workflow')}</button>
+    <div class="row wrap">
+      <button class="primary small" onclick={() => edit(null)} disabled={rules.length >= 50}>＋ {t('Neuer Workflow')}</button>
+      <button class="small" class:on={showTemplates} onclick={openTemplates} disabled={rules.length >= 50}>✨ {t('Aus Vorlage')}</button>
+      <button class="small" onclick={() => importInput.click()} disabled={rules.length >= 50} title={t('Eine geteilte Workflow-Datei übernehmen')}>⤒ {t('Importieren')}</button>
+      <input type="file" accept="application/json,.json" bind:this={importInput} onchange={importFile} hidden />
+    </div>
+    {#if showTemplates && templates}
+      <div class="templates">
+        {#each templates as tpl (tpl.id)}
+          <button class="tpl" onclick={() => fromTemplate(tpl)}>
+            <strong>{tpl.name}</strong>
+            <span class="muted small">{tpl.desc}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
 
     {#if log.length}
       <h4>{t('Protokoll')}</h4>
@@ -468,6 +535,9 @@
   .dry ul { margin: 0; padding-left: 18px; }
   .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
   .log li { overflow-wrap: anywhere; }
+  .templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .tpl { display: grid; gap: 2px; justify-items: start; text-align: left; white-space: normal; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+  .tpl:hover { border-color: var(--accent); }
   .errbadge { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px; color: var(--bad-text, var(--bad)); border: 1px solid currentColor; vertical-align: 1px; }
   /* Shared by the blocks of both views. */
   :global(.wf-fields) { display: grid; gap: 6px; }

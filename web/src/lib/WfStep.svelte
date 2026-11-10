@@ -42,6 +42,13 @@
       textEl?.setSelectionRange(at + code.length, at + code.length);
     });
   }
+  // Channels: none chosen means all; unticking one keeps the others.
+  function toggleChannel(k, on) {
+    const all = ['telegram', 'discord', 'ntfy'];
+    let list = step.channels?.length ? [...step.channels] : [...all];
+    list = on ? [...new Set([...list, k])] : list.filter((x) => x !== k);
+    step.channels = list.length === all.length ? [] : list;
+  }
   // Changing the kind keeps nothing of the old step.
   function changeKind(kind) {
     const fresh = blankStep(kind);
@@ -54,6 +61,7 @@
   <select value={step.kind} onchange={(e) => changeKind(e.currentTarget.value)} aria-label={t('Schritt')}>
     <option value="notify">✉ {t('Nachricht schicken')}</option>
     <option value="button">▶ {t('Knopf einer Kachel drücken')}</option>
+    <option value="http">🌐 {t('Eine Adresse aufrufen')}</option>
     <option value="scene">🎬 {t('Eine Szene starten')}</option>
     <option value="wait">⏳ {t('Warten')}</option>
     {#if !nested}<option value="if">❓ {t('Wenn … dann … sonst')}</option>{/if}
@@ -66,6 +74,7 @@
         <option value={i18n.lang === 'en' ? '{reason}' : '{Grund}'}>{t('Grund – warum der Workflow startet')}</option>
         <option value={i18n.lang === 'en' ? '{time}' : '{Uhrzeit}'}>{t('Uhrzeit')}</option>
         <option value={i18n.lang === 'en' ? '{date}' : '{Datum}'}>{t('Datum')}</option>
+        <option value={i18n.lang === 'en' ? '{entry}' : '{Eintrag}'}>{t('Eintrag – der neue oder fertige Eintrag, die Webhook-Meldung')}</option>
       </optgroup>
       {#each blocks as g (g.name)}
         <optgroup label={g.name}>
@@ -73,7 +82,16 @@
         </optgroup>
       {/each}
     </select>
-    {#if ai?.dashboard}<label class="check"><input type="checkbox" bind:checked={step.report} /> 📋 {t('Lagebericht der KI anhängen')}</label>{/if}
+    {#if ai?.dashboard}
+      <label class="check"><input type="checkbox" bind:checked={step.report} /> 📋 {t('Lagebericht der KI anhängen')}</label>
+      <label class="check"><input type="checkbox" bind:checked={step.review} /> 📅 {t('Wochenrückblick der KI anhängen')}</label>
+    {/if}
+    <div class="wf-row wf-channels" role="group" aria-label={t('Kanäle')}>
+      <span class="help">{t('Senden an:')}</span>
+      {#each [['telegram', 'Telegram'], ['discord', 'Discord'], ['ntfy', 'ntfy']] as [k, label] (k)}
+        <label class="check"><input type="checkbox" checked={!step.channels?.length || step.channels.includes(k)} onchange={(e) => toggleChannel(k, e.currentTarget.checked)} /> {label}</label>
+      {/each}
+    </div>
     {#if cameras.length}
       <select bind:value={step.camera} aria-label={t('Kamerabild')}>
         <option value={0}>{t('ohne Kamerabild')}</option>
@@ -91,6 +109,17 @@
         {#each tileById(step.tile)?.actions || [] as b, j (j)}<option value={j}>{b.label}</option>{/each}
       </select>
     </div>
+  {:else if step.kind === 'http'}
+    <div class="wf-row">
+      <select bind:value={step.method} class="wf-op" aria-label={t('Methode')}>
+        <option>POST</option><option>GET</option><option>PUT</option>
+      </select>
+      <input bind:value={step.url} maxlength="500" placeholder="https://homeassistant.local:8123/api/webhook/…" aria-label={t('Adresse')} />
+    </div>
+    {#if step.method !== 'GET'}
+      <textarea bind:this={textEl} bind:value={step.text} rows="2" maxlength="2000" placeholder={t('Inhalt (optional), z. B. {"text": "{Grund}"} – Bausteine gehen auch hier')}></textarea>
+    {/if}
+    <span class="help">{t('Ruft die Adresse auf, z. B. einen Webhook von Home Assistant, ntfy oder ein eigenes Skript. Fehler (Status ab 400) stehen im Protokoll.')}</span>
   {:else if step.kind === 'scene'}
     <select bind:value={step.scene} aria-label={t('Szene')}>
       <option value="">{t('Szene wählen …')}</option>

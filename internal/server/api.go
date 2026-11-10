@@ -1398,6 +1398,8 @@ type exportData struct {
 	Version  int               `json:"version"`
 	Settings map[string]string `json:"settings"`
 	Groups   []exportGroup     `json:"groups"`
+	// Workflows by the names of their tiles (they get new numbers on restore).
+	Workflows []rule `json:"workflows,omitempty"`
 }
 
 type exportGroup struct {
@@ -1449,6 +1451,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Groups = append(data.Groups, eg)
 	}
+	data.Workflows = s.exportRules(uid(r))
 	w.Header().Set("Content-Disposition", `attachment; filename="heimdeck-backup.json"`)
 	writeJSON(w, data)
 }
@@ -1542,8 +1545,10 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	slog.Debug("Sicherung importiert", "gruppen", len(data.Groups), "kacheln", count)
-	writeJSON(w, map[string]any{"ok": true, "tiles": count})
+	// Workflows after the tiles, so they find them by name.
+	workflows := s.importRules(r, data.Workflows)
+	slog.Debug("Sicherung importiert", "gruppen", len(data.Groups), "kacheln", count, "workflows", workflows)
+	writeJSON(w, map[string]any{"ok": true, "tiles": count, "workflows": workflows})
 }
 
 // importHeimdall adds the items of a Heimdall export to the open dashboard.

@@ -6,7 +6,7 @@
   // Blocks come from the side bar (a tap adds at the end, dragging one onto a
   // ＋ puts it in that place). The places are kept with the workflow.
   import { t } from './i18n.svelte.js';
-  import { blankTrigger, blankCond, blankStep, triggerText, triggerIcon, condText, stepText } from './workflow.js';
+  import { blankTrigger, blankCond, blankStep, triggerText, triggerIcon, condText, stepText, hostOf } from './workflow.js';
   import WfTrigger from './WfTrigger.svelte';
   import WfCond from './WfCond.svelte';
   import WfStep from './WfStep.svelte';
@@ -40,9 +40,10 @@
 
   // ---- the drawing, worked out from the workflow ----
   const tone = (s) => (s.kind === 'wait' ? 'neutral' : s.kind === 'if' ? 'cond' : 'act');
-  const kindName = (s) => ({ notify: t('Nachricht'), button: t('Knopf'), scene: t('Szene'), wait: t('Warten'), if: t('Wenn … sonst') })[s.kind] || t('Schritt');
-  const stepIcon = (s) => ({ notify: '✉', button: '▶', scene: '🎬', wait: '⏳', if: '❓' })[s.kind] || '•';
+  const kindName = (s) => ({ notify: t('Nachricht'), button: t('Knopf'), http: t('Adresse aufrufen'), scene: t('Szene'), wait: t('Warten'), if: t('Wenn … sonst') })[s.kind] || t('Schritt');
+  const stepIcon = (s) => ({ notify: '✉', button: '▶', http: '🌐', scene: '🎬', wait: '⏳', if: '❓' })[s.kind] || '•';
   const stepLabel = (s) => {
+    if (s.kind === 'http') return (s.method || 'POST') + ' ' + (hostOf(s.url) || '…');
     if (s.kind === 'if') return condText(s.if || {}, tiles);
     if (s.kind === 'notify') return s.text || (s.report ? t('Lagebericht') : t('Nachricht'));
     return stepText(s, tiles, scenes).replace(/^\S+\s/, '');
@@ -184,6 +185,13 @@
       requestAnimationFrame(fit);
     }
   });
+  // A block more or less fits the drawing again – unless the person moved or zoomed it.
+  let lastCount = 0;
+  $effect(() => {
+    const c = graph.nodes.length;
+    if (fitted && !touched && lastCount && c !== lastCount) requestAnimationFrame(fit);
+    lastCount = c;
+  });
   // A new window size fits the drawing again – unless the person moved or zoomed it.
   let touched = false;
   let lastW = 0;
@@ -236,17 +244,47 @@
     else if (drag.moved || Math.abs(dx) + Math.abs(dy) > 4) {
       drag.moved = true;
       wf.layout[drag.nd.key] = { x: Math.round(drag.x + dx / view.z), y: Math.round(drag.y + dy / view.z) };
+      // A step held over a ＋ will move there when let go.
+      if (drag.nd.sel?.kind === 'step') {
+        // The held block itself is under the pointer – look through it.
+        const hit = document.elementsFromPoint(e.clientX, e.clientY).map((el) => el.closest?.('.plus')).find(Boolean);
+        moveTarget = hit ? JSON.parse(hit.dataset.at) : null;
+      }
     }
   }
+  let moveTarget = $state(null);
   function up() {
     if (drag?.kind === 'node' && !drag.moved) {
       const nd = drag.nd;
       if (nd.join) wf.all = !wf.all;
       else if (nd.end) addStep({ i: wf.steps.length }, 'notify');
       else sel = nd.sel;
+    } else if (drag?.kind === 'node' && moveTarget) {
+      moveStep(drag.nd.sel, moveTarget);
     }
+    moveTarget = null;
     drag = null;
   }
+  // moveStep takes a step out of its place and puts it in front of the ＋ it was dropped on.
+  function moveStep(from, at) {
+    const src = from.branch ? wf.steps[from.i][from.branch] : wf.steps;
+    const dst = at.branch ? wf.steps[at.i]?.[at.branch] : wf.steps;
+    const step = src[from.branch ? from.j : from.i];
+    if (!dst || !step) return;
+    if (at.branch && (step.kind === 'if' || !from.branch && from.i === at.i)) return; // no "if" in an "if", not into itself
+    let to = at.branch ? at.j : at.i;
+    const fromIdx = from.branch ? from.j : from.i;
+    if (src === dst && fromIdx < to) to--;
+    if (src === dst && fromIdx === to) {
+      delete wf.layout[graphKey(from)];
+      return;
+    }
+    src.splice(fromIdx, 1);
+    dst.splice(to, 0, step);
+    forget('s');
+    sel = null;
+  }
+  const graphKey = (s) => (s.branch ? 's' + s.i + s.branch[0] + s.j : 's' + s.i);
 
   // ---- changing the workflow ----
   // Steps that move lose their chosen place (it belonged to another step).
@@ -296,10 +334,80 @@
     requestAnimationFrame(fit);
   }
   function onKey(e) {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && sel && !e.target.matches?.('input, textarea, select')) {
+    if (e.target.matches?.('input, textarea, select')) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel) {
       e.preventDefault();
       remove();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
     }
+  }
+
+  // ---- undo and redo: every change, kept as a snapshot ----
+  const KEYS = ['name', 'triggers', 'all', 'conds', 'steps', 'only', 'cooldown', 'noAsk', 'layout'];
+  const snap = () => JSON.stringify(Object.fromEntries(KEYS.map((k) => [k, $state.snapshot(wf[k])])));
+  let past = $state([]);
+  let future = $state([]);
+  let current = snap();
+  let restoring = false;
+  $effect(() => {
+    const now = snap();
+    if (restoring || now === current) {
+      restoring = false;
+      current = now;
+      return;
+    }
+    const timer = setTimeout(() => {
+      past = [...past.slice(-49), current];
+      future = [];
+      current = now;
+    }, 350);
+    return () => clearTimeout(timer);
+  });
+  function apply(state) {
+    restoring = true;
+    const o = JSON.parse(state);
+    for (const k of KEYS) wf[k] = o[k];
+    current = state;
+    sel = null;
+  }
+  function undo() {
+    if (!past.length) return;
+    future = [current, ...future];
+    const prev = past[past.length - 1];
+    past = past.slice(0, -1);
+    apply(prev);
+  }
+  function redo() {
+    if (!future.length) return;
+    past = [...past, current];
+    const next = future[0];
+    future = future.slice(1);
+    apply(next);
+  }
+
+  // ---- the mini map: the whole drawing and the part on screen ----
+  const MW = 150, MH = 92;
+  let mini = $derived.by(() => {
+    const ns = graph.nodes;
+    if (!ns.length) return null;
+    const minX = Math.min(...ns.map((n) => n.x)) - 40, maxX = Math.max(...ns.map((n) => n.x + n.w)) + 40;
+    const minY = Math.min(...ns.map((n) => n.y)) - 40, maxY = Math.max(...ns.map((n) => n.y + n.h)) + 40;
+    const k = Math.min(MW / (maxX - minX), MH / (maxY - minY));
+    const vx = -view.x / view.z, vy = -view.y / view.z, vw = boxW / view.z, vh = boxH / view.z;
+    return { k, minX, minY, ns, view: { x: (vx - minX) * k, y: (vy - minY) * k, w: vw * k, h: vh * k } };
+  });
+  function miniGo(e) {
+    if (!mini) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const wx = mini.minX + (e.clientX - r.left) / mini.k, wy = mini.minY + (e.clientY - r.top) / mini.k;
+    view = { ...view, x: boxW / 2 - wx * view.z, y: boxH / 2 - wy * view.z };
+    touched = true;
   }
 
   // Blocks dragged from the side bar onto a ＋ or the canvas.
@@ -308,6 +416,7 @@
     { kind: 'cond', icon: '✔', label: t('Bedingung'), tone: 'cond' },
     { kind: 'notify', icon: '✉', label: t('Nachricht'), tone: 'act' },
     { kind: 'button', icon: '▶', label: t('Knopf'), tone: 'act' },
+    { kind: 'http', icon: '🌐', label: t('Adresse'), tone: 'act' },
     { kind: 'scene', icon: '🎬', label: t('Szene'), tone: 'act' },
     { kind: 'wait', icon: '⏳', label: t('Warten'), tone: 'neutral' },
     { kind: 'if', icon: '❓', label: t('Wenn … sonst'), tone: 'cond' },
@@ -350,7 +459,7 @@
         <div class="mid" style="left: {p.mx}px; top: {p.my}px">
           {#if e.label}<span class="elabel" class:on={e.on}>{e.label}</span>{/if}
           {#if e.add}
-            <button class="plus" class:target={dragKind && dragKind !== 'trigger' && dragKind !== 'cond'} onpointerdown={(ev) => ev.stopPropagation()}
+            <button class="plus" data-at={JSON.stringify(e.add)} class:target={dragKind && dragKind !== 'trigger' && dragKind !== 'cond' || moveTarget && JSON.stringify(moveTarget) === JSON.stringify(e.add)} class:moving={drag?.kind === 'node' && drag.moved && drag.nd.sel?.kind === 'step'} onpointerdown={(ev) => ev.stopPropagation()}
               onclick={() => addStep(e.add, 'notify')} ondragover={(ev) => ev.preventDefault()} ondrop={(ev) => dropOn(ev, e.add)}
               title={t('Schritt hier einfügen')} aria-label={t('Schritt hier einfügen')}>＋</button>
           {/if}
@@ -387,7 +496,18 @@
     <button class="small" onclick={() => zoomBtn(1.2)} aria-label={t('Vergrößern')}>＋</button>
     <button class="small" onclick={fit}>{t('Einpassen')}</button>
     <button class="small" onclick={tidy} title={t('Alle Bausteine wieder automatisch anordnen')}>{t('Aufräumen')}</button>
+    <button class="small" onclick={undo} disabled={!past.length} aria-label={t('Rückgängig')} title={t('Rückgängig (Strg+Z)')}>↶</button>
+    <button class="small" onclick={redo} disabled={!future.length} aria-label={t('Wiederholen')} title={t('Wiederholen (Strg+Y)')}>↷</button>
   </div>
+
+  {#if mini && !narrow}
+    <svg class="minimap" class:left={docked} width={MW} height={MH} onpointerdown={(e) => { e.stopPropagation(); miniGo(e); }} role="img" aria-label={t('Übersicht')}>
+      {#each mini.ns as n (n.key)}
+        <rect x={(n.x - mini.minX) * mini.k} y={(n.y - mini.minY) * mini.k} width={Math.max(2, n.w * mini.k)} height={Math.max(2, n.h * mini.k)} rx="1.5" class={n.tone || 'neutral'} />
+      {/each}
+      <rect class="vp" x={mini.view.x} y={mini.view.y} width={mini.view.w} height={mini.view.h} />
+    </svg>
+  {/if}
 
   {#if live && !live.problem}
     <div class="legend" style:left={narrow ? '60px' : null} onpointerdown={(e) => e.stopPropagation()} role="note">
@@ -481,6 +601,14 @@
   .controls { position: absolute; left: 180px; bottom: 10px; display: flex; gap: 4px; align-items: center; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-solid, var(--bg)); cursor: default; }
   /* In a narrow canvas the zoom bar sits in the middle below the drawing, all of it visible. */
   .controls.center { left: 50%; transform: translateX(-50%); max-width: calc(100% - 12px); flex-wrap: nowrap; white-space: nowrap; }
+  .minimap { position: absolute; right: 10px; bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-solid, var(--bg)); cursor: pointer; }
+  .minimap.left { right: 380px; }
+  .minimap rect { fill: color-mix(in srgb, var(--muted) 60%, transparent); }
+  .minimap rect.trig { fill: #7f77dd; }
+  .minimap rect.cond { fill: #e0a12a; }
+  .minimap rect.act { fill: #1d9e75; }
+  .minimap rect.vp { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1.5; }
+  .plus.moving { opacity: .9; transform: scale(1.25); }
   .zoom { font-size: 12px; min-width: 44px; text-align: center; color: var(--muted); }
   .legend { position: absolute; left: 180px; top: 10px; display: flex; gap: 6px; align-items: center; font-size: 12px; padding: 4px 10px; border-radius: 10px; background: var(--surface-solid, var(--bg)); border: 1px solid var(--border); cursor: default; }
   .ln { display: inline-block; width: 22px; height: 3px; background: #1d9e75; border-radius: 2px; }

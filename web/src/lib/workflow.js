@@ -7,7 +7,7 @@ export const dayName = (d) => new Date(2024, 0, 7 + d).toLocaleDateString(i18n.l
 export const EVENTS = ['Bewegung', 'Person', 'Fahrzeug', 'Tier', 'Klingel', 'Bereich betreten', 'Sabotage'];
 export const COOLDOWNS = [5, 15, 60, 360, 1440];
 
-export const blankTrigger = (kind = 'time') => ({ kind, time: '07:00', days: [], tile: 0, for: 2, stat: '', op: '>', value: '', event: '', match: '', prompt: '', every: 60 });
+export const blankTrigger = (kind = 'time') => ({ kind, time: '07:00', days: [], tile: 0, for: kind === 'value' ? 0 : 2, stat: '', op: '>', value: '', event: '', match: '', gone: false, prompt: '', every: 60 });
 export const WATCH_EVERY = [15, 30, 60, 180, 360, 1440];
 export const blankCond = () => ({ kind: 'value', tile: 0, stat: '', op: '>', value: '' });
 export const blankStep = (kind = 'notify') => {
@@ -20,8 +20,10 @@ export const blankStep = (kind = 'notify') => {
       return { kind, tile: 0, action: '', params: null, confirm: '' };
     case 'scene':
       return { kind, scene: '' };
+    case 'http':
+      return { kind, method: 'POST', url: '', text: '' };
     default:
-      return { kind: 'notify', text: '', report: false, camera: 0 };
+      return { kind: 'notify', text: '', report: false, review: false, camera: 0, channels: [] };
   }
 };
 export const blankWorkflow = () => ({
@@ -72,6 +74,14 @@ export function forSave(w) {
   };
 }
 
+export function hostOf(u) {
+  try {
+    return new URL(u).host;
+  } catch {
+    return '';
+  }
+}
+
 function days(list) {
   if (!list?.length || list.length === 7) return '';
   return DAYS.filter((d) => list.includes(d)).map(dayName).join(', ');
@@ -92,15 +102,17 @@ export function triggerText(tr, tiles) {
       return t('Von Hand gestartet (Szene)');
     case 'ai':
       return t('KI-Wächter: {text}', { text: (tr.prompt || '…').slice(0, 80) });
+    case 'item':
+      return tr.gone ? t('{tile}: ein Eintrag ist weg', { tile: name }) : t('{tile}: neuer Eintrag', { tile: name });
     case 'camera':
       return `${name}: ${tr.event ? t(tr.event) : t('jedes Ereignis')}`;
     case 'webhook':
       return `${name}${tr.match ? ` „${tr.match}“` : ''}`;
     default:
-      return `${name} · ${tr.stat} ${opText(tr.op)} ${tr.value}`;
+      return `${name} · ${tr.stat} ${opText(tr.op)} ${tr.value}` + (Number(tr.for) > 0 ? ' ' + t('seit {n} Min.', { n: tr.for }) : '');
   }
 }
-export const triggerIcon = (kind) => ({ time: '🕑', down: '🔴', up: '🟢', value: '📈', camera: '📹', webhook: '📨', ai: '🤖', manual: '🎬' })[kind] || '⚡';
+export const triggerIcon = (kind) => ({ time: '🕑', down: '🔴', up: '🟢', value: '📈', camera: '📹', webhook: '📨', ai: '🤖', item: '📋', manual: '🎬' })[kind] || '⚡';
 
 export function condText(c, tiles) {
   const name = tileName(c, tiles);
@@ -117,10 +129,12 @@ export function stepText(s, tiles, scenes) {
       return '🎬 ' + (s.label || scenes?.find((x) => x.id === s.scene)?.name || t('Szene wählen …'));
     case 'wait':
       return '⏳ ' + t('{n} Min. warten', { n: s.minutes || 1 });
+    case 'http':
+      return '🌐 ' + (s.method || 'POST') + ' ' + (hostOf(s.url) || t('Adresse …'));
     case 'if':
       return '❓ ' + t('Wenn {cond}', { cond: condText(s.if || {}, tiles) });
     default:
-      return (s.report ? '📋 ' + t('Lagebericht') : '✉ ' + (s.text || t('Nachricht'))) + (s.camera ? ' + 📹' : '');
+      return (s.report ? '📋 ' + t('Lagebericht') : s.review && !s.text ? '📅 ' + t('Wochenrückblick') : '✉ ' + (s.text || t('Nachricht'))) + (s.camera ? ' + 📹' : '');
   }
 }
 

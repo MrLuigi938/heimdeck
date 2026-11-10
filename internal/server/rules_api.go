@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -218,7 +219,7 @@ func (c *ruleCheck) trigger(tr *ruleTrigger) error {
 			every = 60
 		}
 		*tr = ruleTrigger{Kind: "ai", Prompt: prompt, Every: every}
-	case "down", "up", "value", "camera", "webhook":
+	case "down", "up", "value", "item", "camera", "webhook":
 		t, ok := c.tiles[tr.Tile]
 		if !ok {
 			return errors.New("Bitte eine Kachel wählen")
@@ -240,6 +241,16 @@ func (c *ruleCheck) trigger(tr *ruleTrigger) error {
 				return err
 			}
 			clean.Stat, clean.Op, clean.Value = tr.Stat, tr.Op, tr.Value
+			clean.For = min(max(tr.For, 0), 1440) // 0: as soon as it is past the limit
+		case "item":
+			if t.List == "" {
+				return errors.New("Diese Kachel hat keine Liste – bitte eine Kachel mit Einträgen wählen (z. B. Downloads, Anfragen)")
+			}
+			clean.Gone = tr.Gone
+			clean.Match = strings.TrimSpace(tr.Match)
+			if len([]rune(clean.Match)) > 100 {
+				return errors.New("Der Suchtext ist zu lang (bis 100 Zeichen)")
+			}
 		case "camera":
 			if t.Kind != "camera" {
 				return errors.New("Bitte eine Kamera wählen")
@@ -334,7 +345,40 @@ func (c *ruleCheck) step(a *ruleAction, depth int) error {
 		if err := c.checkPlaceholders(text); err != nil {
 			return err
 		}
-		*a = ruleAction{Kind: "notify", Text: text, Report: a.Report, Camera: a.Camera}
+		if a.Review {
+			u, _ := c.s.store.User(c.user)
+			if c.s.aiFor(u) == nil || !c.s.aiConfig().Dashboard {
+				return errors.New("Für den Lagebericht muss ein Admin der KI die Daten des Dashboards erlauben (Einstellungen → KI).")
+			}
+		}
+		var channels []string
+		for _, ch := range a.Channels {
+			if (ch == "telegram" || ch == "discord" || ch == "ntfy") && !slices.Contains(channels, ch) {
+				channels = append(channels, ch)
+			}
+		}
+		*a = ruleAction{Kind: "notify", Text: text, Report: a.Report, Review: a.Review, Camera: a.Camera, Channels: channels}
+	case "http":
+		raw := strings.TrimSpace(a.URL)
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(raw) > 500 {
+			return errors.New("Bitte eine Adresse wie https://beispiel.de/hook angeben")
+		}
+		method := strings.ToUpper(strings.TrimSpace(a.Method))
+		if method != "GET" && method != "POST" && method != "PUT" {
+			method = "POST"
+		}
+		body := strings.TrimSpace(a.Text)
+		if len([]rune(body)) > 2000 {
+			return errors.New("Der Inhalt ist zu lang (bis 2000 Zeichen)")
+		}
+		if err := c.checkPlaceholders(body); err != nil {
+			return err
+		}
+		if method == "GET" {
+			body = ""
+		}
+		*a = ruleAction{Kind: "http", URL: raw, Method: method, Text: body}
 	case "scene":
 		scene, ok := c.s.sceneOf(c.user, a.Scene)
 		if !ok || c.self != "" && scene.ID == c.self {
@@ -680,11 +724,11 @@ func (s *Server) draftRule(r *http.Request, u store.User, text string, current *
 		"{\"kind\":\"down\",\"tile\":ID,\"for\":minutes} (a monitored service stops answering) · {\"kind\":\"up\",\"tile\":ID} · " +
 		"{\"kind\":\"value\",\"tile\":ID,\"stat\":\"exact value label\",\"op\":\">\" or \"<\",\"value\":\"90 %\"} · " +
 		"{\"kind\":\"camera\",\"tile\":ID,\"event\":\"\" or \"Person\", \"Klingel\" (doorbell), \"Bewegung\" (motion), \"Fahrzeug\", \"Tier\"} · " +
-		"{\"kind\":\"webhook\",\"tile\":ID,\"match\":\"text in the message or empty\"} · {\"kind\":\"manual\"} (started by hand: a scene)" + watchHint + ".\n" +
+		"{\"kind\":\"webhook\",\"tile\":ID,\"match\":\"text in the message or empty\"} · {\"kind\":\"item\",\"tile\":ID of a tile with a list,\"gone\":false,\"match\":\"\"} (a new entry appears in the tile's list, e.g. a new request; with \"gone\":true an entry leaves it, e.g. a download finished) · {\"kind\":\"manual\"} (started by hand: a scene)" + watchHint + ". A value trigger may have \"for\":minutes – the value has to stay past the limit that long.\n" +
 		"Triggers are joined by \"or\" (any one starts it); with \"all\":true by \"and\": it starts when one happens while all the others hold (e.g. at 20:00 and Jellyfin streams > 0). \"only\" (optional) limits the automatic triggers to a time window and days. Conditions (all must hold): {\"kind\":\"value\",\"tile\":ID,\"stat\":…,\"op\":…,\"value\":…} · {\"kind\":\"online\",\"tile\":ID} · {\"kind\":\"offline\",\"tile\":ID}.\n" +
 		"Steps, in order: {\"kind\":\"notify\",\"text\":\"message\",\"report\":false,\"camera\":ID of a camera tile or 0} · {\"kind\":\"button\",\"tile\":ID,\"button\":number from the tile's buttons} · " +
-		"{\"kind\":\"scene\",\"scene\":\"name\"} · {\"kind\":\"wait\",\"minutes\":N} · {\"kind\":\"if\",\"if\":condition,\"then\":[steps],\"else\":[steps]} (no if inside an if).\n" +
-		"A notify text may contain building blocks that are filled in when it is sent: {tile name · value label} (a value listed below), {tile name · Liste} (the tile's list, e.g. what is playing; only for tiles with a list), {tile name · Status} (reachable or not), {Grund} (why it started), {Uhrzeit}, {Datum}. Use them whenever the message should say what is going on, e.g. \"Jellyfin: {Jellyfin · Liste} – CPU {Proxmox · CPU}\".\n" +
+		"{\"kind\":\"http\",\"method\":\"POST\",\"url\":\"https://…\",\"text\":\"body\"} (calls an address, e.g. a Home Assistant webhook) · {\"kind\":\"scene\",\"scene\":\"name\"} · {\"kind\":\"wait\",\"minutes\":N} · {\"kind\":\"if\",\"if\":condition,\"then\":[steps],\"else\":[steps]} (no if inside an if).\n" +
+		"A notify text may contain building blocks that are filled in when it is sent: {tile name · value label} (a value listed below), {tile name · Liste} (the tile's list, e.g. what is playing; only for tiles with a list), {tile name · Status} (reachable or not), {Grund} (why it started), {Eintrag} (the new or finished entry, or the webhook message), {Uhrzeit}, {Datum}. A notify step may have \"channels\":[\"telegram\"] (or discord, ntfy) to go only there, and \"review\":true for the AI's review of the week. Use them whenever the message should say what is going on, e.g. \"Jellyfin: {Jellyfin · Liste} – CPU {Proxmox · CPU}\".\n" +
 		"Use only the tiles, value labels, buttons and scenes listed below, with their exact IDs, labels and numbers. If something asked for does not exist, leave it out and add a notify step that says what is missing. " +
 		"Write names and messages in " + aiLanguage(lang) + ".\n\nTiles:\n" + cat.String()
 	if len(sceneNames) > 0 {

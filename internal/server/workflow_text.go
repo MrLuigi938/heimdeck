@@ -51,7 +51,7 @@ func splitPlaceholder(p string) (tile, part string, ok bool) {
 }
 
 func isGeneral(p string) bool {
-	return placeholderWord(p, "grund", "reason", "uhrzeit", "time", "datum", "date")
+	return placeholderWord(p, "grund", "reason", "uhrzeit", "time", "datum", "date", "eintrag", "entry")
 }
 
 func isList(part string) bool   { return placeholderWord(part, "liste", "list", "einträge", "entries") }
@@ -93,6 +93,8 @@ func (w *wfRun) placeholder(p string) (string, bool) {
 	switch {
 	case placeholderWord(p, "grund", "reason"):
 		return firstNonEmptyStr(w.why, i18n.T(lang, "Von Hand gestartet")), true
+	case placeholderWord(p, "eintrag", "entry"):
+		return firstNonEmptyStr(w.entry, "–"), true
 	case placeholderWord(p, "uhrzeit", "time"):
 		return time.Now().Format("15:04"), true
 	case placeholderWord(p, "datum", "date"):

@@ -9,6 +9,7 @@
   let withStats = $derived(tiles.filter((x) => x.stats.length));
   let cameras = $derived(tiles.filter((x) => x.kind === 'camera'));
   let hooks = $derived(tiles.filter((x) => x.kind === 'webhook'));
+  let lists = $derived(tiles.filter((x) => x.list));
   function toggleDay(d) {
     const i = tr.days.indexOf(d);
     if (i >= 0) tr.days.splice(i, 1);
@@ -22,6 +23,7 @@
     <option value="down">🔴 {t('ein Dienst nicht mehr antwortet')}</option>
     <option value="up">🟢 {t('ein Dienst wieder erreichbar ist')}</option>
     <option value="value">📈 {t('ein Wert einer Kachel eine Grenze überschreitet')}</option>
+    <option value="item">📋 {t('in der Liste einer Kachel etwas Neues steht – oder etwas weg ist')}</option>
     <option value="camera">📹 {t('eine Kamera ein Ereignis meldet')}</option>
     <option value="webhook">📨 {t('eine Meldung an eine Webhook-Kachel kommt')}</option>
     {#if ai?.dashboard || tr.kind === 'ai'}<option value="ai">🤖 {t('der KI-Wächter etwas bemerkt')}</option>{/if}
@@ -60,6 +62,7 @@
         <option value="<">{t('unter')}</option>
       </select>
       <input bind:value={tr.value} placeholder="90 %" class="wf-num" aria-label={t('Grenze')} />
+      <label class="wf-inline">{t('seit')} <input type="number" min="0" max="1440" bind:value={tr.for} class="wf-num" aria-label={t('Minuten')} /> {t('Min.')}</label>
     </div>
     <span class="help">{t('Die Grenze als Zahl, gern mit Einheit: 90 %, 100 GB, 2000 W. Größen wie GB und TB werden umgerechnet.')}</span>
   {:else if tr.kind === 'camera'}
@@ -81,6 +84,19 @@
       </select>
     </label>
     <span class="help">{t('Die KI sieht dein Dashboard wie im Chat und meldet sich nur, wenn deine Anweisung zutrifft. Ein Workflow mit KI-Wächter schickt nur Nachrichten – Knöpfe und Szenen gehen hier nicht. Jede Frage an ein Cloud-Modell kostet.')}</span>
+  {:else if tr.kind === 'item'}
+    <div class="wf-row">
+      <select bind:value={tr.tile} aria-label={t('Kachel')}>
+        <option value={0}>{t('Kachel wählen …')}</option>
+        {#each lists as x (x.id)}<option value={x.id}>{x.name} – {x.list}</option>{/each}
+      </select>
+      <select bind:value={tr.gone} class="wf-op" aria-label={t('Was')}>
+        <option value={false}>{t('neuer Eintrag')}</option>
+        <option value={true}>{t('Eintrag ist weg (z. B. Download fertig)')}</option>
+      </select>
+    </div>
+    <input bind:value={tr.match} maxlength="100" placeholder={t('nur Einträge mit … (leer: alle)')} />
+    <span class="help">{t('Der Eintrag steht in der Nachricht über den Baustein {Eintrag}.')}</span>
   {:else if tr.kind === 'webhook'}
     <div class="wf-row">
       <select bind:value={tr.tile} aria-label={t('Kachel')}>

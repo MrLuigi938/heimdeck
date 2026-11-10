@@ -60,6 +60,8 @@ func (t sceneTile) Fetch(ctx context.Context, in *integrations.Instance) (*integ
 			steps = append(steps, integrations.Item{Title: "🎬 " + a.Label})
 		case "wait":
 			steps = append(steps, integrations.Item{Title: "⏳ " + in.T("%d Min. warten", a.Minutes)})
+		case "http":
+			steps = append(steps, integrations.Item{Title: "🌐 " + in.T("Adresse aufrufen")})
 		case "if":
 			steps = append(steps, integrations.Item{Title: "❓ " + in.T("Wenn …") + " " + firstNonEmptyStr(a.If.Name, "")})
 		default:

@@ -296,6 +296,11 @@ func triggerLine(lang string, tr ruleTrigger) string {
 		return "📈 " + tr.Name + " · " + tr.Stat + " " + opText(tr.Op) + " " + tr.Value
 	case "camera":
 		return "📹 " + tr.Name + ": " + i18n.T(lang, firstNonEmptyStr(tr.Event, "jedes Ereignis"))
+	case "item":
+		if tr.Gone {
+			return "📋 " + i18n.T(lang, "%s: ein Eintrag ist weg", tr.Name)
+		}
+		return "📋 " + i18n.T(lang, "%s: neuer Eintrag", tr.Name)
 	case "webhook":
 		if tr.Match != "" {
 			return "📨 " + tr.Name + " „" + tr.Match + "“"
@@ -328,6 +333,8 @@ func stepLines(lang string, steps []ruleAction, indent string, out *[]string) {
 			*out = append(*out, indent+"🎬 "+firstNonEmptyStr(a.Label, a.Scene))
 		case "wait":
 			*out = append(*out, indent+"⏳ "+i18n.T(lang, "%d Min. warten", a.Minutes))
+		case "http":
+			*out = append(*out, indent+"🌐 "+a.Method+" "+hostOf(a.URL))
 		case "if":
 			if a.If == nil {
 				continue

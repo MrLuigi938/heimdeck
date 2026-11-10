@@ -66,7 +66,7 @@ type rule struct {
 }
 
 type ruleTrigger struct {
-	Kind  string `json:"kind"`               // time | down | up | value | camera | webhook | ai | manual
+	Kind  string `json:"kind"`               // time | down | up | value | item | camera | webhook | ai | manual
 	Name  string `json:"tileName,omitempty"` // the tile's name, for the list
 	Time  string `json:"time,omitempty"`     // HH:MM
 	Days  []int  `json:"days,omitempty"`     // 0 = Sunday … 6 = Saturday; none = every day
@@ -76,7 +76,10 @@ type ruleTrigger struct {
 	Op    string `json:"op,omitempty"`    // > or <
 	Value string `json:"value,omitempty"` // e.g. "90 %" or "100 GB"
 	Event string `json:"event,omitempty"` // camera: the kind of event ("Person", "Klingel" …); empty = any
-	Match string `json:"match,omitempty"` // webhook: only messages containing this text
+	Match string `json:"match,omitempty"` // webhook, item: only messages or entries containing this text
+	Gone  bool   `json:"gone,omitempty"`  // item: an entry left the list (a download finished) instead of a new one
+	// TileKind: in a template or a shared workflow, the kind of tile meant (sabnzbd|qbittorrent …)
+	TileKind string `json:"tileKind,omitempty"`
 	// ai: the AI watcher looks at the dashboard every Every minutes with this instruction.
 	Prompt string `json:"prompt,omitempty"`
 	Every  int    `json:"every,omitempty"`
@@ -97,31 +100,40 @@ type ruleOnly struct {
 
 // ruleCond is a condition on another tile: a value, or whether it answers.
 type ruleCond struct {
-	Kind  string `json:"kind"` // value | online | offline
-	Tile  int64  `json:"tile"`
-	Name  string `json:"tileName,omitempty"`
-	Stat  string `json:"stat,omitempty"`
-	Op    string `json:"op,omitempty"`
-	Value string `json:"value,omitempty"`
+	Kind     string `json:"kind"` // value | online | offline
+	Tile     int64  `json:"tile"`
+	TileKind string `json:"tileKind,omitempty"`
+	Name     string `json:"tileName,omitempty"`
+	Stat     string `json:"stat,omitempty"`
+	Op       string `json:"op,omitempty"`
+	Value    string `json:"value,omitempty"`
 }
 
 // ruleAction is one step of a workflow.
 type ruleAction struct {
-	Kind    string            `json:"kind"` // button | notify | scene | wait | if
-	Tile    int64             `json:"tile,omitempty"`
-	Action  string            `json:"action,omitempty"`
-	Params  map[string]string `json:"params,omitempty"`
-	Label   string            `json:"label,omitempty"`   // "Pause · SABnzbd", for the list and messages
-	Confirm string            `json:"confirm,omitempty"` // the button asks before it runs
-	Text    string            `json:"text,omitempty"`
-	Report  bool              `json:"report,omitempty"`  // add the situation report
-	Camera  int64             `json:"camera,omitempty"`  // send this camera's picture along (Telegram)
-	Scene   string            `json:"scene,omitempty"`   // the scene to start
-	Minutes int               `json:"minutes,omitempty"` // wait
-	If      *ruleCond         `json:"if,omitempty"`
-	Then    []ruleAction      `json:"then,omitempty"`
-	Else    []ruleAction      `json:"else,omitempty"`
-	Button  *int              `json:"button,omitempty"` // from an AI draft: the tile's button by number
+	Kind     string            `json:"kind"` // button | notify | http | scene | wait | if
+	Tile     int64             `json:"tile,omitempty"`
+	Action   string            `json:"action,omitempty"`
+	Params   map[string]string `json:"params,omitempty"`
+	Label    string            `json:"label,omitempty"`   // "Pause · SABnzbd", for the list and messages
+	Confirm  string            `json:"confirm,omitempty"` // the button asks before it runs
+	Text     string            `json:"text,omitempty"`
+	Report   bool              `json:"report,omitempty"`   // add the situation report
+	Review   bool              `json:"review,omitempty"`   // add the AI's review of the week
+	Channels []string          `json:"channels,omitempty"` // only these channels (telegram, discord, ntfy); none = all
+	URL      string            `json:"url,omitempty"`      // http: the address to call
+	Method   string            `json:"method,omitempty"`   // http: GET | POST | PUT
+	// In a shared workflow or a template: the tile and camera by name or kind instead of their number.
+	TileName   string       `json:"tileName,omitempty"`
+	TileKind   string       `json:"tileKind,omitempty"`
+	CameraName string       `json:"cameraName,omitempty"`
+	Camera     int64        `json:"camera,omitempty"`  // send this camera's picture along (Telegram)
+	Scene      string       `json:"scene,omitempty"`   // the scene to start
+	Minutes    int          `json:"minutes,omitempty"` // wait
+	If         *ruleCond    `json:"if,omitempty"`
+	Then       []ruleAction `json:"then,omitempty"`
+	Else       []ruleAction `json:"else,omitempty"`
+	Button     *int         `json:"button,omitempty"` // from an AI draft: the tile's button by number
 }
 
 type ruleLogEntry struct {
@@ -147,14 +159,18 @@ type ruleEngine struct {
 }
 
 type ruleState struct {
-	armed    bool // fires when the trigger becomes true
-	since    time.Time
-	wasDown  bool
-	lastFire time.Time
-	minute   string // the last minute a time trigger fired
-	value    string // the value seen last, for the list
-	event    int64  // the newest camera event seen
-	started  bool   // the camera's events were looked at once
+	armed     bool // fires when the trigger becomes true
+	since     time.Time
+	wasDown   bool
+	lastFire  time.Time
+	minute    string          // the last minute a time trigger fired
+	value     string          // the value seen last, for the list
+	event     int64           // the newest camera event seen
+	started   bool            // the camera's events were looked at once
+	items     map[string]bool // item: the entries of the list seen last
+	itemsSeen bool
+	emptyOnce bool   // the list was empty once – one more round before that counts
+	entry     string // the entry (or message) that started the workflow, for {Eintrag}
 	// The AI watcher: when it last asked, whether a question is under way, and the answer.
 	watchAt    time.Time
 	watchBusy  bool
@@ -475,9 +491,24 @@ func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now
 		if ok {
 			s.rules.mu.Lock()
 			s.ruleState(wfKey).value = value
+			// "for X minutes": the value has to stay past the limit that long.
+			st := s.ruleState(key)
+			switch {
+			case !holds:
+				st.since = time.Time{}
+			case st.since.IsZero():
+				st.since = now
+			}
+			if holds && tr.For > 0 {
+				mins := int(now.Sub(st.since).Minutes())
+				holds = mins >= tr.For
+				why += " " + i18n.T(lang, "(seit %d Min.)", mins)
+			}
 			s.rules.mu.Unlock()
 		}
 		return holds, why, ok
+	case "item":
+		return s.itemHolds(user, key, wfKey, tr, lang)
 	case "camera":
 		t, err := s.store.Tile(tr.Tile)
 		if err != nil || !s.ruleTileOK(user, t.ID) {
@@ -703,6 +734,14 @@ type wfRun struct {
 	tiles    []store.Tile                   // the tiles it may read, for building blocks
 	widgets  map[int64]*integrations.Widget // read once per run
 	branches []bool                         // the answers of the top-level "if" steps, in order (for the canvas)
+	entry    string                         // the entry or message that started it, for {Eintrag}
+	sends    []runSend                      // messages, by the channels they go to
+}
+
+// runSend is a message of a run for some channels (none: all).
+type runSend struct {
+	text     string
+	channels []string
 }
 
 // runRule runs the workflow's steps and notes the run in the log.
@@ -737,6 +776,13 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 		}()
 	}
 	run := &wfRun{s: s, ctx: ctx, user: user, lang: lang, r: r, why: why, mode: mode, ok: true}
+	if mode == runAuto {
+		s.rules.mu.Lock()
+		if st := s.rules.state[key]; st != nil {
+			run.entry, st.entry = st.entry, ""
+		}
+		s.rules.mu.Unlock()
+	}
 	if r.watches() && !onlyReports(r.Steps) {
 		// Saving refuses this already; a workflow from before is stopped here.
 		run.fail(i18n.T(lang, "Ein Workflow mit KI-Wächter darf nur Nachrichten schicken"))
@@ -744,9 +790,7 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 		run.steps(r.Steps, 0)
 	}
 	if mode != runDry {
-		if len(run.lines) > 0 {
-			s.send(user, s.notifyPrefs(user).settings, []notification{{Rule: true, Title: r.Name, Body: strings.Join(append([]string{why}, run.lines...), "\n\n")}})
-		}
+		run.flush()
 		for _, cam := range run.pictures {
 			if err := s.sendCameraTelegram(ctx, user, lang, cam); err != nil {
 				run.fail("📹 " + err.Error())
@@ -772,6 +816,40 @@ func (w *wfRun) fail(msg string) {
 	w.lines = append(w.lines, "⚠ "+msg)
 }
 
+// flush sends the run's messages: one per set of channels, each with why it
+// started; problems go along with every message (or alone, without one).
+func (w *wfRun) flush() {
+	type group struct {
+		channels []string
+		lines    []string
+	}
+	var groups []*group
+	byKey := map[string]*group{}
+	for _, m := range w.sends {
+		k := strings.Join(m.channels, ",")
+		g := byKey[k]
+		if g == nil {
+			g = &group{channels: m.channels}
+			byKey[k] = g
+			groups = append(groups, g)
+		}
+		g.lines = append(g.lines, m.text)
+	}
+	var problems []string
+	for _, l := range w.lines {
+		if strings.HasPrefix(l, "⚠ ") {
+			problems = append(problems, l)
+		}
+	}
+	if len(groups) == 0 && len(problems) > 0 {
+		groups = append(groups, &group{})
+	}
+	for _, g := range groups {
+		body := strings.Join(append(append([]string{w.why}, g.lines...), problems...), "\n\n")
+		w.s.send(w.user, w.s.notifyPrefs(w.user).settings, []notification{{Rule: true, Title: w.r.Name, Body: body, Only: g.channels}})
+	}
+}
+
 func (w *wfRun) steps(list []ruleAction, depth int) {
 	s, lang := w.s, w.lang
 	dry := w.mode == runDry
@@ -784,7 +862,11 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 		case "notify":
 			text := w.fill(strings.TrimSpace(a.Text))
 			if dry {
-				w.results = append(w.results, "✉ "+i18n.T(lang, "würde senden: %s", firstNonEmptyStr(text, i18n.T(lang, "Lagebericht"))))
+				what := firstNonEmptyStr(text, i18n.T(lang, "Lagebericht"))
+				if a.Review && text == "" {
+					what = i18n.T(lang, "Wochenrückblick")
+				}
+				w.results = append(w.results, "✉ "+i18n.T(lang, "würde senden: %s", what))
 				continue
 			}
 			if a.Report {
@@ -796,12 +878,33 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				}
 				text = strings.TrimSpace(text + "\n\n" + rep)
 			}
+			if a.Review {
+				rctx, cancel := context.WithTimeout(w.ctx, tgAnswerTime)
+				rep, err := s.weekReview(rctx, w.user, lang)
+				cancel()
+				if err != nil {
+					rep = "⚠ " + err.Error()
+				}
+				text = strings.TrimSpace(text + "\n\n" + rep)
+			}
 			if text != "" {
-				w.lines = append(w.lines, text)
+				w.sends = append(w.sends, runSend{text: text, channels: a.Channels})
 			}
 			w.results = append(w.results, "✉ "+i18n.T(lang, "Nachricht"))
 			if a.Camera != 0 {
 				w.pictures = append(w.pictures, a.Camera)
+			}
+		case "http":
+			body := w.fill(a.Text)
+			if dry {
+				w.results = append(w.results, "🌐 "+i18n.T(lang, "würde aufrufen: %s", a.Method+" "+hostOf(a.URL)))
+				continue
+			}
+			status, err := s.callURL(w.ctx, w.user, a.Method, a.URL, body)
+			if err != nil {
+				w.fail("🌐 " + hostOf(a.URL) + ": " + err.Error())
+			} else {
+				w.results = append(w.results, fmt.Sprintf("🌐 %s %s → %d", a.Method, hostOf(a.URL), status))
 			}
 		case "scene":
 			scene, found := s.sceneOf(w.user, a.Scene)
@@ -1082,6 +1185,9 @@ func (s *Server) hookRules(tileID int64, m integrations.HookMessage) {
 				continue
 			}
 			why := "📨 " + r.Triggers[i].Name + ": " + strings.TrimSpace(firstNonEmptyStr(m.Title, m.Text, m.Value))
+			s.rules.mu.Lock()
+			s.ruleState(stateKey(u.ID, r.ID)).entry = strings.TrimSpace(firstNonEmptyStr(m.Title, m.Text, m.Value))
+			s.rules.mu.Unlock()
 			slog.Info("Automation ausgelöst", "regel", r.Name, "benutzer", u.Username, "grund", why)
 			go s.runRule(context.Background(), u.ID, r, why, runAuto)
 		}
