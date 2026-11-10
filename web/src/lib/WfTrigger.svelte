@@ -1,9 +1,9 @@
 <script>
   // One trigger of a workflow.
   import { t } from './i18n.svelte.js';
-  import { DAYS, dayName, EVENTS } from './workflow.js';
+  import { DAYS, dayName, EVENTS, WATCH_EVERY, cooldownName } from './workflow.js';
 
-  let { tr = $bindable(), tiles = [] } = $props();
+  let { tr = $bindable(), tiles = [], ai = null } = $props();
   const tileById = (id) => tiles.find((x) => x.id === Number(id));
   let monitored = $derived(tiles.filter((x) => x.monitored));
   let withStats = $derived(tiles.filter((x) => x.stats.length));
@@ -24,6 +24,7 @@
     <option value="value">📈 {t('ein Wert einer Kachel eine Grenze überschreitet')}</option>
     <option value="camera">📹 {t('eine Kamera ein Ereignis meldet')}</option>
     <option value="webhook">📨 {t('eine Meldung an eine Webhook-Kachel kommt')}</option>
+    {#if ai?.dashboard || tr.kind === 'ai'}<option value="ai">🤖 {t('der KI-Wächter etwas bemerkt')}</option>{/if}
     <option value="manual">🎬 {t('ich sie starte – eine Szene')}</option>
   </select>
   {#if tr.kind === 'time'}
@@ -72,6 +73,14 @@
         {#each EVENTS as ev (ev)}<option value={ev}>{t(ev)}</option>{/each}
       </select>
     </div>
+  {:else if tr.kind === 'ai'}
+    <textarea bind:value={tr.prompt} rows="2" maxlength="500" aria-label={t('Anweisung an den KI-Wächter')} placeholder={t('z. B. Melde dich, wenn etwas ungewöhnlich ist – ein Dienst hängt, eine Platte fast voll ist oder Downloads seit Stunden stehen')}></textarea>
+    <label class="wf-inline">{t('Nachsehen alle')}
+      <select bind:value={tr.every} aria-label={t('Wie oft')} class="wf-op">
+        {#each WATCH_EVERY as m (m)}<option value={m}>{cooldownName(m)}</option>{/each}
+      </select>
+    </label>
+    <span class="help">{t('Die KI sieht dein Dashboard wie im Chat und meldet sich nur, wenn deine Anweisung zutrifft. Ein Workflow mit KI-Wächter schickt nur Nachrichten – Knöpfe und Szenen gehen hier nicht. Jede Frage an ein Cloud-Modell kostet.')}</span>
   {:else if tr.kind === 'webhook'}
     <div class="wf-row">
       <select bind:value={tr.tile} aria-label={t('Kachel')}>

@@ -1,7 +1,7 @@
 <script>
   // One step of a workflow. An "if" shows its condition here; its two lists of
   // steps are drawn by the list or flow view.
-  import { t } from './i18n.svelte.js';
+  import { t, i18n } from './i18n.svelte.js';
   import { blankStep } from './workflow.js';
   import WfCond from './WfCond.svelte';
 
@@ -16,6 +16,31 @@
     step.action = b?.id || '';
     step.params = b?.params || null;
     step.confirm = b?.confirm || '';
+  }
+  // Building blocks for the message: filled in with the current values when it goes out.
+  let textEl = $state();
+  let blocks = $derived(
+    tiles
+      .map((x) => ({
+        name: x.name,
+        items: [
+          ...x.stats.map((st) => ({ code: `{${x.name} · ${st.label}}`, label: `${st.label} (${t('jetzt')}: ${st.value})` })),
+          ...(x.list ? [{ code: `{${x.name} · ${t('Liste')}}`, label: `${t('Liste')}: ${x.list}` }] : []),
+          ...(x.monitored ? [{ code: `{${x.name} · Status}`, label: t('Status (erreichbar oder nicht)') }] : []),
+        ],
+      }))
+      .filter((g) => g.items.length),
+  );
+  function insertBlock(code) {
+    if (!code) return;
+    const text = step.text || '';
+    const at = textEl && document.activeElement !== null && textEl.selectionStart != null ? textEl.selectionStart : text.length;
+    const end = textEl?.selectionEnd ?? at;
+    step.text = text.slice(0, at) + code + text.slice(end);
+    queueMicrotask(() => {
+      textEl?.focus();
+      textEl?.setSelectionRange(at + code.length, at + code.length);
+    });
   }
   // Changing the kind keeps nothing of the old step.
   function changeKind(kind) {
@@ -34,7 +59,20 @@
     {#if !nested}<option value="if">❓ {t('Wenn … dann … sonst')}</option>{/if}
   </select>
   {#if step.kind === 'notify'}
-    <textarea bind:value={step.text} rows="2" maxlength="1000" placeholder={t('Der Text der Nachricht – sie geht an deine Benachrichtigungs-Kanäle.')}></textarea>
+    <textarea bind:this={textEl} bind:value={step.text} rows="2" maxlength="1000" placeholder={t('Der Text der Nachricht – sie geht an deine Benachrichtigungs-Kanäle.')}></textarea>
+    <select value="" onchange={(e) => { insertBlock(e.currentTarget.value); e.currentTarget.value = ''; }} aria-label={t('Baustein einfügen')} class="wf-blocks">
+      <option value="">＋ {t('Baustein einfügen – wird beim Senden mit dem aktuellen Wert gefüllt')}</option>
+      <optgroup label={t('Allgemein')}>
+        <option value={i18n.lang === 'en' ? '{reason}' : '{Grund}'}>{t('Grund – warum der Workflow startet')}</option>
+        <option value={i18n.lang === 'en' ? '{time}' : '{Uhrzeit}'}>{t('Uhrzeit')}</option>
+        <option value={i18n.lang === 'en' ? '{date}' : '{Datum}'}>{t('Datum')}</option>
+      </optgroup>
+      {#each blocks as g (g.name)}
+        <optgroup label={g.name}>
+          {#each g.items as b (b.code)}<option value={b.code}>{b.label}</option>{/each}
+        </optgroup>
+      {/each}
+    </select>
     {#if ai?.dashboard}<label class="check"><input type="checkbox" bind:checked={step.report} /> 📋 {t('Lagebericht der KI anhängen')}</label>{/if}
     {#if cameras.length}
       <select bind:value={step.camera} aria-label={t('Kamerabild')}>

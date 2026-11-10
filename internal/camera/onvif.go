@@ -340,8 +340,10 @@ func (o *ONVIF) PullEvents(ctx context.Context, on func(kind string)) error {
 	return nil
 }
 
-// Snapshot loads a JPEG from the camera's snapshot address, with basic or
-// digest login (most cameras use digest).
+// Snapshot loads a JPEG from the camera's snapshot address, with digest or
+// basic login (most cameras use digest). The password goes out only once the
+// camera asked for a login, and in the way it asked: basic sends it readable,
+// which a camera that wants digest must not get.
 func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string) ([]byte, string, error) {
 	get := func(auth string) (*http.Response, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr, nil)
@@ -350,8 +352,6 @@ func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string)
 		}
 		if auth != "" {
 			req.Header.Set("Authorization", auth)
-		} else if user != "" {
-			req.SetBasicAuth(user, pass)
 		}
 		return client.Do(req)
 	}
@@ -362,13 +362,17 @@ func Snapshot(ctx context.Context, client *http.Client, addr, user, pass string)
 	if resp.StatusCode == 401 && user != "" {
 		chal := resp.Header.Get("WWW-Authenticate")
 		resp.Body.Close()
-		if !strings.HasPrefix(strings.ToLower(chal), "digest") {
-			return nil, "", shown("Die Kamera lehnt die Anmeldung für das Standbild ab")
+		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pass))
+		if strings.HasPrefix(strings.ToLower(chal), "digest") {
+			u, _ := url.Parse(addr)
+			auth = digestAuth(chal, user, pass, "GET", u.RequestURI())
 		}
-		u, _ := url.Parse(addr)
-		resp, err = get(digestAuth(chal, user, pass, "GET", u.RequestURI()))
-		if err != nil {
+		if resp, err = get(auth); err != nil {
 			return nil, "", err
+		}
+		if resp.StatusCode == 401 {
+			resp.Body.Close()
+			return nil, "", shown("Die Kamera lehnt die Anmeldung für das Standbild ab")
 		}
 	}
 	defer resp.Body.Close()

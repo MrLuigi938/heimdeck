@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/i18n"
@@ -353,7 +354,25 @@ func MatchName(names ...string) (Integration, bool) {
 
 // ---- HTTP helpers ----
 
-func NewClient(insecure bool) *http.Client {
+// NewClient returns the HTTP client for services. There are only four – with
+// and without checking certificates, for the home network or only the public
+// internet – shared by all fetches, so connections are reused instead of a
+// new transport (and its idle connections) for every fetch. Callers must not
+// change the client they get.
+func NewClient(insecure bool) *http.Client { return sharedClient(insecure, false) }
+
+var clients sync.Map // [2]bool{insecure, external} → *http.Client
+
+func sharedClient(insecure, external bool) *http.Client {
+	key := [2]bool{insecure, external}
+	if c, ok := clients.Load(key); ok {
+		return c.(*http.Client)
+	}
+	c, _ := clients.LoadOrStore(key, buildClient(insecure, external))
+	return c.(*http.Client)
+}
+
+func newClient(insecure bool) *http.Client {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	if insecure {
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}

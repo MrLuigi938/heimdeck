@@ -290,6 +290,8 @@ type tgBot struct {
 	chats   map[int64]tgChatUser
 	convs   map[int64]*tgConv
 	pending map[string]*tgPending
+	drafts  map[string]*tgDraft // workflows drafted by the AI, until saved
+	edits   map[int64]*tgEdit   // by chat: waits for the change of a workflow
 	seen    []telegramChat
 	seq     int
 	lastErr string
@@ -312,7 +314,8 @@ type tgPending struct {
 
 func (s *Server) newBot(ctx context.Context, token string) *tgBot {
 	bctx, cancel := context.WithCancel(ctx)
-	b := &tgBot{s: s, token: token, cancel: cancel, chats: map[int64]tgChatUser{}, convs: map[int64]*tgConv{}, pending: map[string]*tgPending{}}
+	b := &tgBot{s: s, token: token, cancel: cancel, chats: map[int64]tgChatUser{}, convs: map[int64]*tgConv{}, pending: map[string]*tgPending{},
+		drafts: map[string]*tgDraft{}, edits: map[int64]*tgEdit{}}
 	go b.run(bctx)
 	return b
 }
@@ -421,11 +424,11 @@ func (b *tgBot) setCommands(ctx context.Context) {
 	}
 	b.mu.Unlock()
 	// Command names in the user's language; both languages' work anyway.
-	names := []string{"lage", "kamera", "szene", "web", "merken", "vergessen", "neu", "hilfe"}
+	names := []string{"lage", "kamera", "szene", "workflow", "automationen", "web", "merken", "vergessen", "neu", "hilfe"}
 	if lang == i18n.EN {
-		names = []string{"status", "camera", "scene", "web", "remember", "forget", "new", "help"}
+		names = []string{"status", "camera", "scene", "workflow", "automations", "web", "remember", "forget", "new", "help"}
 	}
-	descs := []string{"Lagebericht", "Aktuelles Kamerabild", "Eine Szene starten", "Mit Websuche fragen", "Etwas merken", "Gemerktes ansehen und löschen", "Neues Gespräch", "Was ich kann"}
+	descs := []string{"Lagebericht", "Aktuelles Kamerabild", "Eine Szene starten", "Einen Workflow von der KI anlegen lassen", "Workflows ansehen, schalten, ändern", "Mit Websuche fragen", "Etwas merken", "Gemerktes ansehen und löschen", "Neues Gespräch", "Was ich kann"}
 	if !ai {
 		names, descs = names[2:3], descs[2:3] // only scenes and the buttons of automations
 	}
@@ -508,6 +511,14 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 		return // in a group the bot only answers when it is spoken to
 	}
 	lang := b.s.userLang(user)
+	if cmd == "" {
+		// The answer to ✏ of a workflow: the change, in a sentence.
+		if id, ok := b.takeEdit(m.Chat.ID, m.From.ID); ok {
+			change := strings.TrimSpace(regexp.MustCompile(`(?i)@`+regexp.QuoteMeta(name)+`\b`).ReplaceAllString(text, ""))
+			b.changeWorkflow(ctx, m, user, lang, id, change)
+			return
+		}
+	}
 	// In a group only its admins may change what the AI remembers.
 	adminOnly := func() bool {
 		if group && !b.groupAdmin(ctx, m.Chat.ID, m.From.ID) {
@@ -519,9 +530,9 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 	web := false
 	switch cmd {
 	case "start", "help", "hilfe":
-		help := i18n.T(lang, "👋 Ich bin die KI deines Heimdeck. Frag mich etwas zu deinen Diensten, z. B. „Läuft alles?“ oder „Was wird gerade geladen?“ Du kannst mir auch Fotos und Dateien schicken, z. B. einen Brief zum Zusammenfassen.\n\n/lage – Lagebericht\n/kamera – aktuelles Kamerabild\n/szene – eine Szene starten\n/web Frage – mit Websuche\n/merken Text – merke ich mir für später\n/vergessen – Gemerktes ansehen und löschen\n/neu – neues Gespräch\n\nAktionen (z. B. Downloads pausieren) schlage ich nur als Knopf vor – ausgeführt wird erst, wenn du tippst.")
+		help := i18n.T(lang, "👋 Ich bin die KI deines Heimdeck. Frag mich etwas zu deinen Diensten, z. B. „Läuft alles?“ oder „Was wird gerade geladen?“ Du kannst mir auch Fotos und Dateien schicken, z. B. einen Brief zum Zusammenfassen.\n\n/lage – Lagebericht\n/kamera – aktuelles Kamerabild\n/szene – eine Szene starten\n/workflow Satz – einen Workflow anlegen lassen\n/automationen – Workflows ansehen, schalten, ändern\n/web Frage – mit Websuche\n/merken Text – merke ich mir für später\n/vergessen – Gemerktes ansehen und löschen\n/neu – neues Gespräch\n\nAktionen (z. B. Downloads pausieren) schlage ich nur als Knopf vor – ausgeführt wird erst, wenn du tippst.")
 		if group {
-			help += "\n\n" + i18n.T(lang, "In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Lagebericht, Kamerabilder, Aktionen und Szenen gibt es nur für Admins der Gruppe.", mention)
+			help += "\n\n" + i18n.T(lang, "In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Lagebericht, Kamerabilder, Aktionen, Szenen und Workflows gibt es nur für Admins der Gruppe.", mention)
 		}
 		b.reply(ctx, m, help, "", nil)
 		return
@@ -544,6 +555,16 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 		return
 	case "szene", "scene", "szenen", "scenes":
 		go b.scenes(ctx, m, user, lang, rest, group)
+		return
+	case "workflow", "automation", "regel", "rule":
+		if adminOnly() {
+			b.workflowCmd(ctx, m, user, lang, rest)
+		}
+		return
+	case "automationen", "automations", "workflows", "regeln", "rules":
+		if adminOnly() {
+			b.workflowList(ctx, m, user, lang)
+		}
 		return
 	case "merken", "merk", "remember":
 		if adminOnly() {
@@ -963,6 +984,14 @@ func (b *tgBot) onButton(ctx context.Context, q tgCallback) {
 		tgCall(ctx, b.token, "answerCallbackQuery", map[string]any{"callback_query_id": q.ID, "text": text}, nil)
 	}
 	switch kind {
+	case "ws", "wo", "wx", "wt", "we":
+		// A workflow: a draft to save or drop, or one of the list.
+		if !known || q.Message == nil {
+			answer("")
+			return
+		}
+		b.workflowButton(ctx, q, kind, id, owner, lang, answer)
+		return
 	case "s":
 		// A scene from the list.
 		if !known || q.Message == nil {

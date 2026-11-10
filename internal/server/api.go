@@ -119,6 +119,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// Groups opened with their password close with the session.
+	token := sessionToken(r)
+	s.mu.Lock()
+	delete(s.unlocked, token)
+	s.mu.Unlock()
 	s.auth.Logout(w, r)
 	writeJSON(w, map[string]bool{"ok": true})
 }

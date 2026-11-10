@@ -83,3 +83,38 @@ func remember[T any](in *Instance, key string, ttl time.Duration, fetch func() (
 	}
 	return val, err
 }
+
+// Sweep clears what the integrations keep between fetches: results nobody
+// asked for in a day (a tile that was deleted or got another address) and,
+// once a day, the logins and looked-up IDs of the services – a service in use
+// just logs in again on its next fetch.
+func Sweep(now time.Time) {
+	remembered.Range(func(k, v any) bool {
+		rv := v.(rememberedValue)
+		last := rv.at
+		if rv.got.After(last) {
+			last = rv.got
+		}
+		if now.Sub(last) > rememberKeepGood {
+			remembered.Delete(k)
+		}
+		return true
+	})
+	sweepMu.Lock()
+	defer sweepMu.Unlock()
+	if now.Sub(lastSessionSweep) < 24*time.Hour {
+		return
+	}
+	if !lastSessionSweep.IsZero() {
+		for _, m := range []*sync.Map{&sessions, &omvSessions, &ppTokens, &kavitaTokens, &embyServerIDs, &plexMachines,
+			&iobrokerSimple, &shellyGen, &unifiPrefix, &arrLibraries, &lidarrLibraries, &readarrLibraries, &opnTraffic} {
+			m.Clear()
+		}
+	}
+	lastSessionSweep = now
+}
+
+var (
+	sweepMu          sync.Mutex
+	lastSessionSweep time.Time
+)

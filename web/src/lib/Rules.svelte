@@ -12,7 +12,9 @@
   import WfTrigger from './WfTrigger.svelte';
   import WfCond from './WfCond.svelte';
   import WfSteps from './WfSteps.svelte';
-  import WfFlow from './WfFlow.svelte';
+  import WfSentence from './WfSentence.svelte';
+  import WfCanvas from './WfCanvas.svelte';
+  import { portal } from './portal.js';
 
   let { active = false, ai = null } = $props();
 
@@ -28,15 +30,46 @@
   let windowOn = $state(false);
   let loaded = false;
 
-  // List or flow, remembered in this browser.
-  let view = $state(readView());
-  function readView() {
-    try { return localStorage.getItem('heimdeck-wf-view') === 'flow' ? 'flow' : 'list'; } catch { return 'list'; }
+  // Simple (a sentence), or advanced as a flow or a list – and whether the
+  // editor fills the page; both remembered in this browser.
+  let view = $state(readPref('heimdeck-wf-view', 'simple', ['simple', 'flow', 'list']));
+  let big = $state(readPref('heimdeck-wf-big', '', ['1']) === '1');
+  let advanced = $state(readPref('heimdeck-wf-adv', 'flow', ['flow', 'list']));
+  function readPref(key, fallback, allowed) {
+    try {
+      const v = localStorage.getItem(key);
+      return allowed.includes(v) ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  function writePref(key, v) {
+    try { localStorage.setItem(key, v); } catch { /* private window */ }
   }
   function setView(v) {
     view = v;
-    try { localStorage.setItem('heimdeck-wf-view', v); } catch { /* private window */ }
+    if (v !== 'simple') advanced = v;
+    writePref('heimdeck-wf-view', v);
+    if (v !== 'simple') writePref('heimdeck-wf-adv', v);
   }
+  function setBig(v) {
+    big = v;
+    writePref('heimdeck-wf-big', v ? '1' : '');
+  }
+  // Esc makes the large editor small again (and does not close the settings).
+  $effect(() => {
+    if (!editing || !big) return;
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || document.querySelector('.backdrop.top')) return;
+      const el = document.activeElement;
+      if (el?.matches?.('input, textarea, select')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setBig(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
 
   async function load() {
     try {
@@ -86,11 +119,33 @@
     return found;
   });
 
+  // The large advanced view is the canvas: it gets the whole height, the AI box opens on request.
+  let canvas = $derived(big && view === 'flow');
+  let aiOpen = $state(false);
   let aiText = $state('');
   let aiBusy = $state(false);
   let aiProblem = $state('');
   let dry = $state(null);
   let dryBusy = $state(false);
+
+  // What would happen now, kept up to date while editing (without asking the
+  // AI watcher, which may cost money – the 🧪 button does that).
+  let live = $state(null);
+  let liveSeq = 0;
+  $effect(() => {
+    if (!editing || tiles === null) return;
+    const b = body();
+    const seq = ++liveSeq;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await post('/rules/dryrun?quiet=1', b);
+        if (seq === liveSeq) live = { lines: res.lines, conds: res.conds, condList: res.condList, triggers: res.triggers, branches: res.branches };
+      } catch (e) {
+        if (seq === liveSeq) live = { problem: e.message };
+      }
+    }, 900);
+    return () => clearTimeout(timer);
+  });
 
   function edit(r) {
     editing = editable(r || blankWorkflow());
@@ -98,6 +153,7 @@
     aiText = '';
     aiProblem = '';
     dry = null;
+    live = null;
     loadTiles();
   }
 
@@ -187,94 +243,20 @@
     if (i >= 0) editing.only.days.splice(i, 1);
     else editing.only.days.push(d);
   }
-  const lastRun = (r) => log.find((e) => e.rule === r.id);
   const when = (unix) => new Date(unix * 1000).toLocaleString(i18n.lang, { dateStyle: 'short', timeStyle: 'short' });
 </script>
 
-<div class="rules">
-  <p class="help">{t('Workflows der Form „Wenn …, nur wenn …, dann …“ – Heimdeck prüft sie jede halbe Minute und führt sie mit den Rechten deines Kontos aus. Die KI kann einen entwerfen; gespeichert und ausgeführt wird nur, was du selbst speicherst.')}</p>
-
-  {#if !editing}
-    {#each rules as r (r.id)}
-      {@const last = lastRun(r)}
-      <div class="rule" class:off={!r.on}>
-        <label class="switch" title={r.on ? t('Ausschalten') : t('Einschalten')}>
-          <input type="checkbox" checked={r.on} onchange={() => toggle(r)} aria-label={t('Regel an')} />
-        </label>
-        <div class="body">
-          <strong>{r.name}{#if running[r.id]} <span class="badge">⏳ {t('läuft')}</span>{/if}</strong>
-          <span class="muted small">{r.triggers.map((x) => triggerIcon(x.kind) + ' ' + triggerText(x)).join(' · ' + t('oder') + ' ')}{values[r.id] ? ` · ${t('jetzt')}: ${values[r.id]}` : ''}</span>
-          {#if r.conds.length}<span class="muted small">✔ {r.conds.length === 1 ? t('1 Bedingung') : t('{n} Bedingungen', { n: r.conds.length })}</span>{/if}
-          <span class="small">{r.steps.map((s) => stepText(s)).join(' → ')}</span>
-          {#if last}<span class="muted small" class:bad={!last.ok}>{when(last.at)} – {last.result}</span>{/if}
+{#snippet details()}
+      {#if live}
+        <div class="live" class:wait={live.problem}>
+          {#if live.problem}
+            <span>✎ {t('Noch nicht fertig:')} {live.problem}</span>
+          {:else}
+            <span class="muted">{t('Jetzt würde passieren:')}</span>
+            {#if !live.conds}<span class="bad">{t('nichts – die Bedingungen gelten gerade nicht')}</span>{/if}
+            <span class="flowline">{live.lines.join('\n')}</span>
+          {/if}
         </div>
-        <div class="row">
-          <button class="small" onclick={() => start(r)} disabled={starting === r.id || !r.on && isManual(r)} title={t('Die Schritte jetzt ausführen – zählt als Bestätigung')}>{isManual(r) ? '🎬 ' + t('Starten') : '▶ ' + t('Jetzt')}</button>
-          <button class="small" onclick={() => edit(r)}>{t('Bearbeiten')}</button>
-          <button class="small ghost" onclick={() => remove(r)} aria-label={t('Löschen')} title={t('Löschen')}>✕</button>
-        </div>
-      </div>
-    {:else}
-      <p class="muted">{t('Noch keine Workflows. Zum Beispiel: Wenn der NAS-Speicher über 90 % ist und niemand streamt, Downloads pausieren und mir schreiben – oder eine Szene „Filmabend“ zum Starten von Hand.')}</p>
-    {/each}
-    <button class="primary small" onclick={() => edit(null)} disabled={rules.length >= 50}>＋ {t('Neuer Workflow')}</button>
-
-    {#if log.length}
-      <h4>{t('Protokoll')}</h4>
-      <ul class="log">
-        {#each log.slice(0, 20) as e (e.at + e.rule + e.result)}
-          <li class:bad={!e.ok}><span class="muted">{when(e.at)}</span> <strong>{e.name}</strong> – {e.why}{e.why ? ': ' : ''}{e.result}</li>
-        {/each}
-      </ul>
-    {/if}
-  {:else}
-    <div class="editor">
-      <label class="field">
-        <span>{t('Name')}</span>
-        <input bind:value={editing.name} maxlength="80" placeholder={t('z. B. NAS fast voll')} />
-      </label>
-
-      {#if ai}
-        <div class="ai">
-          <span>✨ {editing.id ? t('Mit KI ändern') : t('Mit KI beschreiben')}</span>
-          <textarea bind:value={aiText} rows="2" maxlength="2000" placeholder={editing.id ? t('z. B. Schick mir zusätzlich das Kamerabild und warte vorher 5 Minuten') : t('z. B. Wenn der NAS über 90 % voll ist und niemand streamt, pausiere SABnzbd und schick mir eine Nachricht')}></textarea>
-          <div class="row wrap">
-            <button class="small" onclick={askAI} disabled={aiBusy || !aiText.trim()}>{aiBusy ? t('Die KI denkt …') : editing.id ? t('Ändern lassen') : t('Entwurf erstellen')}</button>
-            <span class="help">{t('Der Entwurf ersetzt, was hier steht – gespeichert wird erst, wenn du speicherst.')}</span>
-          </div>
-          {#if aiProblem}<span class="help bad">⚠ {aiProblem} {t('– bitte im Editor korrigieren.')}</span>{/if}
-        </div>
-      {/if}
-
-      <div class="viewswitch" role="radiogroup" aria-label={t('Ansicht')}>
-        <button class:on={view === 'list'} role="radio" aria-checked={view === 'list'} onclick={() => setView('list')}>☰ {t('Liste')}</button>
-        <button class:on={view === 'flow'} role="radio" aria-checked={view === 'flow'} onclick={() => setView('flow')}>⑂ {t('Fluss')}</button>
-      </div>
-      {#if tiles === null}<p class="muted small">{t('Lade die Kacheln …')}</p>{/if}
-
-      {#if view === 'flow'}
-        <WfFlow bind:wf={editing} tiles={tiles || []} {scenes} {ai} />
-      {:else}
-        <h4>{t('Wenn …')} <span class="sub">{t('einer davon reicht')}</span></h4>
-        {#each editing.triggers as tr, i (i)}
-          <div class="block">
-            {#if editing.triggers.length > 1}<button class="small ghost x" onclick={() => editing.triggers.splice(i, 1)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button>{/if}
-            <WfTrigger bind:tr={editing.triggers[i]} tiles={tiles || []} />
-          </div>
-        {/each}
-        {#if editing.triggers.length < 5}<button class="small" onclick={() => editing.triggers.push(blankTrigger())}>＋ {t('Auslöser')}</button>{/if}
-
-        <h4>{t('Nur wenn …')} <span class="sub">{t('alle müssen gelten – optional')}</span></h4>
-        {#each editing.conds as c, i (i)}
-          <div class="block">
-            <button class="small ghost x" onclick={() => editing.conds.splice(i, 1)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button>
-            <WfCond bind:cond={editing.conds[i]} tiles={tiles || []} />
-          </div>
-        {/each}
-        {#if editing.conds.length < 5}<button class="small" onclick={() => editing.conds.push(blankCond())}>＋ {t('Bedingung')}</button>{/if}
-
-        <h4>{t('… dann')} <span class="sub">{t('der Reihe nach')}</span></h4>
-        <WfSteps bind:steps={editing.steps} tiles={tiles || []} {scenes} {ai} />
       {/if}
 
       <h4>{t('Einstellungen')}</h4>
@@ -317,8 +299,122 @@
           <ul>{#each dry.lines as l, i (i)}<li>{l}</li>{/each}</ul>
         </div>
       {/if}
+{/snippet}
 
-      <div class="row end wrap">
+<div class="rules">
+  <p class="help">{t('Workflows der Form „Wenn …, nur wenn …, dann …“ – Heimdeck prüft sie jede halbe Minute und führt sie mit den Rechten deines Kontos aus. Die KI kann einen entwerfen; gespeichert und ausgeführt wird nur, was du selbst speicherst.')}</p>
+
+  {#if !editing}
+    {#each rules as r (r.id)}
+      <div class="rule" class:off={!r.on}>
+        <label class="switch" title={r.on ? t('Ausschalten') : t('Einschalten')}>
+          <input type="checkbox" checked={r.on} onchange={() => toggle(r)} aria-label={t('Regel an')} />
+        </label>
+        <div class="body">
+          <strong>{r.name}{#if running[r.id]} <span class="badge">⏳ {t('läuft')}</span>{/if}</strong>
+          <span class="muted small">{r.triggers.map((x) => triggerIcon(x.kind) + ' ' + triggerText(x)).join(' · ' + (r.all ? t('und') : t('oder')) + ' ')}{values[r.id] ? ` · ${t('jetzt')}: ${values[r.id]}` : ''}</span>
+          {#if r.conds.length}<span class="muted small">✔ {r.conds.length === 1 ? t('1 Bedingung') : t('{n} Bedingungen', { n: r.conds.length })}</span>{/if}
+          <span class="small">{r.steps.map((s) => stepText(s)).join(' → ')}</span>
+        </div>
+        <div class="row">
+          <button class="small" onclick={() => start(r)} disabled={starting === r.id || !r.on && isManual(r)} title={t('Die Schritte jetzt ausführen – zählt als Bestätigung')}>{isManual(r) ? '🎬 ' + t('Starten') : '▶ ' + t('Jetzt')}</button>
+          <button class="small" onclick={() => edit(r)}>{t('Bearbeiten')}</button>
+          <button class="small ghost" onclick={() => remove(r)} aria-label={t('Löschen')} title={t('Löschen')}>✕</button>
+        </div>
+      </div>
+    {:else}
+      <p class="muted">{t('Noch keine Workflows. Zum Beispiel: Wenn der NAS-Speicher über 90 % ist und niemand streamt, Downloads pausieren und mir schreiben – oder eine Szene „Filmabend“ zum Starten von Hand.')}</p>
+    {/each}
+    <button class="primary small" onclick={() => edit(null)} disabled={rules.length >= 50}>＋ {t('Neuer Workflow')}</button>
+
+    {#if log.length}
+      <h4>{t('Protokoll')}</h4>
+      <ul class="log">
+        {#each log.slice(0, 20) as e (e.at + e.rule + e.result)}
+          <li class:bad={!e.ok}>
+            <span class="muted">{when(e.at)}</span> <strong>{e.name}</strong>
+            {#if !e.ok}<span class="errbadge" title={t('Mindestens ein Schritt hat nicht geklappt – die Zeilen mit ⚠ sagen, welcher und warum.')}>⚠ {t('Fehler')}</span>{/if}
+            – {e.why}{e.why ? ': ' : ''}{e.result}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  {:else}
+    <div class="editor" class:big class:cv={canvas} use:portal={big}>
+      <div class="ed-bar">
+        <input class="ed-name" bind:value={editing.name} maxlength="80" placeholder={t('Name, z. B. NAS fast voll')} aria-label={t('Name')} />
+        <div class="viewswitch" role="radiogroup" aria-label={t('Ansicht')}>
+          <button class:on={view === 'simple'} role="radio" aria-checked={view === 'simple'} onclick={() => setView('simple')}>{t('Einfach')}</button>
+          <button class:on={view !== 'simple'} role="radio" aria-checked={view !== 'simple'} onclick={() => setView(advanced)}>{t('Erweitert')}</button>
+        </div>
+        {#if view !== 'simple'}
+          <button class="small ghost" onclick={() => setView(view === 'flow' ? 'list' : 'flow')} title={t('Darstellung wechseln')}>{view === 'flow' ? '☰ ' + t('als Liste') : '⑂ ' + t('als Fluss')}</button>
+        {/if}
+        <span class="grow"></span>
+        {#if big}
+          <!-- Large: only back to the small view – closing (and losing the changes) goes from there. -->
+          {#if ai && canvas}<button class="small ghost" class:on={aiOpen} onclick={() => (aiOpen = !aiOpen)}>✨ {t('Mit KI')}</button>{/if}
+          <button class="small" onclick={dryRun} disabled={dryBusy}>🧪 {t('Probelauf')}</button>
+          <button class="small primary" onclick={save} disabled={saving}>{t('Speichern')}</button>
+          <button class="small" onclick={() => setBig(false)} title={t('Verkleinern (Esc)')}>⤡ {t('Verkleinern')}</button>
+        {:else}
+          <button class="small ghost" onclick={() => setBig(true)} title={t('Auf die ganze Seite vergrößern')}>⤢ {t('Vollbild')}</button>
+          <button class="small ghost icon" onclick={() => (editing = null)} aria-label={t('Schließen ohne Speichern')} title={t('Schließen ohne Speichern')}>✕</button>
+        {/if}
+      </div>
+
+      {#if ai && (!canvas || aiOpen)}
+        <div class="ai">
+          <span>✨ {editing.id ? t('Mit KI ändern') : t('Mit KI beschreiben')}</span>
+          <textarea bind:value={aiText} rows="2" maxlength="2000" placeholder={editing.id ? t('z. B. Schick mir zusätzlich das Kamerabild und warte vorher 5 Minuten') : t('z. B. Wenn der NAS über 90 % voll ist und niemand streamt, pausiere SABnzbd und schick mir eine Nachricht')}></textarea>
+          <div class="row wrap">
+            <button class="small" onclick={askAI} disabled={aiBusy || !aiText.trim()}>{aiBusy ? t('Die KI denkt …') : editing.id ? t('Ändern lassen') : t('Entwurf erstellen')}</button>
+            <span class="help">{t('Der Entwurf ersetzt, was hier steht – gespeichert wird erst, wenn du speicherst.')}</span>
+          </div>
+          {#if aiProblem}<span class="help bad">⚠ {aiProblem} {t('– bitte im Editor korrigieren.')}</span>{/if}
+        </div>
+      {/if}
+
+      {#if tiles === null}<p class="muted small">{t('Lade die Kacheln …')}</p>{/if}
+
+      {#if view === 'simple'}
+        <WfSentence bind:wf={editing} tiles={tiles || []} {scenes} {ai} />
+      {:else if view === 'flow'}
+        <!-- The same canvas in the window and on the whole page; there it also holds the settings. -->
+        <WfCanvas bind:wf={editing} tiles={tiles || []} {scenes} {ai} {live} fill={canvas} panel={canvas ? details : null} />
+      {:else}
+        <h4>{t('Wenn …')}
+          {#if editing.triggers.length > 1}
+            <select class="joinsel" bind:value={editing.all} aria-label={t('Verknüpfung der Auslöser')}>
+              <option value={false}>{t('oder – einer davon reicht')}</option>
+              <option value={true}>{t('und – alle zugleich')}</option>
+            </select>
+          {/if}
+        </h4>
+        {#each editing.triggers as tr, i (i)}
+          <div class="block">
+            {#if editing.triggers.length > 1}<button class="small ghost x" onclick={() => editing.triggers.splice(i, 1)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button>{/if}
+            <WfTrigger bind:tr={editing.triggers[i]} tiles={tiles || []} {ai} />
+          </div>
+        {/each}
+        {#if editing.triggers.length < 5}<button class="small" onclick={() => editing.triggers.push(blankTrigger())}>＋ {t('Auslöser')}</button>{/if}
+
+        <h4>{t('Nur wenn …')} <span class="sub">{t('alle müssen gelten – optional')}</span></h4>
+        {#each editing.conds as c, i (i)}
+          <div class="block">
+            <button class="small ghost x" onclick={() => editing.conds.splice(i, 1)} aria-label={t('Entfernen')} title={t('Entfernen')}>✕</button>
+            <WfCond bind:cond={editing.conds[i]} tiles={tiles || []} />
+          </div>
+        {/each}
+        {#if editing.conds.length < 5}<button class="small" onclick={() => editing.conds.push(blankCond())}>＋ {t('Bedingung')}</button>{/if}
+
+        <h4>{t('… dann')} <span class="sub">{t('der Reihe nach')}</span></h4>
+        <WfSteps bind:steps={editing.steps} tiles={tiles || []} {scenes} {ai} />
+      {/if}
+
+      {#if !canvas}{@render details()}{/if}
+
+      <div class="row end wrap" class:hide={big}>
         <button class="small" onclick={dryRun} disabled={dryBusy}>🧪 {t('Probelauf')}</button>
         <span class="grow"></span>
         <button class="small" onclick={() => (editing = null)}>{t('Abbrechen')}</button>
@@ -342,7 +438,25 @@
   .bad { color: var(--bad-text, var(--bad)); }
   h4 { margin: 10px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   h4 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
-  .editor { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+  .joinsel { width: auto; margin-left: 8px; text-transform: none; font-size: 12px; padding: 2px 6px; }
+  .editor { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-sm); align-content: start; }
+  .editor.big {
+    position: fixed; inset: 0; z-index: 60; overflow-y: auto; border: 0; border-radius: 0; gap: 10px;
+    background: var(--surface-solid, var(--bg)); color: var(--text); font-family: var(--font);
+    padding: 16px 20px 32px;
+  }
+  .editor.big.cv { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 12px; }
+  .editor.big.cv .ed-bar { margin: -16px 0 0; flex: none; }
+  .editor.big.cv > :global(*) { flex: none; }
+  .editor.big.cv > :global(.canvas) { flex: 1 1 auto; min-height: 0; }
+  .hide { display: none; }
+  .ed-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .editor.big .ed-bar { position: sticky; top: -16px; z-index: 2; margin: -16px 0 0; padding: 12px 0; background: var(--surface-solid, var(--bg)); border-bottom: 1px solid var(--border); }
+  .ed-name { flex: 1 1 220px; min-width: 0; font-size: 15px; font-weight: 600; }
+  .icon { font-size: 16px; width: 34px; justify-content: center; }
+  .live { display: grid; gap: 4px; padding: 8px 10px; border-radius: var(--r-sm); background: color-mix(in srgb, #1d9e75 10%, var(--surface-2)); font-size: 13px; }
+  .live.wait { background: var(--surface-2); color: var(--muted); }
+  .flowline { white-space: pre-wrap; overflow-wrap: anywhere; }
   .ai { display: grid; gap: 6px; padding: 10px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
   .viewswitch { display: inline-flex; justify-self: start; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
   .viewswitch button { border: 0; border-radius: 0; padding: 6px 14px; background: none; }
@@ -354,6 +468,7 @@
   .dry ul { margin: 0; padding-left: 18px; }
   .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
   .log li { overflow-wrap: anywhere; }
+  .errbadge { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 8px; color: var(--bad-text, var(--bad)); border: 1px solid currentColor; vertical-align: 1px; }
   /* Shared by the blocks of both views. */
   :global(.wf-fields) { display: grid; gap: 6px; }
   :global(.wf-row) { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

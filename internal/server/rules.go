@@ -50,18 +50,23 @@ type rule struct {
 	Name     string        `json:"name"`
 	On       bool          `json:"on"`
 	Triggers []ruleTrigger `json:"triggers"`
-	Only     ruleOnly      `json:"only"`
-	Conds    []ruleCond    `json:"conds"`
-	Steps    []ruleAction  `json:"steps"`
-	NoAsk    bool          `json:"noAsk"`    // run buttons that normally ask without asking
-	Cooldown int           `json:"cooldown"` // minutes before the workflow fires again
+	// All: the triggers are joined by "and" – the workflow starts when one of
+	// them happens and all the others hold at that moment. Otherwise "or".
+	All  bool     `json:"all,omitempty"`
+	Only ruleOnly `json:"only"`
+	// Layout: where the person put the blocks on the canvas, by block key.
+	Layout   map[string]rulePos `json:"layout,omitempty"`
+	Conds    []ruleCond         `json:"conds"`
+	Steps    []ruleAction       `json:"steps"`
+	NoAsk    bool               `json:"noAsk"`    // run buttons that normally ask without asking
+	Cooldown int                `json:"cooldown"` // minutes before the workflow fires again
 	// Before workflows (read, then moved into Triggers and Steps):
 	Trigger *ruleTrigger `json:"trigger,omitempty"`
 	Actions []ruleAction `json:"actions,omitempty"`
 }
 
 type ruleTrigger struct {
-	Kind  string `json:"kind"`               // time | down | up | value | camera | webhook | manual
+	Kind  string `json:"kind"`               // time | down | up | value | camera | webhook | ai | manual
 	Name  string `json:"tileName,omitempty"` // the tile's name, for the list
 	Time  string `json:"time,omitempty"`     // HH:MM
 	Days  []int  `json:"days,omitempty"`     // 0 = Sunday … 6 = Saturday; none = every day
@@ -72,6 +77,15 @@ type ruleTrigger struct {
 	Value string `json:"value,omitempty"` // e.g. "90 %" or "100 GB"
 	Event string `json:"event,omitempty"` // camera: the kind of event ("Person", "Klingel" …); empty = any
 	Match string `json:"match,omitempty"` // webhook: only messages containing this text
+	// ai: the AI watcher looks at the dashboard every Every minutes with this instruction.
+	Prompt string `json:"prompt,omitempty"`
+	Every  int    `json:"every,omitempty"`
+}
+
+// rulePos is a block's place on the canvas.
+type rulePos struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
 }
 
 // ruleOnly limits a workflow to a time window (which may pass midnight) and days.
@@ -117,6 +131,8 @@ type ruleLogEntry struct {
 	Why    string `json:"why"`
 	Result string `json:"result"`
 	OK     bool   `json:"ok"`
+	// branches: for a dry run, which way each top-level "if" went.
+	branches []bool
 }
 
 // ruleEngine is the state between checks.
@@ -139,6 +155,12 @@ type ruleState struct {
 	value    string // the value seen last, for the list
 	event    int64  // the newest camera event seen
 	started  bool   // the camera's events were looked at once
+	// The AI watcher: when it last asked, whether a question is under way, and the answer.
+	watchAt    time.Time
+	watchBusy  bool
+	watchSeen  bool
+	watchAlert bool
+	watchWhy   string
 }
 
 // ruleAsk waits for a tap on ✅ in Telegram.
@@ -311,10 +333,16 @@ func (s *Server) ruleState(key string) *ruleState {
 
 // ruleDue looks at the workflow's triggers and says whether it fires now, and why.
 func (s *Server) ruleDue(user int64, r rule, now time.Time) (string, bool) {
+	if r.All && len(r.Triggers) > 1 {
+		return s.ruleDueAll(user, r, now)
+	}
 	lang := s.userLang(user)
 	wfKey := stateKey(user, r.ID)
 	for i, tr := range r.Triggers {
 		key := stateKey(user, r.ID, strconv.Itoa(i))
+		if tr.Kind == "ai" && !r.Only.ok(now) {
+			continue // outside its window the AI is not asked (it may cost money)
+		}
 		cond, why, ok := s.triggerHolds(user, key, wfKey, tr, now, lang)
 		if !ok {
 			continue
@@ -358,6 +386,49 @@ func (s *Server) ruleDue(user int64, r rule, now time.Time) (string, bool) {
 		return why, true
 	}
 	return "", false
+}
+
+// ruleDueAll: triggers joined by "and". Every trigger is looked at in every
+// round (they keep their own state); the workflow fires when all of them hold
+// together and did not all hold before – a moment like 20:00 or a camera event
+// holds only in the round it happens, a value or an outage while it lasts.
+func (s *Server) ruleDueAll(user int64, r rule, now time.Time) (string, bool) {
+	lang := s.userLang(user)
+	wfKey := stateKey(user, r.ID)
+	all := true
+	var whys []string
+	for i, tr := range r.Triggers {
+		if tr.Kind == "ai" && !r.Only.ok(now) {
+			all = false
+			continue
+		}
+		cond, why, ok := s.triggerHolds(user, stateKey(user, r.ID, strconv.Itoa(i)), wfKey, tr, now, lang)
+		if tr.Kind == "webhook" || tr.Kind == "manual" {
+			cond, ok = false, true // a message arrives in hookRules; "by hand" never holds by itself
+		}
+		if !ok || !cond {
+			all = false
+			continue
+		}
+		whys = append(whys, why)
+	}
+	s.rules.mu.Lock()
+	wf := s.ruleState(wfKey)
+	if !all {
+		wf.armed = true
+		s.rules.mu.Unlock()
+		return "", false
+	}
+	wait := !wf.lastFire.IsZero() && now.Sub(wf.lastFire) < r.cooldown()
+	armed := wf.armed
+	s.rules.mu.Unlock()
+	if !armed || wait || !r.Only.ok(now) || !s.condsHold(user, lang, r.Conds) {
+		return "", false
+	}
+	s.rules.mu.Lock()
+	wf.armed, wf.lastFire = false, now
+	s.rules.mu.Unlock()
+	return strings.Join(whys, " · "), true
 }
 
 // triggerHolds says whether one trigger is true now (ok: it could be looked at).
@@ -431,6 +502,8 @@ func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now
 			}
 		}
 		return false, "", true
+	case "ai":
+		return s.watchHolds(user, key, tr, now, lang)
 	}
 	return false, "", false // manual: by hand; webhook: on arrival (hookRules)
 }
@@ -627,6 +700,9 @@ type wfRun struct {
 	results  []string // for the log (or the dry run)
 	pictures []int64
 	ok       bool
+	tiles    []store.Tile                   // the tiles it may read, for building blocks
+	widgets  map[int64]*integrations.Widget // read once per run
+	branches []bool                         // the answers of the top-level "if" steps, in order (for the canvas)
 }
 
 // runRule runs the workflow's steps and notes the run in the log.
@@ -661,7 +737,12 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 		}()
 	}
 	run := &wfRun{s: s, ctx: ctx, user: user, lang: lang, r: r, why: why, mode: mode, ok: true}
-	run.steps(r.Steps, 0)
+	if r.watches() && !onlyReports(r.Steps) {
+		// Saving refuses this already; a workflow from before is stopped here.
+		run.fail(i18n.T(lang, "Ein Workflow mit KI-Wächter darf nur Nachrichten schicken"))
+	} else {
+		run.steps(r.Steps, 0)
+	}
 	if mode != runDry {
 		if len(run.lines) > 0 {
 			s.send(user, s.notifyPrefs(user).settings, []notification{{Rule: true, Title: r.Name, Body: strings.Join(append([]string{why}, run.lines...), "\n\n")}})
@@ -678,7 +759,7 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 	if mode == runDry {
 		sep = "\n"
 	}
-	e := ruleLogEntry{At: time.Now().Unix(), Rule: r.ID, Name: r.Name, Why: why, Result: strings.Join(run.results, sep), OK: run.ok}
+	e := ruleLogEntry{At: time.Now().Unix(), Rule: r.ID, Name: r.Name, Why: why, Result: strings.Join(run.results, sep), OK: run.ok, branches: run.branches}
 	if mode != runDry {
 		s.addRuleLog(user, e)
 	}
@@ -701,7 +782,7 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 		}
 		switch a.Kind {
 		case "notify":
-			text := strings.TrimSpace(a.Text)
+			text := w.fill(strings.TrimSpace(a.Text))
 			if dry {
 				w.results = append(w.results, "✉ "+i18n.T(lang, "würde senden: %s", firstNonEmptyStr(text, i18n.T(lang, "Lagebericht"))))
 				continue
@@ -792,6 +873,9 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				answer = i18n.T(lang, "ja")
 			}
 			w.results = append(w.results, "❓ "+desc+" → "+answer)
+			if depth == 0 {
+				w.branches = append(w.branches, holds)
+			}
 			if holds {
 				w.steps(a.Then, depth+1)
 			} else {
@@ -984,6 +1068,9 @@ func (s *Server) hookRules(tileID int64, m integrations.HookMessage) {
 			if i < 0 || !s.ruleTileOK(u.ID, tileID) || !s.condsHold(u.ID, lang, r.Conds) {
 				continue
 			}
+			if r.All && !s.othersHold(u.ID, r, i, now, lang) {
+				continue
+			}
 			s.rules.mu.Lock()
 			wf := s.ruleState(stateKey(u.ID, r.ID))
 			wait := !wf.lastFire.IsZero() && now.Sub(wf.lastFire) < r.cooldown()
@@ -999,6 +1086,24 @@ func (s *Server) hookRules(tileID int64, m integrations.HookMessage) {
 			go s.runRule(context.Background(), u.ID, r, why, runAuto)
 		}
 	}
+}
+
+// othersHold says whether all triggers but one hold now (a webhook of a
+// workflow with "and" has just arrived).
+func (s *Server) othersHold(user int64, r rule, except int, now time.Time, lang string) bool {
+	for j, tr := range r.Triggers {
+		if j == except {
+			continue
+		}
+		if tr.Kind == "webhook" || tr.Kind == "manual" || tr.Kind == "time" || tr.Kind == "camera" {
+			return false // another moment does not fall on the same instant
+		}
+		cond, _, ok := s.triggerHolds(user, stateKey(user, r.ID, strconv.Itoa(j)), stateKey(user, r.ID), tr, now, lang)
+		if !ok || !cond {
+			return false
+		}
+	}
+	return true
 }
 
 // sendCameraTelegram sends a camera's current picture to the user's Telegram chat.

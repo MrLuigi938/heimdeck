@@ -7,7 +7,8 @@ export const dayName = (d) => new Date(2024, 0, 7 + d).toLocaleDateString(i18n.l
 export const EVENTS = ['Bewegung', 'Person', 'Fahrzeug', 'Tier', 'Klingel', 'Bereich betreten', 'Sabotage'];
 export const COOLDOWNS = [5, 15, 60, 360, 1440];
 
-export const blankTrigger = (kind = 'time') => ({ kind, time: '07:00', days: [], tile: 0, for: 2, stat: '', op: '>', value: '', event: '', match: '' });
+export const blankTrigger = (kind = 'time') => ({ kind, time: '07:00', days: [], tile: 0, for: 2, stat: '', op: '>', value: '', event: '', match: '', prompt: '', every: 60 });
+export const WATCH_EVERY = [15, 30, 60, 180, 360, 1440];
 export const blankCond = () => ({ kind: 'value', tile: 0, stat: '', op: '>', value: '' });
 export const blankStep = (kind = 'notify') => {
   switch (kind) {
@@ -24,7 +25,7 @@ export const blankStep = (kind = 'notify') => {
   }
 };
 export const blankWorkflow = () => ({
-  name: '', on: true, noAsk: false, cooldown: 60,
+  name: '', on: true, noAsk: false, all: false, cooldown: 60,
   triggers: [blankTrigger()], only: { from: '', to: '', days: [] }, conds: [], steps: [blankStep()],
 });
 
@@ -65,7 +66,7 @@ export function forSave(w) {
   return {
     ...w,
     cooldown: num(w.cooldown) || 60,
-    triggers: w.triggers.map((x) => ({ ...x, tile: num(x.tile), for: num(x.for) })),
+    triggers: w.triggers.map((x) => ({ ...x, tile: num(x.tile), for: num(x.for), every: num(x.every) })),
     conds: w.conds.map((x) => ({ ...x, tile: num(x.tile) })),
     steps: w.steps.map(step),
   };
@@ -89,6 +90,8 @@ export function triggerText(tr, tiles) {
       return t('{tile} ist wieder erreichbar', { tile: name });
     case 'manual':
       return t('Von Hand gestartet (Szene)');
+    case 'ai':
+      return t('KI-Wächter: {text}', { text: (tr.prompt || '…').slice(0, 80) });
     case 'camera':
       return `${name}: ${tr.event ? t(tr.event) : t('jedes Ereignis')}`;
     case 'webhook':
@@ -97,7 +100,7 @@ export function triggerText(tr, tiles) {
       return `${name} · ${tr.stat} ${opText(tr.op)} ${tr.value}`;
   }
 }
-export const triggerIcon = (kind) => ({ time: '🕑', down: '🔴', up: '🟢', value: '📈', camera: '📹', webhook: '📨', manual: '🎬' })[kind] || '⚡';
+export const triggerIcon = (kind) => ({ time: '🕑', down: '🔴', up: '🟢', value: '📈', camera: '📹', webhook: '📨', ai: '🤖', manual: '🎬' })[kind] || '⚡';
 
 export function condText(c, tiles) {
   const name = tileName(c, tiles);

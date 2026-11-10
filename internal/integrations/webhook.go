@@ -97,6 +97,17 @@ func ReceiveHook(key string, m HookMessage) {
 	hookInbox.byKey[key] = list[:min(len(list), hookKeep)]
 }
 
+// KeepHooks forgets the messages of keys that no tile uses any more.
+func KeepHooks(keys map[string]bool) {
+	hookInbox.Lock()
+	defer hookInbox.Unlock()
+	for k := range hookInbox.byKey {
+		if !keys[k] {
+			delete(hookInbox.byKey, k)
+		}
+	}
+}
+
 func hookMessages(key string) []HookMessage {
 	hookInbox.Lock()
 	defer hookInbox.Unlock()

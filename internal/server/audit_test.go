@@ -177,3 +177,29 @@ func TestAuditHelpers(t *testing.T) {
 		t.Fatal("image offers")
 	}
 }
+
+// H2, H12: the hourly sweep clears what nobody needs any more.
+func TestSweep(t *testing.T) {
+	dir := t.TempDir()
+	box, _ := secret.Open(dir)
+	st, err := store.Open(filepath.Join(dir, "test.db"), box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	app := New(st, auth.New(st, false), nil, nil)
+	now := time.Now()
+	app.unlocked["old"] = map[int64]time.Time{1: now.Add(-time.Minute)}
+	app.unlocked["open"] = map[int64]time.Time{1: now.Add(time.Hour)}
+	app.favicons["http://gone"] = favicon{at: now.Add(-3 * faviconTTL)}
+	app.rules.state[stateKey(1, "deleted")] = &ruleState{}
+	app.rules.state[stateKey(1, "deleted", "0")] = &ruleState{}
+	integrations.ReceiveHook("no-tile-uses-this", integrations.HookMessage{Title: "x"})
+	app.sweep(now)
+	if _, ok := app.unlocked["old"]; ok || app.unlocked["open"] == nil {
+		t.Fatalf("unlocked: %v", app.unlocked)
+	}
+	if len(app.favicons) != 0 || len(app.rules.state) != 0 {
+		t.Fatalf("favicons %d, workflow state %d", len(app.favicons), len(app.rules.state))
+	}
+}

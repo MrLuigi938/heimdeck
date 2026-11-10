@@ -62,6 +62,7 @@ func (s *Server) Monitor(ctx context.Context) {
 			s.syncCameraWatchers(ctx)
 		case <-prune.C:
 			logErr("Statusverlauf aufräumen", s.store.PruneChecks(time.Now().Add(-historyKeep)))
+			s.sweep(time.Now())
 		}
 	}
 }

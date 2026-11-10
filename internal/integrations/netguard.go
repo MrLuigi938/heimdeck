@@ -60,8 +60,10 @@ func publicOnly(_, address string, _ syscall.RawConn) error {
 }
 
 // NewClientFor is NewClient, limited to public addresses when external is set.
-func NewClientFor(insecure, external bool) *http.Client {
-	c := NewClient(insecure)
+func NewClientFor(insecure, external bool) *http.Client { return sharedClient(insecure, external) }
+
+func buildClient(insecure, external bool) *http.Client {
+	c := newClient(insecure)
 	if !external {
 		return c
 	}
