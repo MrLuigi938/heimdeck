@@ -90,13 +90,14 @@ func (s *Server) dashboardContext(r *http.Request) (string, int) {
 
 	// The live data of all tiles at once; a slow service is left out.
 	lang := langOf(r)
+	owners, _ := s.store.TileOwners()
 	lines := make([]string, len(shown))
 	var wg sync.WaitGroup
 	for i, t := range shown {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lines[i] = s.tileSummary(t, lang)
+			lines[i] = s.tileSummary(t, lang, owners[t.ID] == uid(r))
 		}()
 	}
 	wg.Wait()
@@ -121,12 +122,12 @@ func (s *Server) dashboardContext(r *http.Request) (string, int) {
 }
 
 // tileSummary is one tile as a few lines of text.
-func (s *Server) tileSummary(t store.Tile, lang string) string {
-	return s.tileDetail(t, lang, dashItems, dashTileChars)
+func (s *Server) tileSummary(t store.Tile, lang string, own bool) string {
+	return s.tileDetail(t, lang, dashItems, dashTileChars, own)
 }
 
 // tileDetail is one tile as text, with up to items list entries and chars characters.
-func (s *Server) tileDetail(t store.Tile, lang string, items, chars int) string {
+func (s *Server) tileDetail(t store.Tile, lang string, items, chars int, own bool) string {
 	var b strings.Builder
 	b.WriteString("- " + clip(t.Name, 60))
 	if integ, ok := integrations.Get(t.Integration); ok && t.Integration != "" && t.Integration != "link" {
@@ -151,6 +152,8 @@ func (s *Server) tileDetail(t store.Tile, lang string, items, chars int) string 
 	switch {
 	case pending:
 		b.WriteString("  (live data still loading)\n")
+	case err != nil && !own:
+		b.WriteString("  error: " + i18n.T(lang, "Dieser Dienst ist gerade nicht verfügbar") + "\n")
 	case err != nil:
 		b.WriteString("  error: " + clip(i18n.T(lang, logging.Public(err.Error())), 160) + "\n")
 	case w != nil:

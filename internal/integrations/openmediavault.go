@@ -48,7 +48,7 @@ type omvError struct {
 }
 
 func (o openmediavault) rpc(ctx context.Context, in *Instance, service, method string, params, out any) error {
-	key := in.BaseURL + "\x00" + in.V("username")
+	key := in.cacheKey(in.BaseURL + "\x00" + in.V("username"))
 	for attempt := 0; attempt < 2; attempt++ {
 		sid, _ := omvSessions.Load(key)
 		if sid == nil {

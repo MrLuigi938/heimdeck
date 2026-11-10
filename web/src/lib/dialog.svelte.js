@@ -14,8 +14,8 @@ export function confirmDialog(message, { title = '', confirmLabel = '', danger =
 }
 
 // Resolves to the entered text, or null when cancelled.
-export function promptDialog(message, { title = '', value = '', placeholder = '', confirmLabel = '' } = {}) {
-  return open({ kind: 'prompt', title, message, value, placeholder, confirmLabel });
+export function promptDialog(message, { title = '', value = '', placeholder = '', confirmLabel = '', secret = false } = {}) {
+  return open({ kind: 'prompt', title, message, value, placeholder, confirmLabel, secret });
 }
 
 export function close(d, result) {

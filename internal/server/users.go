@@ -187,6 +187,10 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("Benutzer geändert", "benutzer", u.Username, "rolle", u.Role, "gesperrt", u.Disabled, "extern", u.External, "von", s.username(r))
 	s.forgetUser(u.ID) // live data and status were fetched with the old rights
+	if u.Disabled {
+		s.stopRuns(strconv.FormatInt(u.ID, 10) + ":") // a locked account presses no more buttons
+	}
+	s.kickBots()
 	writeJSON(w, u)
 }
 
@@ -218,6 +222,8 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("Benutzer gelöscht", "benutzer", u.Username, "von", s.username(r))
+	s.stopRuns(strconv.FormatInt(id, 10) + ":")
+	s.kickBots()
 	writeJSON(w, map[string]bool{"ok": true})
 }
 

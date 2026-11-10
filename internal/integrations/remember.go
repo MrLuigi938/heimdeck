@@ -2,9 +2,12 @@ package integrations
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 )
@@ -31,7 +34,23 @@ const (
 
 // cacheKey adds whether the tile may reach the home network to a cache key.
 func (in *Instance) cacheKey(key string) string {
-	return fmt.Sprintf("%s|public=%v", key, in.PublicOnly)
+	return fmt.Sprintf("%s|public=%v|%s", key, in.PublicOnly, in.credentials())
+}
+
+// credentials is a hash of the tile's settings and keys: what one tile looked
+// up or logged in with is only reused by tiles with the same keys – never by a
+// tile that merely names the same address (and has a wrong key, or none).
+func (in *Instance) credentials() string {
+	keys := make([]string, 0, len(in.Values))
+	for k := range in.Values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	h := sha256.New()
+	for _, k := range keys {
+		h.Write([]byte(k + "\x00" + in.Values[k] + "\x00"))
+	}
+	return hex.EncodeToString(h.Sum(nil)[:12])
 }
 
 func remember[T any](in *Instance, key string, ttl time.Duration, fetch func() (T, error)) (T, error) {

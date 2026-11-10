@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"slices"
 	"syscall"
 	"time"
 )
@@ -21,6 +22,17 @@ var ErrHomeNetwork = errors.New("Adressen im Heimnetz sind für dieses Konto ges
 
 var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)} // carrier-grade NAT, Tailscale
 
+// notPublic are more ranges that are no public internet: NAT64 (reaches IPv4
+// addresses, also private ones), benchmark networks, reserved space.
+var notPublic = func() []*net.IPNet {
+	var out []*net.IPNet
+	for _, c := range []string{"64:ff9b::/96", "64:ff9b:1::/48", "198.18.0.0/15", "240.0.0.0/4", "192.0.0.0/24", "2001:db8::/32"} {
+		_, n, _ := net.ParseCIDR(c)
+		out = append(out, n)
+	}
+	return out
+}()
+
 // PublicIP reports whether an address is on the public internet: not
 // loopback, private, link-local (cloud metadata), CGNAT/Tailscale, multicast
 // or unspecified.
@@ -33,7 +45,7 @@ func PublicIP(ip net.IP) bool {
 	}
 	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() || cgnat.Contains(ip) ||
-		ip.Equal(net.IPv4bcast) || ip[0] == 0)
+		ip.Equal(net.IPv4bcast) || ip[0] == 0 || slices.ContainsFunc(notPublic, func(n *net.IPNet) bool { return n.Contains(ip) }))
 }
 
 func publicOnly(_, address string, _ syscall.RawConn) error {

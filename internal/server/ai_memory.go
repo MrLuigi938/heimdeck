@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,6 +86,15 @@ func (s *Server) forgetMemory(user int64, id string) (memoryItem, bool) {
 	}
 	return memoryItem{}, false
 }
+
+// asksToRemember: the AI may save something only when the person's own last
+// message asks for it – not because text in a tile, a web page or a document
+// told the model to (that would stay in every later conversation).
+func asksToRemember(text string) bool {
+	return rememberRe.MatchString(text)
+}
+
+var rememberRe = regexp.MustCompile(`(?i)\b(merk|merke|merken|notier|vergiss nicht|nicht vergessen|remember|keep in mind|don'?t forget|do not forget|note that)`)
 
 // memoryPrompt hands the facts to the model.
 func memoryPrompt(items []memoryItem) string {

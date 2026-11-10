@@ -30,8 +30,11 @@ type ruleTile struct {
 	Actions   []integrations.Action `json:"actions"`
 }
 
-// ruleTiles are the tiles a workflow may use, with their current values and buttons.
+// ruleTiles are the tiles a workflow may use, with their current values and
+// buttons – as a workflow sees them when it runs: no locked or hidden groups,
+// no values or buttons the owner hid on the tile.
 func (s *Server) ruleTiles(r *http.Request) []ruleTile {
+	r = s.botRequest(r.Context(), uid(r), langOf(r))
 	tiles, groups := s.aiTiles(r)
 	access, _ := s.groupsFor(uid(r))
 	lang := langOf(r)
@@ -49,6 +52,7 @@ func (s *Server) ruleTiles(r *http.Request) []ruleTile {
 			if pending || err != nil || w == nil {
 				return
 			}
+			w = hideParts(w, t.Hide, lang)
 			out[i].Stats = append(out[i].Stats, w.Stats...)
 			integ, _ := integrations.Get(t.Integration)
 			if _, ok := integ.(integrations.Actioner); ok && access[t.GroupID].Act && s.dockerAllowed(t) {
@@ -92,7 +96,7 @@ func (s *Server) handleRules(w http.ResponseWriter, r *http.Request) {
 		if st := s.rules.state[key]; st != nil && st.value != "" {
 			values[ru.ID] = st.value
 		}
-		running[ru.ID] = s.rules.running[key]
+		_, running[ru.ID] = s.rules.running[key]
 	}
 	s.rules.mu.Unlock()
 	settings := s.settingsFor(user)
@@ -409,7 +413,8 @@ func (s *Server) handleSaveRule(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	// A changed workflow starts afresh.
+	// A changed workflow starts afresh; a run that is still waiting stops.
+	s.stopRuns(stateKey(user, ru.ID))
 	s.rules.mu.Lock()
 	prefix := stateKey(user, ru.ID)
 	for k := range s.rules.state {
@@ -447,6 +452,7 @@ func (s *Server) handleDeleteRule(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	s.stopRuns(stateKey(user, id))
 	s.kickBots()
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -580,9 +586,9 @@ func (s *Server) handleDraftRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Current != nil {
-		draft.ID, draft.On = in.Current.ID, in.Current.On
+		draft.ID, draft.On, draft.NoAsk = in.Current.ID, in.Current.On, in.Current.NoAsk
 	} else {
-		draft.On = true
+		draft.On, draft.NoAsk = true, false // "without asking" only ever by the person's own tick
 	}
 	// Checked like a saved one; a problem is shown in the editor to fix by hand.
 	checked := draft

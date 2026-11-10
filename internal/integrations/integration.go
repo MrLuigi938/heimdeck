@@ -358,7 +358,25 @@ func NewClient(insecure bool) *http.Client {
 	if insecure {
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	return &http.Client{Transport: tr, Timeout: 10 * time.Second}
+	return &http.Client{Transport: tr, Timeout: 10 * time.Second, CheckRedirect: keepKeysHome}
+}
+
+// keepKeysHome follows redirects like Go does, but a service's key in its own
+// header (X-Api-Key, X-Plex-Token …) is not sent along to another server – Go
+// only drops Authorization and cookies there.
+func keepKeysHome(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+		for k := range req.Header {
+			l := strings.ToLower(k)
+			if strings.Contains(l, "key") || strings.Contains(l, "token") || strings.Contains(l, "auth") || strings.Contains(l, "secret") || strings.Contains(l, "session") || strings.HasPrefix(l, "x-plex") || strings.HasPrefix(l, "x-emby") {
+				req.Header.Del(k)
+			}
+		}
+	}
+	return nil
 }
 
 // HTTPError is returned for non-2xx responses, with a friendly hint.

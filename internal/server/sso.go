@@ -173,8 +173,56 @@ var pending = struct {
 
 const ssoCookie = "heimdeck_sso"
 
-// handleSSOLogin sends the browser to the provider. ?link=1 links the
-// logged-in account instead.
+// linkIntents: linking an account starts with the account's password (a
+// POST), which hands out a one-time token for the provider's round trip. A
+// plain link to /api/oidc/login cannot link anything – otherwise a page could
+// send a logged-in person there while they are signed in at the provider as
+// someone else, and that someone could log in to their account.
+var linkIntents = struct {
+	sync.Mutex
+	m map[string]linkIntent
+}{m: map[string]linkIntent{}}
+
+type linkIntent struct {
+	user int64
+	at   time.Time
+}
+
+// handleSSOLinkStart checks the account's password and returns the address
+// that links the account.
+func (s *Server) handleSSOLinkStart(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if !s.ssoConfig().ready() {
+		writeErr(w, 400, errors.New("Die Anmeldung über einen Anbieter ist nicht eingerichtet"))
+		return
+	}
+	if !s.accountPassword(r, body.Password) {
+		time.Sleep(500 * time.Millisecond)
+		writeErr(w, 403, errors.New("Falsches Passwort"))
+		return
+	}
+	b := make([]byte, 24)
+	rand.Read(b)
+	token := hex.EncodeToString(b)
+	linkIntents.Lock()
+	for k, v := range linkIntents.m {
+		if time.Since(v.at) > 5*time.Minute {
+			delete(linkIntents.m, k)
+		}
+	}
+	linkIntents.m[token] = linkIntent{user: uid(r), at: time.Now()}
+	linkIntents.Unlock()
+	writeJSON(w, map[string]string{"url": "/api/oidc/login?link=" + token})
+}
+
+// handleSSOLogin sends the browser to the provider. ?link=<token> (from
+// handleSSOLinkStart) links the logged-in account instead.
 func (s *Server) handleSSOLogin(w http.ResponseWriter, r *http.Request) {
 	c := s.ssoConfig()
 	if !c.ready() {
@@ -182,8 +230,12 @@ func (s *Server) handleSSOLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var link int64
-	if r.URL.Query().Get("link") == "1" {
-		if link = s.auth.UserID(r); link == 0 {
+	if token := r.URL.Query().Get("link"); token != "" {
+		linkIntents.Lock()
+		intent, ok := linkIntents.m[token]
+		delete(linkIntents.m, token) // once
+		linkIntents.Unlock()
+		if link = s.auth.UserID(r); !ok || link == 0 || intent.user != link || time.Since(intent.at) > 5*time.Minute {
 			ssoFail(w, r, "state")
 			return
 		}

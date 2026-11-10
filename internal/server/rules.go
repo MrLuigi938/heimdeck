@@ -17,6 +17,7 @@ import (
 	"github.com/heimdeck/heimdeck/internal/i18n"
 	"github.com/heimdeck/heimdeck/internal/integrations"
 	"github.com/heimdeck/heimdeck/internal/logging"
+	"github.com/heimdeck/heimdeck/internal/store"
 )
 
 // Workflows (automations): "when one of these happens – and these hold –,
@@ -123,7 +124,9 @@ type ruleEngine struct {
 	mu      sync.Mutex
 	state   map[string]*ruleState // by user:workflow and user:workflow:trigger
 	pending map[string]*ruleAsk
-	running map[string]bool // user:workflow while it runs (it may wait)
+	running map[string]context.CancelFunc // user:workflow while it runs (it may wait); stops it
+	last    time.Time                     // the last check round
+	since   time.Time                     // the round before: time triggers due since then fire
 	seq     int
 }
 
@@ -242,6 +245,9 @@ func (s *Server) Automations(ctx context.Context) {
 
 func (s *Server) checkRules(ctx context.Context, now time.Time) {
 	defer logging.Recover("Automationen")
+	s.rules.mu.Lock()
+	s.rules.since, s.rules.last = s.rules.last, now
+	s.rules.mu.Unlock()
 	users, _ := s.store.Users()
 	for _, u := range users {
 		if u.Disabled {
@@ -313,11 +319,15 @@ func (s *Server) ruleDue(user int64, r rule, now time.Time) (string, bool) {
 		if !ok {
 			continue
 		}
+		var at time.Time
+		if tr.Kind == "time" {
+			at, _ = s.timeDue(tr, now) // before taking the lock, timeDue takes it too
+		}
 		s.rules.mu.Lock()
 		st, wf := s.ruleState(key), s.ruleState(wfKey)
 		if tr.Kind == "time" {
-			// Once in the minute, whatever else says.
-			minute := now.Format("2006-01-02 ") + tr.Time
+			// Once a day at that time, whatever else says.
+			minute := at.Format("2006-01-02 15:04")
 			done := st.minute == minute
 			st.minute = minute
 			s.rules.mu.Unlock()
@@ -354,13 +364,13 @@ func (s *Server) ruleDue(user int64, r rule, now time.Time) (string, bool) {
 func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now time.Time, lang string) (bool, string, bool) {
 	switch tr.Kind {
 	case "time":
-		if now.Format("15:04") != tr.Time || !dayOK(tr.Days, now) {
+		if _, due := s.timeDue(tr, now); !due {
 			return false, "", false
 		}
 		return true, i18n.T(lang, "Es ist %s", tr.Time), true
 	case "down", "up":
 		t, err := s.store.Tile(tr.Tile)
-		if err != nil {
+		if err != nil || !s.ruleTileOK(user, t.ID) {
 			return false, "", false
 		}
 		s.mu.Lock()
@@ -390,7 +400,7 @@ func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now
 		}
 		return up, i18n.T(lang, "%s ist wieder erreichbar", t.Name), true
 	case "value":
-		holds, why, value, ok := s.valueHolds(tr.Tile, tr.Stat, tr.Op, tr.Value, lang)
+		holds, why, value, ok := s.valueHolds(user, tr.Tile, tr.Stat, tr.Op, tr.Value, lang)
 		if ok {
 			s.rules.mu.Lock()
 			s.ruleState(wfKey).value = value
@@ -399,7 +409,7 @@ func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now
 		return holds, why, ok
 	case "camera":
 		t, err := s.store.Tile(tr.Tile)
-		if err != nil {
+		if err != nil || !s.ruleTileOK(user, t.ID) {
 			return false, "", false
 		}
 		events := camera.Events(t.ID)
@@ -425,16 +435,47 @@ func (s *Server) triggerHolds(user int64, key, wfKey string, tr ruleTrigger, now
 	return false, "", false // manual: by hand; webhook: on arrival (hookRules)
 }
 
+// ruleTileOK says whether the user's workflows may still look at a tile: it is
+// on one of their dashboards or shared with them, outside locked and hidden
+// groups. Checked on every run – a share can end, a group can be locked after
+// the workflow was saved.
+func (s *Server) ruleTileOK(user, tile int64) bool {
+	tiles, _ := s.aiTiles(s.botRequest(context.Background(), user, i18n.DE))
+	return slices.ContainsFunc(tiles, func(t store.Tile) bool { return t.ID == tile })
+}
+
+// timeDue says whether a time trigger's time passed since the last check
+// round (not just: whether it is that minute now – a slow round must not let
+// it slip by), and which time that was.
+func (s *Server) timeDue(tr ruleTrigger, now time.Time) (time.Time, bool) {
+	if !hhmmRe.MatchString(tr.Time) {
+		return time.Time{}, false
+	}
+	m := minutesOf(tr.Time)
+	at := time.Date(now.Year(), now.Month(), now.Day(), m/60, m%60, 0, 0, now.Location())
+	if at.After(now) {
+		at = at.AddDate(0, 0, -1) // just after midnight: yesterday's time
+	}
+	s.rules.mu.Lock()
+	from := s.rules.since
+	s.rules.mu.Unlock()
+	if from.IsZero() || !from.Before(now) || now.Sub(from) > 15*time.Minute {
+		from = now.Add(-time.Minute)
+	}
+	return at, at.After(from) && dayOK(tr.Days, at)
+}
+
 // valueHolds compares a tile's value with a limit.
-func (s *Server) valueHolds(tile int64, stat, op, limit, lang string) (holds bool, why, value string, ok bool) {
+func (s *Server) valueHolds(user, tile int64, stat, op, limit, lang string) (holds bool, why, value string, ok bool) {
 	t, err := s.store.Tile(tile)
-	if err != nil {
+	if err != nil || !s.ruleTileOK(user, tile) {
 		return
 	}
 	w, pending, err := s.widget(t, lang, 8*time.Second)
 	if pending || err != nil || w == nil {
 		return
 	}
+	w = hideParts(w, t.Hide, lang) // a value the owner hid is not there
 	for _, st := range w.Stats {
 		if st.Label == stat {
 			value, ok = st.Value, true
@@ -454,16 +495,19 @@ func (s *Server) valueHolds(tile int64, stat, op, limit, lang string) (holds boo
 func (s *Server) condHolds(user int64, lang string, c ruleCond) (bool, string) {
 	switch c.Kind {
 	case "value":
-		holds, why, _, ok := s.valueHolds(c.Tile, c.Stat, c.Op, c.Value, lang)
+		holds, why, _, ok := s.valueHolds(user, c.Tile, c.Stat, c.Op, c.Value, lang)
 		if !ok {
 			return false, i18n.T(lang, "%s: kein Wert", firstNonEmptyStr(c.Name, "?"))
 		}
 		return holds, why
 	case "online", "offline":
+		name := firstNonEmptyStr(c.Name, "?")
+		if !s.ruleTileOK(user, c.Tile) {
+			return false, i18n.T(lang, "%s: nicht mehr erlaubt", name)
+		}
 		s.mu.Lock()
 		ts, checked := s.latest[c.Tile]
 		s.mu.Unlock()
-		name := firstNonEmptyStr(c.Name, "?")
 		if !checked {
 			return false, i18n.T(lang, "%s: noch nicht geprüft", name)
 		}
@@ -594,9 +638,14 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 	}
 	key := stateKey(user, r.ID)
 	if mode != runDry {
+		var stop context.CancelFunc
+		ctx, stop = context.WithCancel(ctx)
+		defer stop()
 		s.rules.mu.Lock()
-		busy := s.rules.running[key]
-		s.rules.running[key] = true
+		_, busy := s.rules.running[key]
+		if !busy {
+			s.rules.running[key] = stop
+		}
 		s.rules.mu.Unlock()
 		if busy {
 			if depth, _ := ctx.Value(sceneDepthKey{}).(int); depth > 0 {
@@ -679,6 +728,8 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 			switch {
 			case !found:
 				w.fail(i18n.T(lang, "Die Szene gibt es nicht mehr"))
+			case !scene.On:
+				w.fail(i18n.T(lang, "Die Szene ist ausgeschaltet"))
 			case sceneDepth >= 3 || scene.ID == w.r.ID:
 				w.fail(i18n.T(lang, "Szenen starten sich hier zu tief ineinander – abgebrochen"))
 			case dry:
@@ -746,6 +797,19 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 			} else {
 				w.steps(a.Else, depth+1)
 			}
+		}
+	}
+}
+
+// stopRuns stops the runs of a workflow (key user:id) or, with a key ending
+// in ":", all runs of a user – the workflow was changed or deleted, the
+// account locked.
+func (s *Server) stopRuns(key string) {
+	s.rules.mu.Lock()
+	defer s.rules.mu.Unlock()
+	for k, stop := range s.rules.running {
+		if k == key || strings.HasSuffix(key, ":") && strings.HasPrefix(k, key) {
+			stop()
 		}
 	}
 }
@@ -917,7 +981,7 @@ func (s *Server) hookRules(tileID int64, m integrations.HookMessage) {
 			i := slices.IndexFunc(r.Triggers, func(tr ruleTrigger) bool {
 				return tr.Kind == "webhook" && tr.Tile == tileID && strings.Contains(text, strings.ToLower(tr.Match))
 			})
-			if i < 0 || !s.condsHold(u.ID, lang, r.Conds) {
+			if i < 0 || !s.ruleTileOK(u.ID, tileID) || !s.condsHold(u.ID, lang, r.Conds) {
 				continue
 			}
 			s.rules.mu.Lock()

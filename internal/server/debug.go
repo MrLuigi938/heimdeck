@@ -68,13 +68,22 @@ func logRequests(next http.Handler) http.Handler {
 			d := time.Since(start)
 			switch {
 			case d > slowRequest && !streaming(r.URL.Path):
-				slog.Warn("Langsame Anfrage", "methode", r.Method, "pfad", r.URL.Path, "status", sw.status, "dauer", d.Round(time.Millisecond))
+				slog.Warn("Langsame Anfrage", "methode", r.Method, "pfad", logPath(r.URL.Path), "status", sw.status, "dauer", d.Round(time.Millisecond))
 			case logging.Debug():
-				slog.Debug("Anfrage", "methode", r.Method, "pfad", r.URL.Path, "status", sw.status, "dauer", d.Round(time.Millisecond))
+				slog.Debug("Anfrage", "methode", r.Method, "pfad", logPath(r.URL.Path), "status", sw.status, "dauer", d.Round(time.Millisecond))
 			}
 		}()
 		next.ServeHTTP(sw, r)
 	})
+}
+
+// logPath is a request path for the log: an invitation link's token is a
+// password of sorts and stays out of it.
+func logPath(p string) string {
+	if strings.HasPrefix(p, "/api/invite/") {
+		return "/api/invite/***"
+	}
+	return p
 }
 
 // streaming reports requests that run long on purpose (camera, AI answers).

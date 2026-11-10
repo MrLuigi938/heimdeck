@@ -167,7 +167,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Web-Results", strconv.Itoa(webUsed))
 	}
 	if useTools {
-		if err := s.chatWithTools(w, r, c, u, msgs, extra); !errors.Is(err, errNoTools) {
+		if err := s.chatWithTools(w, r, c, u, msgs, extra, asksToRemember(last.Text)); !errors.Is(err, errNoTools) {
 			return
 		}
 		// The model cannot use tools: give it the whole dashboard instead.

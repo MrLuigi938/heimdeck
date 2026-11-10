@@ -23,7 +23,7 @@ import (
 var sessions sync.Map // key → cookie or session id
 
 func sessionKey(in *Instance, kind string) string {
-	return kind + "\x00" + in.BaseURL + "\x00" + in.V("username")
+	return in.cacheKey(kind + "\x00" + in.BaseURL + "\x00" + in.V("username"))
 }
 
 // rawDo sends a request and returns status, headers and body (max 5 MB).

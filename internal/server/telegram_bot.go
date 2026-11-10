@@ -521,7 +521,7 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 	case "start", "help", "hilfe":
 		help := i18n.T(lang, "👋 Ich bin die KI deines Heimdeck. Frag mich etwas zu deinen Diensten, z. B. „Läuft alles?“ oder „Was wird gerade geladen?“ Du kannst mir auch Fotos und Dateien schicken, z. B. einen Brief zum Zusammenfassen.\n\n/lage – Lagebericht\n/kamera – aktuelles Kamerabild\n/szene – eine Szene starten\n/web Frage – mit Websuche\n/merken Text – merke ich mir für später\n/vergessen – Gemerktes ansehen und löschen\n/neu – neues Gespräch\n\nAktionen (z. B. Downloads pausieren) schlage ich nur als Knopf vor – ausgeführt wird erst, wenn du tippst.")
 		if group {
-			help += "\n\n" + i18n.T(lang, "In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Aktionen können nur Admins der Gruppe auslösen.", mention)
+			help += "\n\n" + i18n.T(lang, "In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Lagebericht, Kamerabilder, Aktionen und Szenen gibt es nur für Admins der Gruppe.", mention)
 		}
 		b.reply(ctx, m, help, "", nil)
 		return
@@ -532,10 +532,15 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 		b.reply(ctx, m, i18n.T(lang, "Neues Gespräch – das bisherige habe ich vergessen."), "", nil)
 		return
 	case "lage", "status", "bericht", "report":
-		go b.report(ctx, m, user, lang)
+		// In a group the whole dashboard and the cameras are for its admins.
+		if adminOnly() {
+			go b.report(ctx, m, user, lang)
+		}
 		return
 	case "kamera", "camera", "cam":
-		go b.cameras(ctx, m, user, lang, rest)
+		if adminOnly() {
+			go b.cameras(ctx, m, user, lang, rest)
+		}
 		return
 	case "szene", "scene", "szenen", "scenes":
 		go b.scenes(ctx, m, user, lang, rest, group)
@@ -997,6 +1002,10 @@ func (b *tgBot) onButton(ctx context.Context, q tgCallback) {
 			return
 		}
 		if kind == "c" {
+			if q.Message.Chat.Type != "private" && !b.groupAdmin(ctx, q.Message.Chat.ID, q.From.ID) {
+				answer(i18n.T(lang, "Das dürfen in dieser Gruppe nur Admins."))
+				return
+			}
 			answer("📹")
 			cam, _ := strconv.ParseInt(id, 10, 64)
 			b.sendCamera(ctx, q.Message.Chat.ID, owner, lang, cam)
@@ -1094,10 +1103,16 @@ func (s *Server) botAction(ctx context.Context, user int64, lang string, p propo
 	if !s.dockerAllowed(t) {
 		return errors.New(i18n.T(lang, errDockerOwner.Error()))
 	}
+	if u, err := s.store.User(user); err != nil || u.Disabled {
+		return errors.New(i18n.T(lang, "Dieses Konto ist gesperrt"))
+	}
 	integ, _ := integrations.Get(t.Integration)
 	actioner, ok := integ.(integrations.Actioner)
 	if !ok {
 		return errors.New(i18n.T(lang, "dieser Dienst unterstützt keine Aktionen"))
+	}
+	if err := s.checkOffered(user, t, lang, p.Action, p.Params, p.Label); err != nil {
+		return errors.New(i18n.T(lang, err.Error()))
 	}
 	actx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -1182,7 +1197,7 @@ func (s *Server) botAnswer(ctx context.Context, user int64, lang string, history
 	pictures := len(history[len(history)-1].Images) > 0
 	if c.Dashboard && c.Tools {
 		withTools := append([]any{map[string]string{"role": "system", "content": system + aiToolPrompt}}, msgs[1:]...)
-		reply, err := s.botTools(ctx, r, c, withTools, extra, lang, private)
+		reply, err := s.botTools(ctx, r, c, withTools, extra, lang, private && asksToRemember(question))
 		if !errors.Is(err, errNoTools) {
 			reply.Notes = append(notes, reply.Notes...)
 			return reply, pictureHint(err, pictures, lang)

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -154,8 +155,20 @@ func TestSSOLogin(t *testing.T) {
 
 	// The main admin links their own account, then logs in through the provider.
 	idp.user = map[string]any{"sub": "u-luis", "preferred_username": "luis.blum", "groups": []string{"heimdeck"}}
-	if to := ssoLogin(t, luis, "/api/oidc/login?link=1"); to != "/?sso=linked" {
+	// A plain link links nothing; it takes the account's password first.
+	if to := ssoLogin(t, luis, "/api/oidc/login?link=1"); to == "/?sso=linked" {
+		t.Fatal("linked without the password")
+	}
+	if code, _ := luis.call("POST", "/api/oidc/link", map[string]string{"password": "wrong-password"}); code != 403 {
+		t.Fatalf("linking with a wrong password: %d", code)
+	}
+	_, start := luis.call("POST", "/api/oidc/link", map[string]string{"password": "admin-pw-123"})
+	linkURL := fmt.Sprint(start["url"])
+	if to := ssoLogin(t, luis, linkURL); to != "/?sso=linked" {
 		t.Fatalf("link: %q", to)
+	}
+	if to := ssoLogin(t, luis, linkURL); to == "/?sso=linked" {
+		t.Fatal("the link token works twice")
 	}
 	users, _ := st.Users()
 	if !users[0].SSO {

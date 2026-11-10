@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -182,16 +184,58 @@ func (s *Server) handleUnlockGroup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]bool{"ok": true})
 		return
 	}
+	key := strconv.FormatInt(uid(r), 10) + ":" + strconv.FormatInt(id, 10)
+	if unlockBlocked(key) {
+		writeErr(w, 429, errors.New("Zu viele Fehlversuche – bitte in 15 Minuten noch einmal versuchen"))
+		return
+	}
 	// The group's own password, or – if it is forgotten – the password of the
 	// owner's account; unlocked, the group can be deleted or get a new password.
 	if bcrypt.CompareHashAndPassword([]byte(g.PasswordHash), []byte(body.Password)) != nil && !(acc.Own && s.accountPassword(r, body.Password)) {
 		slog.Warn("Entsperren einer geschützten Gruppe fehlgeschlagen", "gruppe", g.Name, "von", r.RemoteAddr)
+		unlockFailed(key)
 		time.Sleep(500 * time.Millisecond) // slow down guessing
 		writeErr(w, 403, errors.New("Falsches Passwort"))
 		return
 	}
+	unlockFailures.Delete(key)
 	s.unlock(r, id)
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// Failed attempts to unlock a group, per account and group: after five, the
+// group cannot be unlocked by that account for 15 minutes (guessing in parallel
+// does not help either).
+type unlockTries struct {
+	mu    sync.Mutex
+	count int
+	until time.Time
+}
+
+var unlockFailures sync.Map // "user:group" → *unlockTries
+
+func unlockBlocked(key string) bool {
+	v, ok := unlockFailures.Load(key)
+	if !ok {
+		return false
+	}
+	t := v.(*unlockTries)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return time.Now().Before(t.until)
+}
+
+func unlockFailed(key string) {
+	v, _ := unlockFailures.LoadOrStore(key, &unlockTries{})
+	t := v.(*unlockTries)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.until.IsZero() && time.Now().After(t.until) {
+		t.count, t.until = 0, time.Time{}
+	}
+	if t.count++; t.count >= 5 {
+		t.until = time.Now().Add(15 * time.Minute)
+	}
 }
 
 // accountPassword reports whether password is the logged-in user's own password.
@@ -309,13 +353,14 @@ func (s *Server) handleUptime(w http.ResponseWriter, r *http.Request) {
 	rows := map[string]*uptimeRow{}
 	out := []*uptimeRow{}
 	settings, _ := s.store.Settings()
+	owners, _ := s.store.TileOwners()
 	for _, t := range tiles {
 		if !t.Monitor {
 			continue
 		}
 		internal := t.APIURL
-		if internal == "" {
-			internal = t.URL
+		if internal == "" || owners[t.ID] != uid(r) {
+			internal = t.URL // someone else's tile: the address it links to, not the one Heimdeck checks
 		}
 		add := func(kind, url string) {
 			row := &uptimeRow{TileID: t.ID, Kind: kind, URL: url, Buckets: make([]*bucket, slots), LastDown: lastDown[store.CheckKey(t.ID, kind)]}

@@ -177,7 +177,18 @@ type tileDTO struct {
 func sharedDTO(t store.Tile) tileDTO {
 	d := toDTO(t)
 	d.Config, d.Hide, d.Shared = map[string]string{}, nil, true
+	d.APIURL, d.Insecure = "", false // the address Heimdeck itself uses stays with the owner
+	// Someone else's app link must not start any program on the viewer's device.
+	d.AppAndroid, d.AppIOS = sharedAppLink(d.AppAndroid), sharedAppLink(d.AppIOS)
 	return d
+}
+
+func sharedAppLink(u string) string {
+	switch strings.ToLower(strings.TrimSuffix(appSchemeRe.FindString(u), ":")) {
+	case "intent", "https", "shortcuts":
+		return u
+	}
+	return ""
 }
 
 func toDTO(t store.Tile) tileDTO {
@@ -421,6 +432,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
+	oldNtfy := s.settingsFor(uid(r))["ntfyUrl"]
 	if err := s.saveSettings(uid(r), admin, m); err != nil {
 		slog.Error("Einstellungen speichern", "fehler", err)
 		writeErr(w, 500, err)
@@ -437,6 +449,13 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := m["updateCheck"]; ok && s.version != "" && s.version != "dev" {
 		go s.checkUpdate(context.Background()) // show or hide the hint right away
+	}
+	// The ntfy token belongs to the server it was entered for.
+	if v, ok := m["ntfyUrl"]; ok && oldNtfy != "" && !sameHost(v, oldNtfy) {
+		if ns := s.notifySecrets(uid(r)); ns.NtfyToken != "" {
+			ns.NtfyToken = ""
+			logErr("ntfy-Token verwerfen", s.saveNotifySecrets(uid(r), ns))
+		}
 	}
 	if _, ok := m["telegramAI"]; ok || m["telegramChat"] != "" || m["language"] != "" {
 		s.kickBots()
@@ -489,6 +508,34 @@ type tileInput struct {
 // fields keep the stored value, so keys never have to be sent back to the
 // browser – but only for a tile on one of the owner's dashboards, so nobody
 // can borrow the keys of someone else's tile.
+// tileHosts are the servers a tile talks to: its addresses and any address in
+// its settings (a camera's RTSP or snapshot address).
+func tileHosts(t store.Tile) map[string]bool {
+	out := map[string]bool{}
+	add := func(v string) {
+		if u, err := url.Parse(strings.TrimSpace(v)); err == nil && u.Scheme != "" && u.Hostname() != "" {
+			out[strings.ToLower(u.Hostname())] = true // another port on the same machine is the same server
+		}
+	}
+	add(t.URL)
+	add(t.APIURL)
+	for _, v := range t.Config {
+		add(v)
+	}
+	return out
+}
+
+// sameServers says whether the new tile talks to no server the old one did not.
+func sameServers(old, t store.Tile) bool {
+	before := tileHosts(old)
+	for h := range tileHosts(t) {
+		if !before[h] {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 	t := in.Tile
 	t.Monitor = in.Monitor == nil || *in.Monitor
@@ -526,7 +573,9 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 		if err != nil {
 			return t, err
 		}
-		if old.Integration == t.Integration {
+		// Stored keys stay only while the tile talks to the same servers: a new
+		// address needs the key entered again, so nobody can send it elsewhere.
+		if old.Integration == t.Integration && sameServers(old, t) {
 			for k, v := range old.Secrets {
 				t.Secrets[k] = v
 			}
@@ -700,18 +749,35 @@ func (s *Server) handleLayout(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
+	locked, err := s.lockedGroups(r)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	kept := l[:0]
 	for _, g := range l {
 		if _, code, err := s.ownGroup(r, g.GroupID); err != nil {
 			writeErr(w, code, err)
 			return
+		}
+		// A locked group is not touched; its tiles never reached the browser.
+		if locked[g.GroupID] {
+			continue
 		}
 		for _, id := range g.Tiles {
 			if owners[id] != uid(r) {
 				writeErr(w, 404, errNotFound)
 				return
 			}
+			// Moving a tile out of a locked group would open it without the password.
+			if t, err := s.store.Tile(id); err != nil || locked[t.GroupID] {
+				writeErr(w, 403, errLocked)
+				return
+			}
 		}
+		kept = append(kept, g)
 	}
+	l = kept
 	if err := s.store.SaveLayout(l); err != nil {
 		slog.Error("Anordnung speichern", "fehler", err)
 		writeErr(w, 500, err)
@@ -719,6 +785,29 @@ func (s *Server) handleLayout(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("Anordnung gespeichert", "gruppen", len(l))
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// mayTest: the tile editor's test, choices and live-data parts use the tile's
+// keys and fetch with its owner's rights (the owner's other tiles too, e.g. the
+// calendar's Sonarr) – so only for the user's own tile or group, and never in
+// a locked group.
+func (s *Server) mayTest(r *http.Request, t store.Tile) (int, error) {
+	if t.ID != 0 {
+		_, code, err := s.ownTile(r, t.ID)
+		return code, err
+	}
+	if t.GroupID == 0 {
+		return 200, nil // not in a group yet: it uses the user's own tiles (instanceFor)
+	}
+	if _, code, err := s.ownGroup(r, t.GroupID); err != nil {
+		return code, err
+	}
+	if open, err := s.groupUnlocked(r, t.GroupID); err != nil {
+		return 500, err
+	} else if !open {
+		return 403, errLocked
+	}
+	return 200, nil
 }
 
 // handleTestTile checks a tile's settings before saving it.
@@ -731,6 +820,10 @@ func (s *Server) handleTestTile(w http.ResponseWriter, r *http.Request) {
 	t, err := s.buildTile(in, uid(r))
 	if err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": tr(r, logging.Public(err.Error()))})
+		return
+	}
+	if code, err := s.mayTest(r, t); err != nil {
+		writeErr(w, code, err)
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -787,6 +880,10 @@ func (s *Server) handleChoices(w http.ResponseWriter, r *http.Request) {
 	t, err := s.buildTile(in.tileInput, uid(r))
 	if err != nil {
 		writeErr(w, 400, err)
+		return
+	}
+	if code, err := s.mayTest(r, t); err != nil {
+		writeErr(w, code, err)
 		return
 	}
 	integ, _ := integrations.Get(t.Integration)
@@ -925,6 +1022,7 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 		if !acc.Act {
 			data = withoutActions(data)
 		}
+		noteWidget(uid(r), t.ID, data)
 		writeJSON(w, map[string]any{"widget": data})
 	}
 }
@@ -986,6 +1084,11 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, errors.New("dieser Dienst unterstützt keine Aktionen"))
 		return
 	}
+	if err := s.checkOffered(uid(r), t, langOf(r), body.Action, body.Params, ""); err != nil {
+		slog.Warn("Aktion abgelehnt – die Kachel bietet sie nicht an", "kachel", t.Name, "aktion", body.Action, "benutzer", s.username(r))
+		writeErr(w, 409, err)
+		return
+	}
 	ctx, cancel := timeout(r, 15*time.Second)
 	defer cancel()
 	start := time.Now()
@@ -1016,6 +1119,12 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	src, ok := integ.(integrations.ImageSource)
 	if !ok {
 		writeErr(w, 404, errors.New("nicht gefunden"))
+		return
+	}
+	// Someone a tile is shared with gets the pictures it showed them, not any
+	// picture the service has (documents, files … by counting up IDs).
+	if s.tileOwner(t) != uid(r) && !imageShown(uid(r), t.ID, r.URL.Query().Get("p")) {
+		writeErr(w, 404, errNotFound)
 		return
 	}
 	ctx, cancel := timeout(r, 15*time.Second)
@@ -1088,7 +1197,11 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := timeout(r, 8*time.Second)
 	defer cancel()
-	writeJSON(w, s.searchTiles(ctx, langOf(r), tiles, groups, q))
+	found := s.searchTiles(ctx, langOf(r), tiles, groups, q)
+	for _, g := range found {
+		noteItems(uid(r), g.TileID, g.Items)
+	}
+	writeJSON(w, found)
 }
 
 // searchTiles asks every searchable tile for q at once (the search window,

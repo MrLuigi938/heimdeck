@@ -421,17 +421,21 @@ func (s *Server) handleSaveNotify(w http.ResponseWriter, r *http.Request) {
 		}
 		ns.TelegramToken = v
 	}
-	plain, _ := json.Marshal(ns)
-	sealed, err := s.store.SealSecret(plain)
-	if err == nil {
-		err = s.store.SaveUserSettings(uid(r), map[string]string{notifySecretsKey: sealed})
-	}
-	if err != nil {
+	if err := s.saveNotifySecrets(uid(r), ns); err != nil {
 		writeErr(w, 500, err)
 		return
 	}
 	s.kickBots()
 	writeJSON(w, ns.status())
+}
+
+func (s *Server) saveNotifySecrets(user int64, ns notifySecrets) error {
+	plain, _ := json.Marshal(ns)
+	sealed, err := s.store.SealSecret(plain)
+	if err == nil {
+		err = s.store.SaveUserSettings(user, map[string]string{notifySecretsKey: sealed})
+	}
+	return err
 }
 
 // status says which secrets are set, without revealing them.

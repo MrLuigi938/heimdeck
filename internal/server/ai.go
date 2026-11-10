@@ -342,6 +342,7 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, c aiConfig, 
 			continue
 		}
 		if piece := chunk.Choices[0].Delta.Content; piece != "" {
+			piece = modelText(piece)
 			io.WriteString(w, piece)
 			n += len(piece)
 			rc.Flush()

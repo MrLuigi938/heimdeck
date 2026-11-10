@@ -997,7 +997,7 @@ var en = map[string]string{
 	"Dienst nicht erreichbar – läuft er, und stimmt die Adresse?":                       "Service not reachable – is it running, and is the address right?",
 
 	// Telegram bot
-	"In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Aktionen können nur Admins der Gruppe auslösen.": "In this group, ask me with /ask question or reply to one of my messages (%s). Only admins of the group can run actions.",
+	"In dieser Gruppe fragt ihr mich mit /ki Frage oder antwortet auf eine meiner Nachrichten (%s). Lagebericht, Kamerabilder, Aktionen und Szenen gibt es nur für Admins der Gruppe.": "In this group, ask me with /ask question or reply to one of my messages (%s). The situation report, camera pictures, actions and scenes are for the group's admins only.",
 	"Neues Gespräch – das bisherige habe ich vergessen.":         "New conversation – I've forgotten the previous one.",
 	"Einen Moment – ich antworte noch auf die letzte Nachricht.": "One moment – I'm still answering the last message.",
 	"Die KI ist für dein Konto nicht eingerichtet":               "The AI is not set up for your account",
@@ -1128,4 +1128,11 @@ var en = map[string]string{
 	"Gestartet – das Protokoll zeigt, was passiert": "Started – the log shows what happens",
 	"%d Min. warten": "wait %d min",
 	"Wenn …":         "If …",
+
+	// Audit fixes
+	"Zu viele Fehlversuche – bitte in 15 Minuten noch einmal versuchen":          "Too many failed attempts – please try again in 15 minutes",
+	"Diesen Knopf bietet die Kachel gerade nicht an – bitte die Seite neu laden": "The tile does not offer this button right now – please reload the page",
+	"Der Knopf der Kachel hat sich geändert – bitte den Workflow prüfen":         "The tile's button has changed – please check the workflow",
+	"%s: nicht mehr erlaubt":                                   "%s: no longer allowed",
+	"Die Anmeldung über einen Anbieter ist nicht eingerichtet": "Login through a provider is not set up",
 }

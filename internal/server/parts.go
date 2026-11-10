@@ -72,13 +72,7 @@ func (s *Server) handleTileParts(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	if t.ID != 0 {
-		if _, code, err := s.ownTile(r, t.ID); err != nil {
-			writeErr(w, code, err)
-			return
-		}
-	} else if _, code, err := s.ownGroup(r, t.GroupID); err != nil {
-		// a new tile is fetched with its owner's rights (external or not), so it must be the user's group
+	if code, err := s.mayTest(r, t); err != nil {
 		writeErr(w, code, err)
 		return
 	}

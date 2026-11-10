@@ -63,7 +63,9 @@ func (t sceneTile) Fetch(ctx context.Context, in *integrations.Instance) (*integ
 		case "if":
 			steps = append(steps, integrations.Item{Title: "❓ " + in.T("Wenn …") + " " + firstNonEmptyStr(a.If.Name, "")})
 		default:
-			steps = append(steps, integrations.Item{Title: "✉ " + firstNonEmptyStr(a.Text, in.T("Nachricht"))})
+			// Only that a message goes out – its text is for the owner, not for
+			// everyone the dashboard is shared with.
+			steps = append(steps, integrations.Item{Title: "✉ " + in.T("Nachricht")})
 		}
 	}
 	w := &integrations.Widget{Stats: []integrations.Stat{{Label: in.T("Zuletzt"), Value: last}}, Items: steps,

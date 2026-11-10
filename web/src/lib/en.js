@@ -1012,4 +1012,6 @@ export const en = {
   '{tile} ist nicht erreichbar': '{tile} is not reachable',
   'Ändern lassen': 'Change it',
   '– bitte im Editor korrigieren.': '– please fix it in the editor.',
+  'Zum Verknüpfen bitte dein Heimdeck-Passwort eingeben.': 'Please enter your Heimdeck password to link the account.',
+  'Weiter': 'Continue',
 };

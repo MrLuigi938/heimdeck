@@ -179,17 +179,12 @@ func (s *Server) handleAlbumImages(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	t, err := s.store.Tile(id)
+	// The owner's own tile or one on a dashboard the user can see – not in a
+	// locked group.
+	t, code, err := s.accessibleTile(r, id)
 	if err != nil {
-		writeErr(w, 404, errNotFound)
+		writeErr(w, code, err)
 		return
-	}
-	// The owner's own tile, or one on a dashboard the user can see.
-	if s.tileOwner(t) != uid(r) {
-		if _, code, err := s.accessibleTile(r, id); err != nil {
-			writeErr(w, code, err)
-			return
-		}
 	}
 	integ, _ := integrations.Get(t.Integration)
 	src, ok := integ.(integrations.AlbumSource)
@@ -203,6 +198,9 @@ func (s *Server) handleAlbumImages(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, 502, err)
 		return
+	}
+	for _, img := range images {
+		noteImage(uid(r), t.ID, img)
 	}
 	writeJSON(w, map[string]any{"images": images})
 }

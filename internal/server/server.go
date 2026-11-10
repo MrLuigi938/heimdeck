@@ -67,7 +67,7 @@ func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 		widgets: map[string]cached[*integrations.Widget]{}, fetching: map[string]chan struct{}{}, widgetGen: map[string]int{}, favicons: map[string]favicon{}, faviconFetch: map[string]chan struct{}{}, latest: map[int64]TileStatus{}, outages: map[string]*outage{},
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now(),
 		tg:    tgBots{bots: map[string]*tgBot{}, kick: make(chan struct{}, 1)},
-		rules: ruleEngine{state: map[string]*ruleState{}, pending: map[string]*ruleAsk{}, running: map[string]bool{}}}
+		rules: ruleEngine{state: map[string]*ruleState{}, pending: map[string]*ruleAsk{}, running: map[string]context.CancelFunc{}}}
 	integrations.Register(dockerTile{srv})
 	integrations.Register(sceneTile{srv})
 	srv.migrateSettings()
@@ -143,6 +143,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("PUT /api/ai", s.adminOnly(s.handleSaveAI))
 	api.HandleFunc("POST /api/ai/models", s.adminOnly(s.handleAIModels))
 	api.HandleFunc("POST /api/ai/websearch", s.adminOnly(s.handleWebTest))
+	api.HandleFunc("POST /api/oidc/link", s.handleSSOLinkStart)
 	api.HandleFunc("GET /api/ai/memory", s.handleGetMemory)
 	api.HandleFunc("GET /api/rules", s.handleRules)
 	api.HandleFunc("GET /api/rules/tiles", s.handleRuleTiles)
@@ -262,6 +263,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "SAMEORIGIN")
+		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -359,6 +361,11 @@ func (s *Server) othersOf(owner int64, kind, lang string) []*integrations.Instan
 // not saved yet.
 func (s *Server) instanceFor(r *http.Request, t store.Tile) *integrations.Instance {
 	in := s.instance(t, langOf(r))
+	if s.tileOwner(t) == 0 {
+		// A tile not in a group yet: the user's own other tiles (e.g. the calendar's Sonarr).
+		user, lang := uid(r), langOf(r)
+		in.Others = func(kind string) []*integrations.Instance { return s.othersOf(user, kind, lang) }
+	}
 	if s.external(uid(r)) {
 		in.Client, in.PublicOnly = integrations.NewClientFor(t.Insecure, true), true
 	}

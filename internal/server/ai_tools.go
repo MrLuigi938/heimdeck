@@ -116,6 +116,7 @@ func (tr *toolRun) offer(t store.Tile, a integrations.Action, about string) stri
 		label += " – " + about
 	}
 	tr.actions[key] = proposal{TileID: t.ID, Tile: t.Name, Action: a.ID, Params: a.Params, Label: label, Confirm: a.Confirm, Tone: a.Tone}
+	noteAction(tr.user, t.ID, a) // the button may be pressed from the chat
 	return key
 }
 
@@ -223,7 +224,7 @@ func (tr *toolRun) readTile(name string) string {
 	}
 	var b strings.Builder
 	for _, t := range found {
-		b.WriteString(tr.s.tileDetail(t, tr.lang, toolTileItems, toolTileChars))
+		b.WriteString(tr.s.tileDetail(t, tr.lang, toolTileItems, toolTileChars, tr.s.tileOwner(t) == tr.user))
 		if !tr.canAct(t) {
 			continue
 		}
@@ -297,6 +298,16 @@ func (tr *toolRun) search(q string) string {
 	return b.String()
 }
 
+// modelText takes the frame characters out of the model's text: only Heimdeck
+// writes events into the stream – a model talked into it (by text in a tile, a
+// web page or a document) must not slip in a button of its own.
+func modelText(s string) string {
+	if !strings.ContainsAny(s, "\x1e\x1f") {
+		return s
+	}
+	return strings.NewReplacer("\x1e", "", "\x1f", "").Replace(s)
+}
+
 // sendEvent writes an event for the chat between the text.
 func sendEvent(w io.Writer, ev map[string]any) {
 	b, _ := json.Marshal(ev)
@@ -316,17 +327,17 @@ type toolCall struct {
 // chatWithTools runs the conversation with tools and streams the answer. It
 // returns errNoTools – before anything was written – when the model or the
 // server does not take tools, so the caller can fall back to stage 1.
-func (s *Server) chatWithTools(w http.ResponseWriter, r *http.Request, c aiConfig, u store.User, messages []any, extra map[string]any) error {
+func (s *Server) chatWithTools(w http.ResponseWriter, r *http.Request, c aiConfig, u store.User, messages []any, extra map[string]any, memory bool) error {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Minute)
 	defer cancel()
 	run := s.newToolRun(ctx, r)
-	run.memory = true
+	run.memory = memory
 	rc := http.NewResponseController(w)
 	started := false
 	start := time.Now()
 	used := 0
 	for round := 0; round < toolRounds; round++ {
-		body := map[string]any{"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages, "tools": toolDefs(true)}
+		body := map[string]any{"model": c.Model, "stream": true, "temperature": 0.3, "messages": messages, "tools": toolDefs(memory)}
 		if round == toolRounds-1 {
 			body["tool_choice"] = "none" // enough looking around – answer now
 		}
@@ -426,8 +437,9 @@ func streamRound(body io.Reader, w io.Writer, rc *http.ResponseController) (stri
 		}
 		d := chunk.Choices[0].Delta
 		if d.Content != "" {
-			text.WriteString(d.Content)
-			io.WriteString(w, d.Content)
+			piece := modelText(d.Content)
+			text.WriteString(piece)
+			io.WriteString(w, piece)
 			rc.Flush()
 		}
 		for i, tc := range d.ToolCalls {

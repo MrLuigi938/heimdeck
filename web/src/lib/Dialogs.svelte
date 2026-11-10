@@ -21,7 +21,7 @@
       {#if d.message}<p>{d.message}</p>{/if}
       {#if d.kind === 'prompt'}
         <!-- svelte-ignore a11y_autofocus -->
-        <input bind:value={d.value} placeholder={d.placeholder} autofocus />
+        <input bind:value={d.value} placeholder={d.placeholder} type={d.secret ? 'password' : 'text'} autocomplete={d.secret ? 'current-password' : 'off'} autofocus />
       {/if}
     </form>
     {#snippet footer()}

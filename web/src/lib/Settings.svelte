@@ -4,7 +4,7 @@
   import Modal from './Modal.svelte';
   import { detectLocal } from './network.svelte.js';
   import { t, i18n, setLang } from './i18n.svelte.js';
-  import { confirmDialog } from './dialog.svelte.js';
+  import { confirmDialog, promptDialog } from './dialog.svelte.js';
   import BackgroundPicker from './BackgroundPicker.svelte';
   import { parseBackgrounds, ROTATE_CHOICES } from './backgrounds.js';
 
@@ -367,6 +367,18 @@
     if (!ok) {
       e.target.checked = browserNotify.on;
       toast(t('Der Browser hat Benachrichtigungen nicht erlaubt'), 'bad');
+    }
+  }
+
+  // Linking takes the account's password, then goes to the provider.
+  async function linkSso() {
+    const password = await promptDialog(t('Zum Verknüpfen bitte dein Heimdeck-Passwort eingeben.'), { title: t('Mit {name} verknüpfen', { name: sso.label }), secret: true, confirmLabel: t('Weiter') });
+    if (!password) return;
+    try {
+      const res = await post('/oidc/link', { password });
+      location.href = res.url;
+    } catch (e) {
+      toast(e.message, 'bad');
     }
   }
 
@@ -856,7 +868,7 @@
             {/if}
           {:else}
             <p class="help">{t('Verknüpfe dein Konto mit {name}, dann meldest du dich dort an statt mit Passwort.', { name: sso.label })}</p>
-            <div class="row"><span class="spacer"></span><a class="button small primary" href="/api/oidc/login?link=1">{t('Mit {name} verknüpfen', { name: sso.label })}</a></div>
+            <div class="row"><span class="spacer"></span><button class="small primary" onclick={linkSso}>{t('Mit {name} verknüpfen', { name: sso.label })}</button></div>
           {/if}
         {/if}
         <h3>{t('Sicherung')}</h3>
