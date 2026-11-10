@@ -289,7 +289,7 @@ func (s *Server) checkRules(ctx context.Context, now time.Time) {
 	s.rules.mu.Unlock()
 	users, _ := s.store.Users()
 	for _, u := range users {
-		if u.Disabled {
+		if u.Disabled || !s.mayAutomate(u.ID) {
 			continue
 		}
 		for _, r := range s.rulesOf(u.ID) {
@@ -763,6 +763,9 @@ func (s *Server) runRuleFrom(ctx context.Context, user int64, r rule, why string
 		why = i18n.T(lang, "Von Hand gestartet")
 	}
 	key := stateKey(user, r.ID)
+	if mode != runDry && !s.mayAutomate(user) {
+		return ruleLogEntry{At: time.Now().Unix(), Rule: r.ID, Name: r.Name, Why: why, Result: "⚠ " + i18n.T(lang, errAutomationsAdmins.Error()), OK: false}
+	}
 	if mode != runDry {
 		var stop context.CancelFunc
 		ctx, stop = context.WithCancel(ctx)
@@ -1136,6 +1139,9 @@ func (s *Server) tgNotice(ctx context.Context, user int64, text string) {
 // rulesAsk says whether a user has workflows that may ask in Telegram, or
 // scenes to start with /szene – then the bot has to listen even without the AI.
 func (s *Server) rulesAsk(user int64) bool {
+	if !s.mayAutomate(user) {
+		return false
+	}
 	for _, r := range s.rulesOf(user) {
 		if !r.On {
 			continue
@@ -1207,7 +1213,7 @@ func (s *Server) hookRules(tileID int64, m integrations.HookMessage) {
 	now := time.Now()
 	text := strings.ToLower(m.Title + " " + m.Text + " " + m.Value)
 	for _, u := range users {
-		if u.Disabled {
+		if u.Disabled || !s.mayAutomate(u.ID) {
 			continue
 		}
 		lang := s.userLang(u.ID)

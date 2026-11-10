@@ -1,6 +1,12 @@
 package server
 
-import "log/slog"
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"github.com/heimdeck/heimdeck/internal/store"
+)
 
 // Settings are personal (look, search, shortcuts, notifications) or belong
 // to the whole instance and can only be changed by an admin. Personal
@@ -8,6 +14,42 @@ import "log/slog"
 // the login page and as the start value of new accounts.
 var instanceSettings = map[string]bool{
 	"localHosts": true, "dockerControl": true, "dockerUpdates": true, "debug": true, "updateCheck": true, "monitorExternal": true,
+	"automationsAdmins": true,
+}
+
+// mayAutomate says whether an account may have workflows: everyone, unless
+// an admin limited automations to admins.
+func (s *Server) mayAutomate(user int64) bool {
+	inst, _ := s.store.Settings()
+	if inst["automationsAdmins"] != "true" {
+		return true
+	}
+	u, err := s.store.User(user)
+	return err == nil && u.Role == store.RoleAdmin
+}
+
+var errAutomationsAdmins = errors.New("Automationen sind auf diesem Heimdeck nur für Admins freigegeben")
+
+// automations wraps the workflow API: closed to accounts that may not automate.
+func (s *Server) automations(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.mayAutomate(uid(r)) {
+			writeErr(w, 403, errAutomationsAdmins)
+			return
+		}
+		h(w, r)
+	}
+}
+
+// stopOthersAutomations stops the waiting runs of accounts that may no longer automate.
+func (s *Server) stopOthersAutomations() {
+	users, _ := s.store.Users()
+	for _, u := range users {
+		if !s.mayAutomate(u.ID) {
+			s.stopRuns(stateKey(u.ID, ""))
+		}
+	}
+	s.kickBots()
 }
 
 // settingsMoved marks that the personal settings were moved to the admin (1.4).

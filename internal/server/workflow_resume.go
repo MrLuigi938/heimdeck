@@ -193,7 +193,7 @@ func (s *Server) resumeRuns(ctx context.Context) {
 		}
 		for id, rec := range recs {
 			r, ok := rules[id]
-			if u.Disabled || !ok || !r.On || rec.Rev != ruleRev(r) {
+			if u.Disabled || !ok || !r.On || rec.Rev != ruleRev(r) || !s.mayAutomate(u.ID) {
 				s.dropRunRecord(u.ID, id) // gone, switched off or changed since
 				continue
 			}

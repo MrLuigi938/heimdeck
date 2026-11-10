@@ -90,6 +90,9 @@ func (t sceneTile) Action(ctx context.Context, in *integrations.Instance, action
 	if !r.On {
 		return in.Errorf("Die Szene ist ausgeschaltet")
 	}
+	if !t.s.mayAutomate(owner) {
+		return in.Errorf("Automationen sind auf diesem Heimdeck nur für Admins freigegeben")
+	}
 	e := t.s.startScene(ctx, owner, r, "Kachel")
 	if !e.OK {
 		return errors.New(e.Result)

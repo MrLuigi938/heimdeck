@@ -1113,4 +1113,6 @@ export const en = {
   'Rückgängig (Strg+Z)': 'Undo (Ctrl+Z)',
   'Wiederholen (Strg+Y)': 'Redo (Ctrl+Y)',
   'Übersicht': 'Overview',
+  'Automationen nur für Admins': 'Automations for admins only',
+  'Dann können nur Admins Workflows und Szenen anlegen und nutzen – auch über Telegram und Szenen-Kacheln. Workflows anderer Konten bleiben gespeichert, laufen aber nicht, bis du das wieder ausschaltest.': 'Then only admins can create and use workflows and scenes – also through Telegram and scene tiles. Other accounts\' workflows stay stored but do not run until you switch this off again.',
 };

@@ -554,15 +554,23 @@ func (b *tgBot) onMessage(ctx context.Context, m tgMessage) {
 		}
 		return
 	case "szene", "scene", "szenen", "scenes":
+		if !b.s.mayAutomate(user) {
+			b.reply(ctx, m, i18n.T(lang, errAutomationsAdmins.Error()), "", nil)
+			return
+		}
 		go b.scenes(ctx, m, user, lang, rest, group)
 		return
 	case "workflow", "automation", "regel", "rule":
-		if adminOnly() {
+		if !b.s.mayAutomate(user) {
+			b.reply(ctx, m, i18n.T(lang, errAutomationsAdmins.Error()), "", nil)
+		} else if adminOnly() {
 			b.workflowCmd(ctx, m, user, lang, rest)
 		}
 		return
 	case "automationen", "automations", "workflows", "regeln", "rules":
-		if adminOnly() {
+		if !b.s.mayAutomate(user) {
+			b.reply(ctx, m, i18n.T(lang, errAutomationsAdmins.Error()), "", nil)
+		} else if adminOnly() {
 			b.workflowList(ctx, m, user, lang)
 		}
 		return
@@ -988,6 +996,10 @@ func (b *tgBot) onButton(ctx context.Context, q tgCallback) {
 		// A workflow: a draft to save or drop, or one of the list.
 		if !known || q.Message == nil {
 			answer("")
+			return
+		}
+		if !b.s.mayAutomate(owner) {
+			answer(i18n.T(lang, errAutomationsAdmins.Error()))
 			return
 		}
 		b.workflowButton(ctx, q, kind, id, owner, lang, answer)

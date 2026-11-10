@@ -1238,6 +1238,7 @@ var en = map[string]string{
 	"Filmabend (Szene)":                                                "Movie night (scene)",
 	"Von Hand oder per /szene: Downloads pausieren und Bescheid geben": "By hand or with /scene: pause downloads and say so",
 	"Filmabend": "Movie night",
-	"🍿 Filmabend – Downloads sind pausiert": "🍿 Movie night – downloads are paused",
-	"wird nach dem Neustart fortgesetzt":    "goes on after the restart",
+	"🍿 Filmabend – Downloads sind pausiert":                            "🍿 Movie night – downloads are paused",
+	"wird nach dem Neustart fortgesetzt":                               "goes on after the restart",
+	"Automationen sind auf diesem Heimdeck nur für Admins freigegeben": "On this Heimdeck automations are for admins only",
 }

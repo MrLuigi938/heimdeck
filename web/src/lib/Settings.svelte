@@ -93,7 +93,7 @@
     { id: 'ai', label: 'KI', icon: '✨', admin: true },
     { id: 'account', label: 'Konto und Sicherung', icon: '🔐' },
     { id: 'info', label: 'Info', icon: 'ℹ️' },
-  ].filter((x) => admin || !x.admin);
+  ].filter((x) => admin || (!x.admin && !(x.id === 'auto' && settings.automationsAdmins === 'true')));
   const phone = () => matchMedia('(max-width: 640px)').matches;
   // svelte-ignore state_referenced_locally
   let current = $state(section || (phone() ? '' : 'general'));
@@ -845,6 +845,10 @@
 
       <section hidden={current !== 'auto'} bind:this={sectionEls.auto}>
         <h3>{t('Automationen')}</h3>
+        {#if admin}
+          <label class="check"><input type="checkbox" checked={s.automationsAdmins === 'true'} onchange={setFlag('automationsAdmins')} /> {t('Automationen nur für Admins')}</label>
+          <span class="help">{t('Dann können nur Admins Workflows und Szenen anlegen und nutzen – auch über Telegram und Szenen-Kacheln. Workflows anderer Konten bleiben gespeichert, laufen aber nicht, bis du das wieder ausschaltest.')}</span>
+        {/if}
         <Rules active={current === 'auto'} {ai} />
       </section>
 

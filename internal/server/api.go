@@ -396,7 +396,7 @@ var allowedSettings = map[string]bool{
 	"columns": true, "searchEngine": true, "searchUrl": true, "openInNewTab": true, "showGreeting": true,
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
-	"debug": true, "telegramChat": true, "telegramAI": true, "telegramReport": true, "notifyAI": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
+	"debug": true, "automationsAdmins": true, "telegramChat": true, "telegramAI": true, "telegramReport": true, "notifyAI": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
 	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true,
 }
 
@@ -442,6 +442,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Einstellungen speichern", "fehler", err)
 		writeErr(w, 500, err)
 		return
+	}
+	if m["automationsAdmins"] == "true" {
+		s.stopOthersAutomations()
 	}
 	keys := make([]string, 0, len(m))
 	for k := range m {
