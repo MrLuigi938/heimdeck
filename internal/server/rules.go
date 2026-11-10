@@ -269,6 +269,7 @@ func (s *Server) addRuleLog(user int64, e ruleLogEntry) {
 // Automations checks the workflows of all users every half minute.
 func (s *Server) Automations(ctx context.Context) {
 	defer logging.Recover("Automationen")
+	s.resumeRuns(ctx)
 	tick := time.NewTicker(ruleTick)
 	defer tick.Stop()
 	for {
@@ -720,22 +721,24 @@ type sceneDepthKey struct{}
 
 // wfRun is one run of a workflow.
 type wfRun struct {
-	s        *Server
-	ctx      context.Context
-	user     int64
-	lang     string
-	r        rule
-	why      string
-	mode     runMode
-	lines    []string // for the notification
-	results  []string // for the log (or the dry run)
-	pictures []int64
-	ok       bool
-	tiles    []store.Tile                   // the tiles it may read, for building blocks
-	widgets  map[int64]*integrations.Widget // read once per run
-	branches []bool                         // the answers of the top-level "if" steps, in order (for the canvas)
-	entry    string                         // the entry or message that started it, for {Eintrag}
-	sends    []runSend                      // messages, by the channels they go to
+	s         *Server
+	ctx       context.Context
+	user      int64
+	lang      string
+	r         rule
+	why       string
+	mode      runMode
+	lines     []string // for the notification
+	results   []string // for the log (or the dry run)
+	pictures  []int64
+	ok        bool
+	tiles     []store.Tile                   // the tiles it may read, for building blocks
+	widgets   map[int64]*integrations.Widget // read once per run
+	branches  []bool                         // the answers of the top-level "if" steps, in order (for the canvas)
+	entry     string                         // the entry or message that started it, for {Eintrag}
+	started   time.Time
+	persisted bool      // a record of where it stands is kept (it waited)
+	sends     []runSend // messages, by the channels they go to
 }
 
 // runSend is a message of a run for some channels (none: all).
@@ -746,9 +749,17 @@ type runSend struct {
 
 // runRule runs the workflow's steps and notes the run in the log.
 func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mode runMode) ruleLogEntry {
+	return s.runRuleFrom(ctx, user, r, why, mode, nil)
+}
+
+// runRuleFrom runs a workflow – from the start, or (from) where a run stood
+// when Heimdeck stopped.
+func (s *Server) runRuleFrom(ctx context.Context, user int64, r rule, why string, mode runMode, from *runRecord) ruleLogEntry {
 	defer logging.Recover("Automationen")
 	lang := s.userLang(user)
-	if mode == runByHand {
+	if from != nil {
+		why, mode = from.Why, runMode(from.Mode)
+	} else if mode == runByHand {
 		why = i18n.T(lang, "Von Hand gestartet")
 	}
 	key := stateKey(user, r.ID)
@@ -775,8 +786,10 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 			s.rules.mu.Unlock()
 		}()
 	}
-	run := &wfRun{s: s, ctx: ctx, user: user, lang: lang, r: r, why: why, mode: mode, ok: true}
-	if mode == runAuto {
+	run := &wfRun{s: s, ctx: ctx, user: user, lang: lang, r: r, why: why, mode: mode, ok: true, started: time.Now()}
+	if from != nil {
+		run.entry, run.results, run.ok, run.started, run.persisted = from.Entry, from.Results, from.OK, time.Unix(from.Started, 0), true
+	} else if mode == runAuto {
 		s.rules.mu.Lock()
 		if st := s.rules.state[key]; st != nil {
 			run.entry, st.entry = st.entry, ""
@@ -786,8 +799,17 @@ func (s *Server) runRule(ctx context.Context, user int64, r rule, why string, mo
 	if r.watches() && !onlyReports(r.Steps) {
 		// Saving refuses this already; a workflow from before is stopped here.
 		run.fail(i18n.T(lang, "Ein Workflow mit KI-Wächter darf nur Nachrichten schicken"))
+	} else if from != nil {
+		run.resume(from)
 	} else {
-		run.steps(r.Steps, 0)
+		run.steps(r.Steps, 0, stepPlace{branch: -1})
+	}
+	if mode != runDry && ctx.Err() != nil && s.hasRunRecord(user, r.ID) {
+		// Heimdeck is stopping: the run goes on where it stands after the next start.
+		return ruleLogEntry{At: time.Now().Unix(), Rule: r.ID, Name: r.Name, Why: why, Result: i18n.T(lang, "wird nach dem Neustart fortgesetzt"), OK: true}
+	}
+	if run.persisted {
+		s.dropRunRecord(user, r.ID)
 	}
 	if mode != runDry {
 		run.flush()
@@ -850,10 +872,25 @@ func (w *wfRun) flush() {
 	}
 }
 
-func (w *wfRun) steps(list []ruleAction, depth int) {
+// stepPlace says where a list of steps is in the workflow, so a run can be
+// continued there: the top-level list (branch -1) or a branch (0 "then",
+// 1 "else") of the top-level step top; offset is the list's first index.
+type stepPlace struct {
+	top, branch, offset int
+}
+
+func (p stepPlace) at(k int) []int {
+	if p.branch < 0 {
+		return []int{p.offset + k}
+	}
+	return []int{p.top, p.branch, p.offset + k}
+}
+
+func (w *wfRun) steps(list []ruleAction, depth int, place stepPlace) {
 	s, lang := w.s, w.lang
 	dry := w.mode == runDry
-	for _, a := range list {
+	for k, a := range list {
+		pos := place.at(k)
 		if w.ctx.Err() != nil {
 			w.fail(i18n.T(lang, "abgebrochen"))
 			return
@@ -920,6 +957,7 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				w.results = append(w.results, "🎬 "+i18n.T(lang, "würde starten: %s", scene.Name))
 			default:
 				mode := w.mode
+				w.persist(pos, time.Time{}, false) // after a restart: on with the step after the scene
 				e := s.runRule(context.WithValue(w.ctx, sceneDepthKey{}, sceneDepth+1), w.user, scene, i18n.T(lang, "Gestartet von „%s“", w.r.Name), mode)
 				w.results = append(w.results, "🎬 "+scene.Name)
 				if !e.OK {
@@ -937,6 +975,8 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				continue
 			}
 			if ask {
+				w.sendNow()
+				w.persist(pos, time.Now(), true) // after a restart: ask again
 				yes, err := s.askAndWait(w.ctx, w.user, w.r, w.why, a, lang)
 				switch {
 				case err != nil:
@@ -964,8 +1004,12 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				w.results = append(w.results, "⏳ "+i18n.T(lang, "würde %d Min. warten", m))
 				continue
 			}
-			sleepCtx(w.ctx, time.Duration(m)*time.Minute)
+			// What came before goes out now; where the run stands is kept.
+			w.sendNow()
+			wake := time.Now().Add(time.Duration(m) * time.Minute)
 			w.results = append(w.results, "⏳ "+i18n.T(lang, "%d Min. gewartet", m))
+			w.persist(pos, wake, false)
+			sleepCtx(w.ctx, time.Until(wake))
 		case "if":
 			if a.If == nil || depth >= 2 {
 				continue
@@ -980,9 +1024,9 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 				w.branches = append(w.branches, holds)
 			}
 			if holds {
-				w.steps(a.Then, depth+1)
+				w.steps(a.Then, depth+1, stepPlace{top: pos[len(pos)-1], branch: 0})
 			} else {
-				w.steps(a.Else, depth+1)
+				w.steps(a.Else, depth+1, stepPlace{top: pos[len(pos)-1], branch: 1})
 			}
 		}
 	}
@@ -992,6 +1036,12 @@ func (w *wfRun) steps(list []ruleAction, depth int) {
 // in ":", all runs of a user – the workflow was changed or deleted, the
 // account locked.
 func (s *Server) stopRuns(key string) {
+	// The records first: a run stopped on purpose is not continued after a restart.
+	if user, id, ok := strings.Cut(key, ":"); ok {
+		if uid, err := strconv.ParseInt(user, 10, 64); err == nil {
+			s.dropRunRecord(uid, id)
+		}
+	}
 	s.rules.mu.Lock()
 	defer s.rules.mu.Unlock()
 	for k, stop := range s.rules.running {

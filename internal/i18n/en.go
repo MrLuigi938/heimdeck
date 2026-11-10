@@ -1239,4 +1239,5 @@ var en = map[string]string{
 	"Von Hand oder per /szene: Downloads pausieren und Bescheid geben": "By hand or with /scene: pause downloads and say so",
 	"Filmabend": "Movie night",
 	"🍿 Filmabend – Downloads sind pausiert": "🍿 Movie night – downloads are paused",
+	"wird nach dem Neustart fortgesetzt":    "goes on after the restart",
 }

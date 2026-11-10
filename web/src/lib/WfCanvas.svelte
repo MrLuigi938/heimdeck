@@ -490,7 +490,7 @@
     {/each}
   </div>
 
-  <div class="controls" class:center={narrow} onpointerdown={(e) => e.stopPropagation()} role="group">
+  <div class="controls" class:center={narrow} class:middle={!narrow} style:left={!narrow ? (docked ? 'calc((100% - 180px - 370px) / 2 + 180px)' : 'calc((100% - 180px) / 2 + 180px)') : null} onpointerdown={(e) => e.stopPropagation()} role="group">
     <button class="small" onclick={() => zoomBtn(1 / 1.2)} aria-label={t('Verkleinern')}>−</button>
     <span class="zoom">{Math.round(view.z * 100)} %</span>
     <button class="small" onclick={() => zoomBtn(1.2)} aria-label={t('Vergrößern')}>＋</button>
@@ -599,6 +599,8 @@
   .pitem.cond { --hue: #e0a12a; }
   .pitem.act { --hue: #1d9e75; }
   .controls { position: absolute; left: 180px; bottom: 10px; display: flex; gap: 4px; align-items: center; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-solid, var(--bg)); cursor: default; }
+  /* The zoom bar sits in the middle of the free area (between the side bar and the panel). */
+  .controls.middle { transform: translateX(-50%); }
   /* In a narrow canvas the zoom bar sits in the middle below the drawing, all of it visible. */
   .controls.center { left: 50%; transform: translateX(-50%); max-width: calc(100% - 12px); flex-wrap: nowrap; white-space: nowrap; }
   .minimap { position: absolute; right: 10px; bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-solid, var(--bg)); cursor: pointer; }
