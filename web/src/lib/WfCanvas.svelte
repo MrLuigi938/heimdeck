@@ -492,10 +492,11 @@
 
   <div class="controls" class:center={narrow} class:middle={!narrow} style:left={!narrow ? (docked ? 'calc((100% - 180px - 370px) / 2 + 180px)' : 'calc((100% - 180px) / 2 + 180px)') : null} onpointerdown={(e) => e.stopPropagation()} role="group">
     <button class="small" onclick={() => zoomBtn(1 / 1.2)} aria-label={t('Verkleinern')}>−</button>
-    <span class="zoom">{Math.round(view.z * 100)} %</span>
+    {#if !narrow}<span class="zoom">{Math.round(view.z * 100)} %</span>{/if}
     <button class="small" onclick={() => zoomBtn(1.2)} aria-label={t('Vergrößern')}>＋</button>
-    <button class="small" onclick={fit}>{t('Einpassen')}</button>
-    <button class="small" onclick={tidy} title={t('Alle Bausteine wieder automatisch anordnen')}>{t('Aufräumen')}</button>
+    <!-- Narrow (a phone): symbols only, so the whole bar fits. -->
+    <button class="small" onclick={fit} aria-label={t('Einpassen')} title={t('Einpassen')}>{narrow ? '⛶' : t('Einpassen')}</button>
+    <button class="small" onclick={tidy} aria-label={t('Aufräumen')} title={t('Alle Bausteine wieder automatisch anordnen')}>{narrow ? '⇅' : t('Aufräumen')}</button>
     <button class="small" onclick={undo} disabled={!past.length} aria-label={t('Rückgängig')} title={t('Rückgängig (Strg+Z)')}>↶</button>
     <button class="small" onclick={redo} disabled={!future.length} aria-label={t('Wiederholen')} title={t('Wiederholen (Strg+Y)')}>↷</button>
   </div>

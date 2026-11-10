@@ -360,13 +360,13 @@
         <label class="switch" title={r.on ? t('Ausschalten') : t('Einschalten')}>
           <input type="checkbox" checked={r.on} onchange={() => toggle(r)} aria-label={t('Regel an')} />
         </label>
+        <strong class="name">{r.name}{#if running[r.id]} <span class="badge">⏳ {t('läuft')}</span>{/if}</strong>
         <div class="body">
-          <strong>{r.name}{#if running[r.id]} <span class="badge">⏳ {t('läuft')}</span>{/if}</strong>
           <span class="muted small">{r.triggers.map((x) => triggerIcon(x.kind) + ' ' + triggerText(x)).join(' · ' + (r.all ? t('und') : t('oder')) + ' ')}{values[r.id] ? ` · ${t('jetzt')}: ${values[r.id]}` : ''}</span>
           {#if r.conds.length}<span class="muted small">✔ {r.conds.length === 1 ? t('1 Bedingung') : t('{n} Bedingungen', { n: r.conds.length })}</span>{/if}
           <span class="small">{r.steps.map((s) => stepText(s)).join(' → ')}</span>
         </div>
-        <div class="row">
+        <div class="row actions">
           <button class="small" onclick={() => start(r)} disabled={starting === r.id || !r.on && isManual(r)} title={t('Die Schritte jetzt ausführen – zählt als Bestätigung')}>{isManual(r) ? '🎬 ' + t('Starten') : '▶ ' + t('Jetzt')}</button>
           <button class="small" onclick={() => edit(r)}>{t('Bearbeiten')}</button>
           <button class="small ghost" onclick={() => duplicate(r)} title={t('Als neuen Workflow kopieren')}>⧉ {t('Kopieren')}</button>
@@ -493,9 +493,13 @@
 
 <style>
   .rules { display: grid; gap: 10px; }
-  .rule { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
-  .rule.off .body { opacity: .55; }
-  .rule .body { flex: 1; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
+  /* Name and buttons in the head line, what the workflow does below over the whole width. */
+  .rule { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "sw name act" ". body body"; gap: 4px 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+  .rule .switch { grid-area: sw; padding-top: 0; }
+  .rule .name { grid-area: name; min-width: 0; overflow-wrap: anywhere; }
+  .rule .actions { grid-area: act; flex-wrap: wrap; justify-content: flex-end; }
+  .rule.off .body, .rule.off .name { opacity: .55; }
+  .rule .body { grid-area: body; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
   .switch { padding-top: 2px; }
   .badge { font-size: 11px; font-weight: 400; padding: 1px 6px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
   .row { display: flex; gap: 6px; align-items: center; }
@@ -559,7 +563,6 @@
   :global(.wf-branch) { display: grid; gap: 6px; padding: 8px; border-radius: var(--r-sm); border: 1px dashed var(--border); }
   :global(.wf-blabel) { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
   @media (max-width: 640px) {
-    .rule { flex-wrap: wrap; }
-    .rule .row { width: 100%; justify-content: flex-end; }
+    .rule { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "sw name" ". body" "act act"; }
   }
 </style>
