@@ -177,6 +177,9 @@ type tileDTO struct {
 	Shared bool `json:"shared,omitempty"`
 }
 
+// errKeyAgain: a stored key does not follow a tile to another server.
+var errKeyAgain = errors.New("Die Adresse zeigt auf einen anderen Server – bitte API-Key bzw. Passwort für diese Kachel noch einmal eingeben")
+
 // sharedDTO is a tile as the people it is shared with see it: what the tile
 // shows and links to, without its settings.
 func sharedDTO(t store.Tile) tileDTO {
@@ -586,6 +589,14 @@ func (s *Server) buildTile(in tileInput, owner int64) (store.Tile, error) {
 		if old.Integration == t.Integration && sameServers(old, t) {
 			for k, v := range old.Secrets {
 				t.Secrets[k] = v
+			}
+		} else if old.Integration == t.Integration {
+			// The address points to another server: say so instead of dropping the
+			// key silently (the tile would only say "access denied" afterwards).
+			for k, v := range old.Secrets {
+				if v != "" && in.Secrets[k] == "" {
+					return t, errKeyAgain
+				}
 			}
 		}
 	}

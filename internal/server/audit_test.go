@@ -131,9 +131,17 @@ func TestAuditFindings(t *testing.T) {
 	if s, _ := st.Tile(sabID); s.Secrets["apiKey"] != "k1" {
 		t.Fatal("the key was lost although the server stayed the same")
 	}
-	luis.call("PUT", fmt.Sprintf("/api/tiles/%d", sabID), map[string]any{"groupId": g["id"], "name": "SAB", "url": "http://evil.example", "integration": "sabnzbd"})
-	if s, _ := st.Tile(sabID); s.Secrets["apiKey"] != "" {
+	// Another server without the key again: refused with a hint, the key stays with the old address.
+	if code, res := luis.call("PUT", fmt.Sprintf("/api/tiles/%d", sabID), map[string]any{"groupId": g["id"], "name": "SAB", "url": "http://evil.example", "integration": "sabnzbd"}); code != 400 || !strings.Contains(fmt.Sprint(res["error"]), "API-Key") {
+		t.Fatalf("new server without the key: %d %v", code, res)
+	}
+	if s, _ := st.Tile(sabID); s.URL == "http://evil.example" {
 		t.Fatal("the key followed the tile to another server")
+	}
+	// With the key entered again it saves, with that key.
+	luis.call("PUT", fmt.Sprintf("/api/tiles/%d", sabID), map[string]any{"groupId": g["id"], "name": "SAB", "url": "http://evil.example", "integration": "sabnzbd", "secrets": map[string]string{"apiKey": "k2"}})
+	if s, _ := st.Tile(sabID); s.URL != "http://evil.example" || s.Secrets["apiKey"] != "k2" {
+		t.Fatalf("with the key again: %+v", s.Secrets)
 	}
 
 	// N6, H9: someone else's tile without the internal address and with only harmless app links.

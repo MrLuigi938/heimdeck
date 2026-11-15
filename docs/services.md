@@ -51,7 +51,9 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | OPNsense (API key + secret) | WAN throughput, RAM, load, uptime, gateways, updates | | |
 | UniFi (Network API key) | clients, Wi-Fi, devices online, firmware updates | ✓ clients and devices | restart device |
 | FRITZ!Box (TR-064, user + password) | choose: internet (connection, data rate, line, public IP), devices online, call list with missed calls, smart home (DECT sockets and thermostats), Wi-Fi networks | | switch DECT sockets |
+| Wake-on-LAN (MAC address) | with a FRITZ!Box tile: whether the computer is on, name, IP | | switch a computer on – through the FRITZ!Box (also from Docker) or a magic packet |
 | UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
+| Hivornet honeypot (user + password, role “viewer” is enough) | connections, logins, commands, downloads, attackers, countries, active tarpits in a chosen time; top countries; the latest attacks | ✓ attacks by IP, user name, password | |
 | Camera (RTSP and/or ONVIF) | still picture on a timer, live stream, events (motion, person, doorbell …) with a picture of the moment | | |
 | Speedtest Tracker | download, upload, ping, history | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |

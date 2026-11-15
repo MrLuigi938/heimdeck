@@ -51,7 +51,9 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | OPNsense (API-Key + Secret) | WAN-Datenrate, RAM, Last, Laufzeit, Gateways, Updates | | |
 | UniFi (Network-API-Schlüssel) | Clients, WLAN, Geräte online, Firmware-Updates | ✓ Clients und Geräte | Gerät neu starten |
 | FRITZ!Box (TR-064, Benutzer + Passwort) | wählbar: Internet (Verbindung, Datenrate, Leitung, externe IP), Geräte online, Anrufliste mit verpassten Anrufen, Smart Home (DECT-Steckdosen und Thermostate), WLAN-Netze | | DECT-Steckdosen schalten |
+| Wake-on-LAN (MAC-Adresse) | mit FRITZ!Box-Kachel: ob der Rechner an ist, Name, IP | | Rechner einschalten – über die FRITZ!Box (auch aus Docker) oder ein Magic Packet |
 | UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
+| Hivornet-Honeypot (Benutzer + Passwort, Rolle „viewer“ reicht) | Verbindungen, Logins, Befehle, Downloads, Angreifer, Länder, aktive Tarpits im gewählten Zeitraum; häufigste Länder; die letzten Angriffe | ✓ Angriffe nach IP, Benutzername, Passwort | |
 | Kamera (RTSP und/oder ONVIF) | Standbild mit Timer, Livebild, Ereignisse (Bewegung, Person, Klingel …) mit Bild des Moments | | |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
