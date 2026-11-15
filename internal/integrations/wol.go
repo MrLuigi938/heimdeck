@@ -19,7 +19,7 @@ func init() { register(wol{}) }
 
 func (wol) Def() Definition {
 	return Definition{
-		ID: "wol", Name: "PC einschalten (Wake-on-LAN)", Icon: "⏻", Category: "Netzwerk",
+		ID: "wol", Name: "PC einschalten (Wake-on-LAN)", Icon: "hd:power", Category: "Netzwerk",
 		Description: "Ein Knopf, der einen Rechner im Heimnetz einschaltet – über die FRITZ!Box oder ein Magic Packet; mit FRITZ!Box auch, ob er an ist",
 		Setup: []string{
 			"Am Rechner Wake-on-LAN einschalten: im BIOS/UEFI und bei der Netzwerkkarte (Windows: Geräte-Manager → Netzwerkadapter → Eigenschaften → Energieverwaltung und Erweitert → „Wake on Magic Packet“).",
@@ -110,7 +110,7 @@ func (w wol) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if err != nil {
 		return nil, in.Errorf("Die MAC-Adresse ist ungültig – z. B. 3C:7C:3F:12:34:56")
 	}
-	wd := &Widget{Actions: []Action{{ID: "wake", Label: "⏻ " + in.T("Einschalten"), Tone: "primary"}}}
+	wd := &Widget{Actions: []Action{{ID: "wake", Label: "⚡ " + in.T("Einschalten"), Tone: "primary"}}}
 	fb := w.fritz(in)
 	switch {
 	case fb != nil:
@@ -135,7 +135,7 @@ func (w wol) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				wd.Stats = append(wd.Stats, Stat{Label: "IP", Value: ip})
 			}
 			if on {
-				wd.Actions[0].Label = "⏻ " + in.T("Nochmal wecken")
+				wd.Actions[0].Label = "⚡ " + in.T("Nochmal wecken")
 				wd.Actions[0].Tone = ""
 			}
 		}

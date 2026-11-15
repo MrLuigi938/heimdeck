@@ -20,6 +20,23 @@
   let box = $state();
   let video = $state();
 
+  // Privacy (setting "Bild verschwommen zeigen"): picture, live view and event
+  // pictures stay blurred until uncovered; covered again after the chosen
+  // time, and always when the page is left (another tab, phone locked).
+  let uncovered = $state(false);
+  let veiled = $derived(!!view?.blur && !uncovered);
+  $effect(() => {
+    if (!uncovered || !view?.blur || !view.blurFor) return;
+    const timer = setTimeout(() => (uncovered = false), view.blurFor * 1000);
+    return () => clearTimeout(timer);
+  });
+  $effect(() => {
+    if (!view?.blur) return;
+    const cover = () => document.visibilityState === 'hidden' && (uncovered = false);
+    document.addEventListener('visibilitychange', cover);
+    return () => document.removeEventListener('visibilitychange', cover);
+  });
+
   const MS = typeof window !== 'undefined' ? window.ManagedMediaSource || window.MediaSource : null;
   const base = () => `/api/tiles/${tileId}/camera`;
 
@@ -336,7 +353,7 @@
 </script>
 
 <div class="cam" class:fill>
-  <div class="screen" class:maxed class:full={full || maxed} bind:this={box} use:portal={maxed}>
+  <div class="screen" class:maxed class:veiled class:full={full || maxed} bind:this={box} use:portal={maxed}>
     <!-- svelte-ignore a11y_media_has_caption -->
     <video bind:this={video} muted playsinline class:on={live}></video>
     {#if !live}
@@ -353,6 +370,12 @@
 
     {#if liveWaiting}<div class="placeholder over"><span class="spin"></span></div>{/if}
 
+    {#if veiled && (still || shown || live)}
+      <button class="uncover" onclick={() => (uncovered = true)} title={t('Bild ist verdeckt')}>
+        <span class="eye" aria-hidden="true">👁</span> {t('Aufdecken')}
+      </button>
+    {/if}
+
     {#if shown}
       <div class="tag top">{icon(shown.kind)} {shown.kind} · {ago(shown.at)}</div>
       <button class="chip close" onclick={() => (shown = null)} aria-label={t('Schließen')}>✕</button>
@@ -364,6 +387,11 @@
     <div class="controls">
       {#if !live && still && !shown}<span class="age">{age(stillAt)}</span>{/if}
       <span class="grow"></span>
+      {#if view.blur && uncovered}
+        <button class="chip" onclick={() => (uncovered = false)} title={t('Wieder verdecken')} aria-label={t('Wieder verdecken')}>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.39-1.61" /><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" /><path d="m2 2 20 20" /></svg>
+        </button>
+      {/if}
       {#if !live && !shown}
         <button class="chip" onclick={() => loadStill(true)} disabled={busy} title={t('Bild aktualisieren')} aria-label={t('Bild aktualisieren')}>⟳</button>
       {/if}
@@ -417,6 +445,16 @@
   .screen.full .chip.close { top: 12px; right: 64px; }
   .screen img, .screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
   .screen video { visibility: hidden; }
+  /* Covered: strongly blurred (scaled up a little, so the edges do not show through). */
+  .screen.veiled img, .screen.veiled video { filter: blur(28px) saturate(.7); transform: scale(1.15); }
+  .screen img, .screen video { transition: filter .25s, transform .25s; }
+  .uncover {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1;
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+    color: #fff; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .35); backdrop-filter: blur(6px); white-space: nowrap;
+  }
+  .uncover:hover { background: rgba(0, 0, 0, .7); }
+  .eye { font-size: 16px; }
   .screen video.on { visibility: visible; }
   .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #ddd; background: #111; border: 0; border-radius: 0; font-size: 13px; }
   .placeholder.over { background: transparent; }

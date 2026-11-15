@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -400,7 +401,7 @@ var allowedSettings = map[string]bool{
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 	"debug": true, "automationsAdmins": true, "telegramChat": true, "telegramAI": true, "telegramReport": true, "notifyAI": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
-	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true,
+	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true, "pageLayout": true,
 }
 
 // checkSettings checks the addresses among the settings – from the settings
@@ -408,6 +409,28 @@ var allowedSettings = map[string]bool{
 func checkSettings(m map[string]string) error {
 	if v, ok := m["telegramReport"]; ok && v != "" && !reportTimeRe.MatchString(v) {
 		return errors.New("Bitte eine Uhrzeit wie 07:00 angeben")
+	}
+	// The free page layout: positions of the page's parts, as JSON.
+	if v, ok := m["pageLayout"]; ok && v != "" {
+		type place struct{ X, Y, W, H int }
+		type pageLayout struct {
+			Mode    string           `json:"mode"`
+			Desktop map[string]place `json:"desktop"`
+			Tablet  map[string]place `json:"tablet"`
+		}
+		var layout struct {
+			All    *pageLayout            `json:"all"`
+			Boards map[string]*pageLayout `json:"boards"`
+		}
+		bad := len(v) > 128<<10 || json.Unmarshal([]byte(v), &layout) != nil
+		for _, l := range append([]*pageLayout{layout.All}, slices.Collect(maps.Values(layout.Boards))...) {
+			if l != nil && l.Mode != "" && l.Mode != "auto" && l.Mode != "free" {
+				bad = true
+			}
+		}
+		if bad {
+			return errors.New("Das Seitenlayout ist ungültig")
+		}
 	}
 	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {
 		if p, err := url.Parse(u); err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" || len(strings.Trim(p.Path, "/")) == 0 {

@@ -184,7 +184,7 @@ func (s *Server) Handler() http.Handler {
 // https for the check whether an icon exists.
 const appCSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; " +
 	"media-src 'self' blob:; connect-src 'self' https:; font-src 'self' data:; worker-src 'self' blob:; " +
-	"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+	"frame-src 'self' http: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
 
 func (s *Server) spa() http.Handler {
 	files := http.FileServerFS(s.web)

@@ -23,6 +23,7 @@
   import { toast } from './toast.svelte.js';
   import Icon from './Icon.svelte';
   import Camera from './Camera.svelte';
+  import Embed from './Embed.svelte';
   import Widget from './Widget.svelte';
   import { tileHref, rewrite, isAppLink } from './network.svelte.js';
   import { t, i18n } from './i18n.svelte.js';
@@ -142,7 +143,7 @@
   {#if def?.hasWidget && tile.showWidget && missing.length > 0 && onEdit}
     <button class="setup" onclick={onEdit}>🔑 {t('{fields} fehlt – jetzt einrichten', { fields: missing.map((f) => f.label).join(', ') })}</button>
   {:else if live}
-    <div class="body" class:fill={free && !!widget?.camera}>
+    <div class="body" class:fill={free && !!(widget?.camera || widget?.embed)}>
       {#if error}
         <div class="error">{error}</div>
       {:else if !loaded}
@@ -150,6 +151,8 @@
       {:else}
         {#if widget?.camera}
           <Camera tileId={tile.id} view={widget.camera} fill={free} />
+        {:else if widget?.embed}
+          <Embed src={href} view={widget.embed} fill={free} {editMode} {newTab} />
         {:else}
           <Widget {widget} onAction={action} {newTab} link={(u) => rewrite(u, tile, local)} compact={!free} />
         {/if}

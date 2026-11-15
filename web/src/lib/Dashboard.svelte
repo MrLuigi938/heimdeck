@@ -22,6 +22,9 @@
   import AiChat from './AiChat.svelte';
   import SeasonFx from './SeasonFx.svelte';
   import DisplayMode from './DisplayMode.svelte';
+  import PageGrid, { readingOrder } from './PageGrid.svelte';
+  import { confirmDialog } from './dialog.svelte.js';
+  import { tick } from 'svelte';
 
   let data = $state(null);
   let status = $state({});
@@ -171,13 +174,13 @@
   }
   // The groups to jump to from the search: the ones shown, hidden ones only while they are shown.
   let jumpTargets = $derived(
-    boardGroups.filter((g) => g.visibility !== 'hidden' || showHidden).map((g) => ({ id: g.id, name: g.name, count: g.tiles.length })),
+    orderedGroups.filter((g) => g.visibility !== 'hidden' || showHidden).map((g) => ({ id: g.id, name: g.name, count: g.tiles.length })),
   );
   // Jumping to a group works from the search ("Jump to"). On top, optionally:
   // a bar under the search on larger screens (setting jumpBar, off by default,
   // from three groups on) and on phones a round button that opens the groups
   // as a sheet (setting jumpButton, on by default).
-  let showJumpBar = $derived(settings.jumpBar === 'true' && !narrow && jumpTargets.length >= 3);
+  let showJumpBar = $derived(settings.jumpBar === 'true' && !narrow && jumpTargets.length >= 3 && !freePage);
   let jumpBarHeight = $state(0);
   let showJumpButton = $derived(settings.jumpButton !== 'false' && jumpTargets.length >= 2);
   let activeGroup = $state(0);
@@ -401,6 +404,10 @@
   function onShortcut(e) {
     if (!data || !shortcutsOn || blocked(e)) return;
     if (display) return;
+    if (arranging) {
+      if (e.key === 'Escape') cancelArrange();
+      return;
+    }
     if (isBoardKey(e.key)) {
       const b = boards[Number(e.key) - 1];
       if (b) {
@@ -572,6 +579,143 @@
     editing = { groupId: gid, integration: 'proxmox', name: 'Proxmox', icon: 'proxmox', url: data.proxmoxHint || '', insecure: true };
   }
 
+  // ---- free page layout ----
+  // Setting pageLayout: { all: L, boards: { <id>: L } } with L = { mode: 'auto' | 'free',
+  // desktop: {block: {x, y, w, h}}, tablet: {…} }. A dashboard's own layout wins over
+  // the one for all. Blocks: title, boards, greet, search, tools, settings and g<group id>.
+  // Phones stay automatic and only take the order of the groups from it.
+  const deviceOf = () => (innerWidth <= 640 ? 'phone' : innerWidth <= 1100 ? 'tablet' : 'desktop');
+  let device = $state(deviceOf());
+  $effect(() => {
+    const update = () => (device = deviceOf());
+    addEventListener('resize', update);
+    return () => removeEventListener('resize', update);
+  });
+  function parseLayouts(text) {
+    try {
+      const v = JSON.parse(text || '{}');
+      return v && typeof v === 'object' ? v : {};
+    } catch {
+      return {};
+    }
+  }
+  let layouts = $derived(parseLayouts(settings.pageLayout));
+  let ownLayout = $derived(board ? layouts.boards?.[board.id] || null : null);
+  // While arranging: { scope: 'all' | 'board', layout: L, hadOwn }.
+  let draft = $state(null);
+  let arranging = $state(false);
+  let pageGrid = $state();
+  let activeLayout = $derived(draft ? draft.layout : ownLayout || layouts.all || null);
+  let freeOn = $derived(activeLayout?.mode === 'free');
+  let freePage = $derived(freeOn && device !== 'phone' && !display && allTiles.length > 0);
+  let pagePositions = $derived(activeLayout ? (device === 'tablet' && activeLayout.tablet) || activeLayout.desktop || {} : {});
+  // Groups in the order of the free layout (phones and the jump list follow it).
+  let orderedGroups = $derived(freeOn ? [...boardGroups].sort((a, b) => readingOrder(pagePositions)('g' + a.id, 'g' + b.id)) : boardGroups);
+  const groupShown = (g) => g.locked || g.visibility !== 'hidden' || showHidden || editMode;
+  let pageBlocks = $derived([
+    { id: 'title', label: t('Titel'), size: { w: 3, h: 1 } },
+    ...(boards.length > 1 ? [{ id: 'boards', label: t('Dashboard wechseln'), size: { w: 2, h: 1 } }] : []),
+    ...(settings.showGreeting !== 'false' ? [{ id: 'greet', label: t('Begrüßung'), size: { w: 4, h: 2 } }] : []),
+    { id: 'search', label: t('Suche'), size: { w: 4, h: 2 }, fixed: true },
+    { id: 'tools', label: t('Knöpfe'), size: { w: 3, h: 1 } },
+    { id: 'settings', label: t('Einstellungen'), size: { w: 1, h: 1 } },
+    ...boardGroups.filter(groupShown).map((g) => ({ id: 'g' + g.id, kind: 'group', label: g.name, size: { w: 12, h: 4 }, min: { w: 2, h: 2 }, group: g })),
+  ]);
+  // The free layout starts out looking like the automatic one.
+  function startPositions() {
+    const p = { title: { x: 0, y: 0, w: 3, h: 1 }, greet: { x: 0, y: 1, w: 5, h: 2 }, search: { x: 5, y: 0, w: 4, h: 2 }, tools: { x: 9, y: 0, w: 2, h: 2 }, settings: { x: 11, y: 0, w: 1, h: 2 } };
+    if (boards.length > 1) p.boards = { x: 3, y: 0, w: 2, h: 1 };
+    let y = 3;
+    for (const g of boardGroups) {
+      p['g' + g.id] = { x: 0, y, w: 12, h: 4 };
+      y += 4;
+    }
+    return p;
+  }
+  const clone = (v) => JSON.parse(JSON.stringify(v ?? null));
+  async function startArrange() {
+    editMode = false;
+    const layout = clone(ownLayout?.mode === 'free' ? ownLayout : !ownLayout && layouts.all?.mode === 'free' ? layouts.all : null) || {};
+    layout.mode = 'free';
+    if (!layout[device]) layout[device] = layout.desktop ? clone(layout.desktop) : startPositions();
+    draft = { scope: ownLayout ? 'board' : 'all', layout, hadOwn: !!ownLayout };
+    await tick();
+    // Measure the page as it is shown, so the fixed rows while arranging cut nothing off.
+    if (pageGrid) draft.layout[device] = pageGrid.fitted();
+    arranging = true;
+  }
+  function changePositions(positions) {
+    draft.layout[device] = { ...draft.layout[device], ...positions };
+  }
+  // "All dashboards" shows and edits the layout for all; "only this one" goes on with the current one.
+  async function setScope(scope) {
+    if (!draft || draft.scope === scope) return;
+    if (scope === 'all') {
+      const all = clone(layouts.all?.mode === 'free' ? layouts.all : null) || { mode: 'free' };
+      if (!all[device]) all[device] = all.desktop ? clone(all.desktop) : clone(draft.layout[device]);
+      arranging = false;
+      draft = { ...draft, scope, layout: all };
+      await tick();
+      if (pageGrid) draft.layout[device] = pageGrid.fitted();
+      arranging = true;
+    } else {
+      draft = { ...draft, scope };
+    }
+  }
+  // This dashboard's layout becomes the one for all.
+  function useForAll() {
+    draft = { ...draft, scope: 'all' };
+    toast(t('Beim Speichern gilt dieses Layout für alle Dashboards ohne eigenes Layout.'));
+  }
+  async function storeLayouts(next) {
+    try {
+      await put('/settings', { pageLayout: JSON.stringify(next) });
+      data.settings = { ...data.settings, pageLayout: JSON.stringify(next) };
+      return true;
+    } catch (e) {
+      toast(e.message, 'bad');
+      return false;
+    }
+  }
+  async function saveArrange() {
+    const next = clone(layouts) || {};
+    next.boards ||= {};
+    if (draft.scope === 'all') {
+      next.all = draft.layout;
+      delete next.boards[board.id];
+    } else {
+      next.boards[board.id] = draft.layout;
+    }
+    if (await storeLayouts(next)) {
+      arranging = false;
+      draft = null;
+    }
+  }
+  function cancelArrange() {
+    arranging = false;
+    draft = null;
+  }
+  async function resetArrange() {
+    const msg = draft.scope === 'all'
+      ? t('Alle Dashboards ohne eigenes Layout werden wieder automatisch angeordnet.')
+      : t('Dieses Dashboard wird wieder automatisch angeordnet.');
+    if (!(await confirmDialog(msg, { title: t('Layout zurücksetzen?'), confirmLabel: t('Zurücksetzen'), danger: true }))) return;
+    const next = clone(layouts) || {};
+    next.boards ||= {};
+    if (draft.scope === 'all') {
+      next.all = { mode: 'auto' };
+      delete next.boards[board.id];
+    } else {
+      next.boards[board.id] = { mode: 'auto' };
+    }
+    if (await storeLayouts(next)) {
+      arranging = false;
+      draft = null;
+    }
+  }
+  // How a block looks follows its size.
+  const searchShape = (it) => (it.w <= 1 ? 'icon' : it.h >= 5 ? 'panel' : 'field');
+
   function saved(opts) {
     if (!opts?.keepOpen) {
       editing = null;
@@ -594,11 +738,7 @@
 
 {#if data}
   <div class="page" class:display bind:this={pageEl} onclickcapture={keepOnDisplay} style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
-    <header class="top">
-      <div class="brand on-bg">
-        <div class="title-row">
-          <h1>{settings.title || 'Heimdeck'}</h1>
-          {#if boards.length > 1}
+    {#snippet boardSwitch()}
             <div class="boards">
               <button class="board-btn" onclick={() => (boardMenu = !boardMenu)} aria-expanded={boardMenu} title={t('Dashboard wechseln')}>
                 <span>{board?.icon || '▦'}</span><span class="board-name">{t(board?.name || '')}</span><span class="caret">▾</span>
@@ -617,18 +757,18 @@
                 </div>
               {/if}
             </div>
-          {/if}
-        </div>
-        {#if settings.showGreeting !== 'false'}
+    {/snippet}
+    {#snippet greetBlock()}
           <div class="muted greet">
             <div>{greeting}</div>
             <div class="when">{dateText} · {timeText}</div>
           </div>
-        {/if}
-      </div>
+    {/snippet}
+    {#snippet searchBlock(shape)}
       <Search bind:this={searchBox} ai={data.ai} onAskAI={openChat} tiles={allTiles} sections={jumpTargets} onJump={jumpToGroup} {defs} view={settings.searchView || 'window'} jumpTop={settings.searchJump === 'true'} history={settings.searchHistory !== 'false'} {newTab} searchEngine={settings.searchEngine} searchUrl={settings.searchUrl} {hasSearchServices} {local} boardId={board?.id}
-        shortcut={shortcutsOn ? keys.search : ''} />
-      <div class="tools on-bg">
+        shortcut={shortcutsOn ? keys.search : ''} {shape} />
+    {/snippet}
+    {#snippet toolButtons()}
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
             title={`${local ? t('Zuhause: lokale Adressen werden geöffnet') : t('Unterwegs: öffentliche Adressen werden geöffnet')} (${network.override ? t('manuell gewählt') : t('automatisch erkannt')}) – ${t('klicken zum Umschalten')}`}>
@@ -656,15 +796,33 @@
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>
           {/if}
         </button>
-        <button class="ghost icon settings-btn" title={updateStale ? t('Update verfügbar') : t('Einstellungen')} aria-label={updateStale ? t('Einstellungen – Update verfügbar') : t('Einstellungen')} onclick={() => openSettings(updateStale ? 'info' : '')}>
+    {/snippet}
+    {#snippet settingsButton(wide)}
+        <button class="ghost settings-btn" class:icon={!wide} class:wide title={updateStale ? t('Update verfügbar') : t('Einstellungen')} aria-label={updateStale ? t('Einstellungen – Update verfügbar') : t('Einstellungen')} onclick={() => openSettings(updateStale ? 'info' : '')}>
           {#if updateStale}<span class="update-dot" aria-hidden="true"></span>{/if}
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+          {#if wide}<span class="btn-label">{t('Einstellungen')}</span>{/if}
         </button>
+    {/snippet}
+    {#if !freePage}
+    <header class="top">
+      <div class="brand on-bg">
+        <div class="title-row">
+          <h1>{settings.title || 'Heimdeck'}</h1>
+          {#if boards.length > 1}{@render boardSwitch()}{/if}
+        </div>
+        {#if settings.showGreeting !== 'false'}{@render greetBlock()}{/if}
+      </div>
+      {@render searchBlock('field')}
+      <div class="tools on-bg">
+        {@render toolButtons()}
+        {@render settingsButton(false)}
       </div>
       {#if updateBubble}
         <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
       {/if}
     </header>
+    {/if}
 
     {#if showJumpBar}
       <nav class="jumpbar" class:stuck={barStuck} bind:this={jumpBarEl} bind:clientHeight={jumpBarHeight} aria-label={t('Zu einer Gruppe springen')}>
@@ -710,8 +868,31 @@
       <div class="editbar card">
         <span>✎ {t('Bearbeitungsmodus: Kacheln per Drag & Drop verschieben, anklicken zum Bearbeiten.')}</span>
         <span class="spacer"></span>
+        {#if device !== 'phone' && allTiles.length}
+          <button class="small" onclick={startArrange} title={t('Titel, Suche, Knöpfe und Gruppen frei auf der Seite anordnen')}>▦ {t('Seite anordnen')}</button>
+        {/if}
         <button class="small" onclick={addGroup}>+ {t('Gruppe')}</button>
         <button class="small primary" onclick={() => (editMode = false)}>{t('Fertig')}</button>
+      </div>
+    {/if}
+
+    {#if arranging && draft}
+      <div class="editbar arrangebar card">
+        <span class="arrange-text">▦ {t('Seite anordnen: Teile ziehen, über die Ecke unten rechts die Größe ändern.')}
+          <span class="muted">{device === 'tablet' ? t('Gilt für Tablets und kleinere Fenster.') : t('Gilt für große Bildschirme; Handys ordnen automatisch, in dieser Reihenfolge.')}</span>
+          {#if draft.scope === 'all' && draft.hadOwn}<span class="muted">{t('Beim Speichern verliert dieses Dashboard sein eigenes Layout.')}</span>{/if}
+        </span>
+        <span class="spacer"></span>
+        <div class="seg" role="group" aria-label={t('Gilt für')}>
+          <button class="small" class:on={draft.scope === 'all'} aria-pressed={draft.scope === 'all'} onclick={() => setScope('all')}>{t('Alle Dashboards')}</button>
+          <button class="small" class:on={draft.scope === 'board'} aria-pressed={draft.scope === 'board'} onclick={() => setScope('board')}>{t('Nur dieses')}</button>
+        </div>
+        {#if draft.scope === 'board' && ownBoards.length > 1}
+          <button class="small" onclick={useForAll} title={t('Dieses Layout für alle Dashboards übernehmen')}>{t('Für alle übernehmen')}</button>
+        {/if}
+        <button class="small" onclick={resetArrange}>{t('Zurücksetzen')}</button>
+        <button class="small" onclick={cancelArrange}>{t('Abbrechen')}</button>
+        <button class="small primary" onclick={saveArrange}>{t('Fertig')}</button>
       </div>
     {/if}
 
@@ -737,7 +918,29 @@
       </div>
     {/if}
 
-    {#each boardGroups as group, gi (group.id)}
+    {#snippet pageBlock(b, it)}
+      {#if b.id === 'title'}
+        <div class="brand on-bg pb"><h1>{settings.title || 'Heimdeck'}</h1></div>
+      {:else if b.id === 'boards'}
+        <div class="pb title-row">{@render boardSwitch()}</div>
+      {:else if b.id === 'greet'}
+        <div class="brand on-bg pb">{@render greetBlock()}</div>
+      {:else if b.id === 'search'}
+        {@render searchBlock(searchShape(it))}
+      {:else if b.id === 'tools'}
+        <div class="tools on-bg pb" class:column={it.h > it.w * 2}>{@render toolButtons()}</div>
+      {:else if b.id === 'settings'}
+        <div class="tools on-bg pb settings-block">
+          {@render settingsButton(it.w >= 2)}
+          {#if updateBubble}
+            <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
+          {/if}
+        </div>
+      {:else if b.group}
+        {@render groupBlock(b.group, 0)}
+      {/if}
+    {/snippet}
+    {#snippet groupBlock(group, gi)}
       {#if group.locked}
         <form class="locked card" id="group-{group.id}" class:flash={flashGroup === group.id} onsubmit={(e) => unlock(e, group)}>
           <span class="lock-name">🔒 {group.name}</span>
@@ -747,7 +950,7 @@
           <button class="small">{t('Entsperren')}</button>
           {#if editMode}<span class="help lock-hint">{t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')}</span>{/if}
         </form>
-      {:else if group.visibility !== 'hidden' || showHidden || editMode}
+      {:else}
         <section class="group" id="group-{group.id}" class:hidden-group={group.visibility === 'hidden'} class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2 class="on-bg">{group.name}</h2>
@@ -757,8 +960,10 @@
             {/if}
             {#if editMode}
               <div class="group-tools on-bg">
-                <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title={t('Nach oben')}>↑</button>
-                <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === boardGroups.length - 1} title={t('Nach unten')}>↓</button>
+                {#if !freeOn}
+                  <button class="ghost small" onclick={() => moveGroup(gi, -1)} disabled={gi === 0} title={t('Nach oben')}>↑</button>
+                  <button class="ghost small" onclick={() => moveGroup(gi, 1)} disabled={gi === boardGroups.length - 1} title={t('Nach unten')}>↓</button>
+                {/if}
                 <button class="ghost small" onclick={() => (editingGroup = group)}>{t('Bearbeiten')}</button>
               </div>
             {/if}
@@ -793,7 +998,15 @@
           {/if}
         </section>
       {/if}
-    {/each}
+    {/snippet}
+
+    {#if freePage}
+      <PageGrid bind:this={pageGrid} blocks={pageBlocks} positions={pagePositions} {arranging} onChange={changePositions} block={pageBlock} />
+    {:else}
+      {#each orderedGroups as group, gi (group.id)}
+        {#if groupShown(group)}{@render groupBlock(group, gi)}{/if}
+      {/each}
+    {/if}
 
     {#if hiddenCount && !showHidden && !editMode}
       <button class="hidden-hint on-bg" onclick={toggleHidden}>
@@ -915,6 +1128,31 @@
   .logout-check { display: none; font-weight: 700; }
   .hidden-hint { justify-self: center; background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 13px; padding: 6px 14px; border-radius: 999px; }
 
+  /* Free page: the blocks fill their cell. */
+  /* Small parts keep their natural size inside their block: title and greeting
+     on the left, buttons in the middle. */
+  .pb { min-width: 0; }
+  .brand.pb { align-self: flex-start; max-width: 100%; }
+  .pb.title-row { align-self: flex-start; max-width: 100%; }
+  /* A narrow block shortens the dashboard name with "…" instead of sticking out. */
+  .pb.title-row .boards, .pb .board-btn { min-width: 0; max-width: 100%; }
+  .pb .board-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tools.pb { align-self: center; align-items: center; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+  .tools.pb.column { flex-direction: column; flex-wrap: nowrap; }
+  .settings-block { position: relative; }
+  .settings-btn.wide { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; max-width: 100%; }
+  .btn-label { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Too narrow for the name: only the gear, like the small button. */
+  @container (max-width: 150px) {
+    .settings-btn.wide .btn-label { display: none; }
+    .settings-btn.wide { padding: 8px; }
+  }
+  .arrangebar { position: sticky; top: 8px; z-index: 40; background: var(--surface-solid); border-color: var(--accent); }
+  .arrange-text { display: grid; gap: 2px; }
+  .arrange-text .muted { font-size: 12.5px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+  .seg button.on { background: var(--accent); color: var(--on-accent, #fff); }
   .editbar { display: flex; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14px; flex-wrap: wrap; }
   .group { display: grid; gap: 12px; }
   /* Jumped to from the search: a little room above, and the title lights up briefly. */

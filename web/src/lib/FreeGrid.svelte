@@ -8,12 +8,12 @@
   // Some tiles need more room: a camera picture with its buttons.
   const MIN_SIZE = { camera: { w: 2, h: 5 } };
 
-  const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  export const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
   // Puts `moving` in place and pushes the tiles it covers further down. Tiles
   // never move up on their own, so gaps the user left stay where they are.
-  function settle(items, moving) {
+  export function settle(items, moving) {
     const placed = [moving];
     const rest = items.filter((i) => i.id !== moving.id).map((i) => ({ ...i })).sort((a, b) => a.y - b.y || a.x - b.x);
     for (const it of rest) {
@@ -25,7 +25,7 @@
   }
 
   // First free spot for a w×h tile, row by row from the top left.
-  function freeSpot(items, w, h) {
+  export function freeSpot(items, w, h) {
     for (let y = 0; ; y++) {
       for (let x = 0; x + w <= COLS; x++) {
         const c = { x, y, w, h };
@@ -62,7 +62,11 @@
   // cols below COLS (phones) shows the tiles flowing, see below: they can still be
   // opened and edited there, but not moved or resized.
   let { tiles, defs, status, editMode, newTab, local, cols = COLS, dragging = null, findTile, grab, tileDragProps, onEdit, onCommit } = $props();
-  let arranging = $derived(editMode && cols === COLS);
+  // A group that is narrow on the page (free page layout) flows like on a
+  // phone: twelve columns would squeeze its tiles.
+  let width = $state(0);
+  let tight = $derived(width > 0 && width < 900);
+  let arranging = $derived(editMode && cols === COLS && !tight);
   const minSize = (it) => MIN_SIZE[tiles.find((tl) => tl.id === it.id)?.integration] || { w: 1, h: MIN_H };
 
   // Starting size, close to what the tile takes in rows.
@@ -81,7 +85,7 @@
   // order, take the height their content needs, live tiles get the whole
   // width (those of 2–3 desktop columns half of it) and plain links become icons
   // that fill rows together. The desktop arrangement itself is not changed.
-  let flow = $derived(cols < COLS);
+  let flow = $derived(cols < COLS || tight);
   let ordered = $derived.by(() => {
     if (!flow) return tiles;
     const at = Object.fromEntries(items.map((i) => [i.id, i]));
@@ -241,7 +245,11 @@
   }
 </script>
 
+<div class="fg" bind:clientWidth={width}>
 {#if flow}
+{#if editMode && tight && cols === COLS}
+  <p class="narrow-hint">{t('Freies Raster: Die Gruppe ist hier zu schmal – zum Anordnen breiter ziehen (▦ Seite anordnen).')}</p>
+{/if}
 <div class="flow" role="list">
   {#each ordered as tile (tile.id)}
     {@const kind = phoneKind(tile)}
@@ -280,8 +288,11 @@
   {/if}
 </div>
 {/if}
+</div>
 
 <style>
+  .fg { min-width: 0; }
+  .narrow-hint { margin: 0 0 10px; font-size: 13px; color: var(--muted); padding: 8px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); }
   .free {
     position: relative; display: grid; gap: 12px;
     grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), 29px);

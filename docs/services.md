@@ -54,7 +54,8 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Wake-on-LAN (MAC address) | with a FRITZ!Box tile: whether the computer is on, name, IP | | switch a computer on – through the FRITZ!Box (also from Docker) or a magic packet |
 | UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
 | Hivornet honeypot (user + password, role “viewer” is enough) | connections, logins, commands, downloads, attackers, countries, active tarpits in a chosen time; top countries; the latest attacks | ✓ attacks by IP, user name, password | |
-| Camera (RTSP and/or ONVIF) | still picture on a timer, live stream, events (motion, person, doorbell …) with a picture of the moment | | |
+| Camera (RTSP and/or ONVIF) | still picture on a timer, live stream, events (motion, person, doorbell …) with a picture of the moment; optionally blurred until you uncover it | | |
+| Embed a web page (address) | the page itself inside the tile – height, zoom, reload and view only adjustable; says so when a page forbids being embedded | | |
 | Speedtest Tracker | download, upload, ping, history | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |

@@ -167,6 +167,8 @@ type Widget struct {
 	Fit bool `json:"fit,omitempty"`
 	// Camera makes the tile a camera view (still picture, live stream, events).
 	Camera *CameraView `json:"camera,omitempty"`
+	// Embed makes the tile show a web page (an iframe in the browser).
+	Embed *EmbedView `json:"embed,omitempty"`
 }
 
 type Integration interface {

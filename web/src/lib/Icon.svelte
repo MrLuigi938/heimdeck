@@ -84,11 +84,24 @@
 
   const CDN = 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons';
 
+  // Heimdeck's own icons for tiles that are no app of their own ("hd:…").
+  // "⏻" is what the first Wake-on-LAN tiles stored.
+  const svg = (body) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${body}</svg>`);
+  const tileBg = (a, b) => `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#g)"/>`;
+  const POWER = svg(tileBg('#34d399', '#059669') +
+    '<g fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"><path d="M32 15v16"/><path d="M22 21.5a15 15 0 1 0 20 0"/></g>');
+  const EMBED = svg(tileBg('#60a5fa', '#2563eb') +
+    '<rect x="12" y="15" width="40" height="34" rx="5" fill="#fff"/><rect x="12" y="15" width="40" height="8" rx="4" fill="#dbeafe"/>' +
+    '<circle cx="17.5" cy="19" r="1.6" fill="#2563eb"/><circle cx="22.5" cy="19" r="1.6" fill="#2563eb"/>' +
+    '<g fill="none" stroke="#2563eb" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M27 31l-5 5 5 5"/><path d="M37 31l5 5-5 5"/></g>');
+  const BUILTIN = { 'hd:power': POWER, '⏻': POWER, 'hd:embed': EMBED };
+
   // Only a single emoji (or one or two characters) is drawn as text; longer
   // text like "Paperless NGX" or "sonarr.png" is turned into an icon name,
   // so it can never overflow the tile.
   const isEmoji = (s) => /\p{Extended_Pictographic}/u.test(s) && [...new Intl.Segmenter().segment(s)].length <= 2;
   function iconSources(i) {
+    if (BUILTIN[i]) return [BUILTIN[i]];
     if (!i || isEmoji(i)) return [];
     if (/^(https?:)?\/\//.test(i) || i.startsWith('/') || i.startsWith('data:')) return [i];
     const slug = i.toLowerCase().replace(/\.(svg|png|webp|jpe?g)$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -97,12 +110,12 @@
   }
   let sources = $derived.by(() => {
     const i = (icon || '').trim();
-    if (isEmoji(i)) return [];
+    if (isEmoji(i) && !BUILTIN[i]) return [];
     const list = favicon ? [...iconSources(i), favicon] : iconSources(i);
     const known = list.filter((s) => !misses[s]);
     return known.length ? known : list; // all failed before: try again rather than show nothing
   });
-  let emoji = $derived(icon && isEmoji(icon.trim()) ? icon.trim() : '');
+  let emoji = $derived(icon && isEmoji(icon.trim()) && !BUILTIN[icon.trim()] ? icon.trim() : '');
 
   // Load state is remembered per URL instead of being reset in an effect:
   // a cached image can finish loading before an effect runs, which used to

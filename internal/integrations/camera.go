@@ -50,14 +50,20 @@ func (cameraTile) Def() Definition {
 				Help: "Wie oft die Kachel ein neues Bild holt – nur solange das Dashboard offen ist. „nur auf Klick“ weckt Akku-Kameras nicht."},
 			{Key: "list", Label: "Ereignisliste", Type: "select", Options: []string{"3", "0", "5", "10"}, Display: true,
 				Help: "Wie viele der letzten Ereignisse unter dem Bild stehen (0 = nur das letzte im Bild)."},
+			{Key: "blur", Label: "Bild verschwommen zeigen", Type: "checkbox", Display: true,
+				Help: "Für die Privatsphäre: Bild und Livebild sind unscharf, bis du auf „Aufdecken“ tippst. Nur die Anzeige – das Bild wird trotzdem geladen."},
+			{Key: "blurAgain", Label: "Wieder verdecken", Type: "select", Options: []string{"nach 1 Minute", "nach 5 Minuten", "nach 15 Minuten", "nur von Hand"}, Display: true,
+				Help: "Nur mit „Bild verschwommen zeigen“. Verlässt du die Seite, wird das Bild immer wieder verdeckt."},
 		},
 	}
 }
 
 // CameraView is what the browser needs for a camera tile.
 type CameraView struct {
-	Still   string        `json:"still"`            // load | seconds | click
-	Detect  string        `json:"detect,omitempty"` // onvif | stream
+	Still   string        `json:"still"`             // load | seconds | click
+	Blur    bool          `json:"blur,omitempty"`    // blurred until uncovered
+	BlurFor int           `json:"blurFor,omitempty"` // seconds until covered again, 0 = by hand
+	Detect  string        `json:"detect,omitempty"`  // onvif | stream
 	Events  []CameraEvent `json:"events,omitempty"`
 	List    int           `json:"list"`
 	HasLive bool          `json:"hasLive"`
@@ -83,6 +89,10 @@ func (c cameraTile) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		list = 3
 	}
 	v := &CameraView{Still: still, Detect: CameraDetect(in), List: list, HasLive: in.V("rtsp") != "" || in.V("onvif") != ""}
+	if in.V("blur") == "true" {
+		v.Blur = true
+		v.BlurFor = map[string]int{"nach 1 Minute": 60, "nach 5 Minuten": 300, "nach 15 Minuten": 900, "nur von Hand": 0, "": 60}[in.V("blurAgain")]
+	}
 	for _, e := range camera.Events(in.TileID) {
 		v.Events = append(v.Events, CameraEvent{ID: e.ID, At: e.At.Format(time.RFC3339), Kind: in.T(e.Kind), Image: e.Image != nil})
 	}

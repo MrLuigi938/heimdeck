@@ -54,7 +54,8 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Wake-on-LAN (MAC-Adresse) | mit FRITZ!Box-Kachel: ob der Rechner an ist, Name, IP | | Rechner einschalten – über die FRITZ!Box (auch aus Docker) oder ein Magic Packet |
 | UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
 | Hivornet-Honeypot (Benutzer + Passwort, Rolle „viewer“ reicht) | Verbindungen, Logins, Befehle, Downloads, Angreifer, Länder, aktive Tarpits im gewählten Zeitraum; häufigste Länder; die letzten Angriffe | ✓ Angriffe nach IP, Benutzername, Passwort | |
-| Kamera (RTSP und/oder ONVIF) | Standbild mit Timer, Livebild, Ereignisse (Bewegung, Person, Klingel …) mit Bild des Moments | | |
+| Kamera (RTSP und/oder ONVIF) | Standbild mit Timer, Livebild, Ereignisse (Bewegung, Person, Klingel …) mit Bild des Moments; auf Wunsch verschwommen, bis du es aufdeckst | | |
+| Webseite einbetten (Adresse) | die Seite selbst in der Kachel – Höhe, Zoom, Neuladen und „nur ansehen“ einstellbar; sagt es, wenn eine Seite das Einbetten verbietet | | |
 | Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |

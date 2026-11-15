@@ -15,7 +15,11 @@
   // jumpTop: the shortcut scrolls up to the field instead of showing the window in the middle.
   // history: remember recent searches in this browser (setting "searchHistory").
   // sections: the groups of the open dashboard ({id, name, count}); a hit jumps there with onJump.
-  let { ai = null, onAskAI = null, tiles, sections = [], onJump = null, defs = {}, view = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/' } = $props();
+  // shape (free page layout): 'field' as usual, 'icon' a button that opens the
+  // search window, 'panel' a tall panel with the field on top and the hits
+  // below it (the groups to jump to while nothing is typed).
+  let { ai = null, onAskAI = null, tiles, sections = [], onJump = null, defs = {}, view: chosenView = 'window', jumpTop = false, history = true, newTab, searchEngine, searchUrl, hasSearchServices, local, boardId, shortcut = '/', shape = 'field' } = $props();
+  let view = $derived(shape === 'panel' ? 'list' : shape === 'icon' ? 'window' : chosenView);
 
   // The search window opens right under the field when the field is in view
   // (anchored, you type in the field itself), otherwise in the middle of the
@@ -23,6 +27,7 @@
   // the full-screen window.
   const phone = () => matchMedia('(max-width: 640px)').matches;
   function fieldInView() {
+    if (!input) return false;
     const r = input.getBoundingClientRect();
     return r.bottom > 0 && r.top < innerHeight;
   }
@@ -33,7 +38,7 @@
   }
   export function focus() {
     if (view !== 'window') return input.focus();
-    if (phone()) {
+    if (shape === 'icon' || phone()) {
       anchored = false;
       windowOpen = true;
     } else if (fieldInView()) {
@@ -179,7 +184,7 @@
     loading = false;
     open = false;
     if (!focus) windowOpen = false;
-    if (focus) input?.focus();
+    if (focus && shape !== 'icon') input?.focus();
     else input?.blur();
   }
 
@@ -232,7 +237,12 @@
 
 <svelte:window onpageshow={onPageShow} />
 
-<div class="search" class:wide={view === 'columns'} onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
+{#if shape === 'icon'}
+<button class="search-icon" onclick={focus} title={t('Suche') + (shortcut ? ` ( ${shortcut} )` : '')} aria-label={t('Suche')}>
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+</button>
+{:else}
+<div class="search" class:wide={view === 'columns'} class:tall={shape === 'panel'} onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
   <svg class="glass" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
   <input
     bind:this={input}
@@ -254,8 +264,24 @@
     </button>
   {/if}
 
-  {#if open && q.trim() && view === 'list'}
-    <div class="panel card" tabindex="-1">
+  {#if shape === 'panel' && !q.trim()}
+    <div class="panel inline card" tabindex="-1">
+      {#if history && recent.length}
+        <div class="section">{t('Zuletzt gesucht')}</div>
+        {#each recent as r (r)}
+          <button class="hit" onclick={() => { q = r; onInput(); input.focus(); }}><span class="jump" aria-hidden="true">↺</span> <span>{r}</span></button>
+        {/each}
+      {/if}
+      {#if onJump && sections.length}
+        <div class="section">{t('Springen zu')}</div>
+        {#each sections as s (s.id)}
+          <button class="hit" onclick={() => onJump(s.id)}><span class="jump" aria-hidden="true">↓</span> <span>{s.name}</span><span class="count">{s.count}</span></button>
+        {/each}
+      {/if}
+    </div>
+  {/if}
+  {#if (open || shape === 'panel') && q.trim() && view === 'list'}
+    <div class="panel card" class:inline={shape === 'panel'} tabindex="-1">
       {#if tileHits.length}
         <div class="section">{t('Kacheln')}</div>
         {#each tileHits as hit}
@@ -349,6 +375,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 {#if windowOpen}
   <SearchWindow bind:this={win} bind:q {ai} onAskAI={(question, hits) => { reset(); onAskAI?.(question, hits); }} {anchored} {input} {parsed} {tileHits} {groupHits} sections={onJump ? sections : []} {groups} {loading} {noHits} {tileById} {defs} {tiles} {local} {newTab} {recent} {hasSearchServices}
@@ -361,6 +388,15 @@
   .ask-ai.shift { right: 40px; }
   input.with-ai { padding-right: 76px; }
   .search { position: relative; width: 100%; max-width: 620px; }
+  /* Tall panel: field on top, hits below, scrolling inside the panel. */
+  /* Like a sidebar: stays in view while the page scrolls past its block. */
+  .search.tall { max-width: none; height: 100%; max-height: calc(100dvh - 32px); position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .search.tall > input { flex: none; }
+  .search.tall .glass { top: 22px; }
+  .search.tall .ask-ai, .search.tall .clear { top: 22px; }
+  .panel.inline { position: static; flex: 1; min-height: 0; max-height: none; align-content: start; background: var(--surface); backdrop-filter: blur(14px); }
+  .search-icon { width: 100%; height: 100%; min-height: 40px; padding: 0; display: grid; place-items: center; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); color: var(--muted); }
+  .search-icon:hover { color: var(--text); }
   .glass { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
   input { padding: 12px 44px 12px 40px; border-radius: 14px; background: var(--surface); backdrop-filter: blur(14px); border-color: var(--border); }
   /* Empties the field; only there while something is typed. */
