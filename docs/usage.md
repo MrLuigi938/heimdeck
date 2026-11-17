@@ -2,6 +2,7 @@
 
 [← Back to the README](../README.md) · [Deutsch](de/benutzung.md)
 
+- [First start](#first-start)
 - [Moving from Heimdall](#moving-from-heimdall)
 - [Dashboards and groups](#dashboards-and-groups)
 - [Several users](#several-users)
@@ -19,6 +20,12 @@
 - [Forgot your password?](#forgot-your-password)
 - [Tips](#tips)
 
+## First start
+
+![Choosing a background in the welcome](images/welcome-background.webp)
+
+After creating the first login (and for every new account) a short welcome shows what Heimdeck does, lets you pick one of Heimdeck's backgrounds and explains the ways to get services onto the dashboard. At the end a short **tour** lights up search, edit mode, the groups and the settings one after the other – it can be skipped and taken again any time under *Settings → Info → Short tour of Heimdeck*.
+
 ## Moving from Heimdall
 
 1. In Heimdall: Settings → **Export** – this downloads `HeimdallExport.json`.
@@ -34,6 +41,9 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
 
   ![Free layout: the search as a tall sidebar on the left, the groups next to it](images/free-layout-sidebar.webp)
   ![Arranging the page: every part can be dragged and resized](images/free-layout-arrange.webp)
+- **Info blocks** on the freely arranged page: while arranging, **+ Block** puts a block on the page – a **clock** (digital with thin, bold, mono or glowing digits, analog or as a word clock; with seconds, the date, the greeting and a second time zone), the **weather** with the next hours as a curve with rain bars, the coming days and one sentence like “Rain from about 15:30” (the data comes from a weather tile, which may sit in a hidden group; with *Mood* the sky behind it follows the weather and the time of day), the **status** (“All good” or which services are down – a click jumps to the group), the next **dates** from a calendar tile, a **text** (heading, note, sticky note or quote, simple Markdown) or a **countdown** (days until a date, also every year, with a bar from a start date). Like the search, the size decides what a block shows: one row high only the main value, wider and taller the curve and the days. The content grows and shrinks with the block and never reaches past it. ⚙ on a block sets its options and look (card, glass or none, font size, alignment, own accent colour), ✕ removes it. Title, dashboard switch, greeting, search and the buttons can be hidden with the crossed-out eye and brought back under **Hidden**; the settings always stay. On phones the blocks come one below the other above the groups.
+
+  ![Info blocks: clock, weather, status, countdown and a note next to the groups](images/info-blocks.webp)
 
 - **Hidden groups** are only shown after clicking 👁 (for the current session). **Protected groups** need their own password; if you forget it, your login password unlocks them too, so they can still be deleted or get a new password.
 - **Online status**: by default only the local address of a tile is checked. Turn on *Check the public address too* in the tile editor, or for all tiles under *Settings → Network and Docker*.
@@ -102,7 +112,7 @@ In the tile editor under *More options → Open the app on phones*, a tile can o
 
 - **Classic**: Heimdeck Dark and Light (or automatically like the system), Nord, Mocha, Retro Warm, Vampire and Sand – colour palettes for every taste.
 - **Playful**: Terminal (green on black), Neon City (cut corners, neon yellow and cyan), Luna 2001 (every tile a window with a blue title bar), Aero Glass (frosted glass frames), Grim Hunter (dark fantasy with brass frames), Guild Hall (gold frames, progress as experience bars), Studio (a light desktop: every tile a window with three coloured lights) and Fluid Glass (very round, see-through glass tiles over a colourful backdrop).
-- **Style options** work with every theme: corners (square or very round), tiles (glass or solid – solid is easier on weak tablets), font (system or monospace) and spacing (compact).
+- **Style options** work with every theme: corners (square or very round), tiles (glass or solid – solid is easier on weak tablets), font (system or monospace) and spacing (compact). The **page width** is 1400 px normally; *Wide* (1920 px) or *Full width* make use of large and wide screens – under *Dashboards* each dashboard can get its own width, e.g. full width for a wall tablet.
 - Every theme brings its **accent colour**; pick your own one below the themes, ✦ goes back to the theme's.
 - **Per dashboard**: under *Settings → Dashboards* a dashboard can get its own theme, e.g. Nord for “Work”.
 - A background image of your own (general or per dashboard) replaces the theme's backdrop – see [Background pictures](#background-pictures).
@@ -259,6 +269,7 @@ Use a name from [dashboardicons.com](https://dashboardicons.com) (e.g. `jellyfin
 
 *Settings → Appearance → Background picture* (or per dashboard under *Settings → Dashboards → Own background*):
 
+- **Heimdeck's own**: *Bifröst* (northern lights arching over the page), *Himinbjörg* (a starry sky over the mountains) and *Deck* (a calm grid of glowing tiles) – each drawn for dark and for light themes; the one that fits the theme in effect is shown. A new account starts with Bifröst.
 - **Upload pictures**: large photos are scaled down in the browser before they are stored (to at most 2560 pixels, as WebP), so even a 10 MB photo ends up at a few hundred KB. Uploads are kept in Heimdeck's database and are included in the data-folder backup.
 - **Address**: any picture on the web (`https://…`).
 - **Album**: with an Immich or PhotoPrism tile, pick one of its albums – its photos are used as backgrounds.

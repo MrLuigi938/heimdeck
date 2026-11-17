@@ -82,9 +82,12 @@ func newFakeFunc(t *testing.T, respond func(mode string) any) *fake {
 
 func TestArrMoreValues(t *testing.T) {
 	f := newFake(t, map[string]any{
-		"GET /api/v3/queue":          obj{"totalRecords": 0, "records": []obj{}},
-		"GET /api/v3/calendar":       []obj{},
-		"GET /api/v3/health":         []obj{},
+		"GET /api/v3/queue":    obj{"totalRecords": 0, "records": []obj{}},
+		"GET /api/v3/calendar": []obj{},
+		"GET /api/v3/health": []obj{
+			{"source": "RemovedMovieCheck", "type": "error", "message": "Film X wurde aus TMDb entfernt"},
+			{"source": "IndexerStatusCheck", "type": "warning", "message": "Indexer down"},
+		},
 		"GET /api/v3/wanted/missing": obj{"totalRecords": 7},
 		"GET /api/v3/movie":          []obj{{"sizeOnDisk": 4e9}, {"sizeOnDisk": 6e9}},
 		"GET /api/v3/rootfolder":     []obj{{"path": "/a", "freeSpace": 900e9}, {"path": "/b", "freeSpace": 30e9}},
@@ -97,6 +100,10 @@ func TestArrMoreValues(t *testing.T) {
 	s := stats(w)
 	if s["Fehlend"] != "7" || s["Filme"] != "2" || !strings.HasPrefix(s["Auf der Platte"], "9") || !strings.HasPrefix(s["Freier Speicher"], "27") {
 		t.Fatalf("stats %v", s)
+	}
+	// "Removed from TMDb" is not shown and not counted; other warnings are.
+	if s["Warnungen"] != "1" || len(w.Alerts) != 1 || w.Alerts[0] != "Indexer down" {
+		t.Fatalf("health %v %v", s["Warnungen"], w.Alerts)
 	}
 }
 

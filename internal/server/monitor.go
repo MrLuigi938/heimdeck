@@ -184,8 +184,9 @@ func ping(ctx context.Context, target string, insecure, external bool) Check {
 	if err != nil {
 		return Check{}
 	}
-	client := integrations.NewClientFor(insecure, external)
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	// Some sites answer Go's default user agent with an error page.
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Heimdeck status check)")
+	client := integrations.CheckClientFor(insecure, external)
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {

@@ -75,9 +75,16 @@ type arrQueue struct {
 }
 
 type arrHealth []struct {
+	Source  string `json:"source"`
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }
+
+// arrQuiet are health checks that are not shown: a movie or series removed
+// from TMDb/TheTVDB is only a note, stays until it is deleted by hand and
+// would otherwise sit on the tile for good. Sonarr and Radarr translate the
+// message, so the check is recognised by its source.
+var arrQuiet = map[string]bool{"RemovedMovieCheck": true, "RemovedSeriesCheck": true}
 
 func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	var queue arrQueue
@@ -91,8 +98,14 @@ func (a *arr) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if err := a.get(ctx, in, "/queue", q, &queue); err != nil {
 		return nil, err
 	}
-	var health arrHealth
-	a.get(ctx, in, "/health", nil, &health)
+	var all arrHealth
+	a.get(ctx, in, "/health", nil, &all)
+	health := all[:0]
+	for _, h := range all {
+		if !arrQuiet[h.Source] {
+			health = append(health, h)
+		}
+	}
 
 	w := &Widget{ItemsTitle: in.T("Warteschlange")}
 	for _, r := range queue.Records {

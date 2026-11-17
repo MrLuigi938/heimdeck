@@ -2,10 +2,12 @@ package integrations
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
 	"slices"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -61,6 +63,30 @@ func publicOnly(_, address string, _ syscall.RawConn) error {
 
 // NewClientFor is NewClient, limited to public addresses when external is set.
 func NewClientFor(insecure, external bool) *http.Client { return sharedClient(insecure, external) }
+
+// checkClients are the clients of the status check, one per kind.
+var checkClients sync.Map
+
+// CheckClientFor is the client for status checks: like NewClientFor, but
+// every check opens a fresh connection (HTTP/1.1, nothing kept), so a
+// connection that went stale between two checks – or an HTTP/2 connection
+// a router dropped silently – can not make a working site look down. It does
+// not follow redirects: any answer counts. Its own client, so the shared
+// one of the tiles is never changed.
+func CheckClientFor(insecure, external bool) *http.Client {
+	key := [2]bool{insecure, external}
+	if c, ok := checkClients.Load(key); ok {
+		return c.(*http.Client)
+	}
+	c := buildClient(insecure, external)
+	tr := c.Transport.(*http.Transport)
+	tr.DisableKeepAlives = true
+	tr.ForceAttemptHTTP2 = false
+	tr.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	got, _ := checkClients.LoadOrStore(key, c)
+	return got.(*http.Client)
+}
 
 func buildClient(insecure, external bool) *http.Client {
 	c := newClient(insecure)

@@ -135,8 +135,10 @@
   let abort = null;
   let ms = null;
 
+  // Pressing play or picking an event means you want to see it: uncover.
   async function startLive() {
     if (live) return;
+    uncovered = true;
     shown = null;
     error = '';
     live = true;
@@ -224,6 +226,7 @@
   async function showEvent(e) {
     if (!e.image) return;
     if (shown?.id === e.id) return (shown = null);
+    uncovered = true;
     stopLive();
     try {
       shown = { ...e, url: (await fetchPicture(`${base()}/events/${e.id}`)).url };

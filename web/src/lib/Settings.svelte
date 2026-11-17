@@ -21,7 +21,7 @@
   import Rules from './Rules.svelte';
 
   // section: the area to open first, e.g. "notify".
-  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, ai = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard } = $props();
+  let { settings, boards = [], boardId, notify = {}, docker = false, username, role = 'admin', sso = null, ai = null, photoTiles = [], groups = [], debug = false, debugForced = false, section = '', update = null, version = '', system = {}, onClose, onSaved, onSwitchBoard, onTour = null } = $props();
   // svelte-ignore state_referenced_locally
   const admin = role === 'admin';
 
@@ -195,6 +195,15 @@
     savedFlash = true;
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => (savedFlash = false), 1800);
+  }
+  // Page width per dashboard, kept as one setting {"boardId": width}.
+  let boardWidths = $derived.by(() => { try { return JSON.parse(s.pageWidthBoards || '{}') || {}; } catch { return {}; } });
+  function saveBoardWidth(id, width) {
+    const next = { ...boardWidths };
+    if (width) next[id] = width; else delete next[id];
+    const v = Object.keys(next).length ? JSON.stringify(next) : '';
+    s.pageWidthBoards = v;
+    saveSetting({ pageWidthBoards: v });
   }
   async function saveSetting(change) {
     Object.assign(s, change);
@@ -551,7 +560,16 @@
               <option value="compact">{t('Kompakt')}</option>
             </select>
           </label>
+          <label class="field">
+            <span>{t('Seitenbreite')}</span>
+            <select value={s.pageWidth || ''} onchange={(e) => saveSetting({ pageWidth: e.target.value })}>
+              <option value="">{t('Normal (1400 px)')}</option>
+              <option value="wide">{t('Breit (1920 px)')}</option>
+              <option value="full">{t('Volle Breite')}</option>
+            </select>
+          </label>
         </div>
+        <p class="help">{t('Die Seitenbreite gilt für alle Dashboards – unter „Dashboards“ kann jedes seine eigene bekommen.')}</p>
         <div class="field">
           <span>{t('Akzentfarbe')}</span>
           <div class="row wrap">
@@ -600,6 +618,12 @@
             <select class="board-theme" bind:value={b.theme} onchange={() => saveBoard(b)} aria-label={t('Theme')}>
               <option value="">{t('Allgemeines Theme')}</option>
               {#each THEMES.filter((th) => th.id !== 'auto') as th}<option value={th.id}>{t(th.name)}</option>{/each}
+            </select>
+            <select class="board-width" value={boardWidths[b.id] || ''} onchange={(e) => saveBoardWidth(b.id, e.target.value)} aria-label={t('Seitenbreite')}>
+              <option value="">{t('Allgemeine Seitenbreite')}</option>
+              <option value="normal">{t('Normal (1400 px)')}</option>
+              <option value="wide">{t('Breit (1920 px)')}</option>
+              <option value="full">{t('Volle Breite')}</option>
             </select>
             <div class="board-actions">
               <button class="small" onclick={() => { onSwitchBoard(b.id); onClose(); }}>{t('Öffnen')}</button>
@@ -918,6 +942,7 @@
           <a class="button small" href="https://github.com/MrLuigi938/heimdeck" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a class="button small" href={docsLink} target="_blank" rel="noopener noreferrer">📖 {t('Anleitung')}</a>
           <a class="button small" href={issueLink} target="_blank" rel="noopener noreferrer">🐞 {t('Fehler melden')}</a>
+          {#if onTour}<button class="small" onclick={onTour}>🧭 {t('Kurze Tour durch Heimdeck')}</button>{/if}
         </div>
 
         <h3>{t('System')}</h3>
@@ -1025,7 +1050,8 @@
   .board-bg > summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
   .inline { display: flex; gap: 8px; align-items: center; font-size: 13.5px; white-space: nowrap; }
   .inline select { width: auto; }
-  .board-theme { grid-column: 1 / -1; grid-row: 3; font-size: 13px; }
+  .board-theme { grid-column: 1 / 3; grid-row: 3; font-size: 13px; }
+  .board-width { grid-column: 3; grid-row: 3; font-size: 13px; }
   .board-row:not(form) { margin-bottom: 8px; }
   /* Theme cards: a tiny tile in the theme's colours. */
   .theme-group { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }

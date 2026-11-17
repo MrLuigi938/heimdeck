@@ -2,7 +2,20 @@ import { get } from './api.js';
 
 // A background is one entry per line: a picture address (uploaded or from
 // the web) or a photo album – "album:<tile>:<album id>:<name>". A single
-// address, as stored before 1.5, is a list of one.
+// address, as stored before 1.5, is a list of one. Heimdeck's own
+// backgrounds are "builtin:<id>".
+
+// Each is drawn twice – for the dark and for the light look – and the one
+// that fits the theme in effect is shown.
+export const BUILTIN_BACKGROUNDS = [
+  { id: 'bifroest', name: 'Bifröst', text: 'Nordlicht als Bogen über der Seite' },
+  { id: 'himinbjoerg', name: 'Himinbjörg', text: 'Sternenhimmel über den Bergen' },
+  { id: 'deck', name: 'Deck', text: 'Ein ruhiges Raster aus leuchtenden Kacheln' },
+];
+const builtinIds = new Set(BUILTIN_BACKGROUNDS.map((b) => b.id));
+/** Dark or light, as the theme in effect right now. */
+export const backgroundMode = () => (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+export const builtinUrl = (id, mode = backgroundMode()) => `/backgrounds/${id}-${mode}.svg`;
 
 export function parseBackgrounds(value) {
   return String(value || '')
@@ -10,13 +23,15 @@ export function parseBackgrounds(value) {
     .map((l) => l.trim())
     .filter(Boolean)
     .map((l) => {
+      const b = /^builtin:([a-z]+)$/.exec(l);
+      if (b && builtinIds.has(b[1])) return { kind: 'builtin', id: b[1], name: BUILTIN_BACKGROUNDS.find((x) => x.id === b[1]).name, url: builtinUrl(b[1]) };
       const m = /^album:(\d+):([^:]+):?(.*)$/.exec(l);
       return m ? { kind: 'album', tile: Number(m[1]), album: m[2], name: m[3] || m[2] } : { kind: 'url', url: l };
     });
 }
 
 export const joinBackgrounds = (list) =>
-  list.map((e) => (e.kind === 'album' ? `album:${e.tile}:${e.album}:${e.name.replace(/\n/g, ' ')}` : e.url)).join('\n');
+  list.map((e) => (e.kind === 'album' ? `album:${e.tile}:${e.album}:${e.name.replace(/\n/g, ' ')}` : e.kind === 'builtin' ? `builtin:${e.id}` : e.url)).join('\n');
 
 // Album pictures, loaded once per page view (the server keeps them 10 minutes).
 const albumCache = new Map();
@@ -33,6 +48,7 @@ export async function backgroundImages(value) {
   const out = [];
   for (const e of parseBackgrounds(value)) {
     if (e.kind === 'album') out.push(...(await albumImages(e)));
+    else if (e.kind === 'builtin') out.push(builtinUrl(e.id));
     else out.push(e.url);
   }
   return out;

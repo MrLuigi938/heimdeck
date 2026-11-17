@@ -124,8 +124,11 @@ func (s *Server) migrateSettings() {
 }
 
 // starterSettings gives a new account the language of whoever created it.
+// A new account starts with Heimdeck's Bifröst background; onboarding=1
+// shows the welcome (background, short tour) once; it is
+// cleared when the person finishes or skips it.
 func (s *Server) starterSettings(user int64, lang string) {
-	logErr("Sprache speichern", s.store.SaveUserSettings(user, map[string]string{"language": lang}))
+	logErr("Sprache speichern", s.store.SaveUserSettings(user, map[string]string{"language": lang, "onboarding": "1", "background": "builtin:bifroest"}))
 }
 
 // newAccount sets up a fresh account: its first dashboard with starter groups.

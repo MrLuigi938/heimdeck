@@ -9,6 +9,8 @@
   import { importFile } from './importFile.js';
   import { browserNotify, checkAlerts } from './browserNotify.svelte.js';
   import Settings from './Settings.svelte';
+  import Welcome from './Welcome.svelte';
+  import Tour from './Tour.svelte';
   import GroupEditor from './GroupEditor.svelte';
   import Uptime from './Uptime.svelte';
   import Credit from './Credit.svelte';
@@ -23,6 +25,10 @@
   import SeasonFx from './SeasonFx.svelte';
   import DisplayMode from './DisplayMode.svelte';
   import PageGrid, { readingOrder } from './PageGrid.svelte';
+  import { freeSpot } from './FreeGrid.svelte';
+  import InfoBlock from './InfoBlock.svelte';
+  import BlockEditor from './BlockEditor.svelte';
+  import { BLOCK_TYPES, HIDEABLE, blockOf, newBlockId, textRows } from './infoBlocks.js';
   import { confirmDialog } from './dialog.svelte.js';
   import { tick } from 'svelte';
 
@@ -107,6 +113,12 @@
   let defs = $derived(Object.fromEntries((data?.integrations || []).map((d) => [d.id, d])));
   let boards = $derived(data?.boards || []);
   let board = $derived(boards.find((b) => b.id === boardId) || boards[0]);
+  // Page width: the dashboard's own, else the general one (normal = 1400 px).
+  let pageWidth = $derived.by(() => {
+    let per = {};
+    try { per = JSON.parse(settings.pageWidthBoards || '{}') || {}; } catch {}
+    return per[board?.id] || settings.pageWidth || 'normal';
+  });
   // A dashboard someone else shared: only to look at, buttons only if allowed.
   let readOnly = $derived(!!board?.shared);
   let admin = $derived(data?.role === 'admin');
@@ -302,7 +314,10 @@
   // Theme, accent colour and background follow the settings; a dashboard can have its own theme.
   $effect(() => {
     const media = matchMedia('(prefers-color-scheme: light)');
-    const apply = () => applyTheme(settings, board?.theme);
+    const apply = () => {
+      applyTheme(settings, board?.theme);
+      themeMode = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    };
     apply();
     media.addEventListener('change', apply);
     document.title = settings.title || 'Heimdeck';
@@ -326,7 +341,26 @@
       document.body.classList.remove('has-bg');
     }
   }
+  // Dark or light right now: Heimdeck's own backgrounds come in both.
+  let themeMode = $state('dark');
+
+  // The welcome for a new account (once) and the short tour (also from Settings → Info).
+  let welcomeDone = $state(false);
+  let showWelcome = $derived(!!data && settings.onboarding === '1' && !welcomeDone);
+  let touring = $state(false);
+  function chooseBackground(value) {
+    data.settings.background = value;
+    put('/settings', { background: value }).catch((e) => toast(e.message, 'bad'));
+  }
+  function finishWelcome(tour) {
+    welcomeDone = true;
+    data.settings.onboarding = '';
+    put('/settings', { onboarding: '' }).catch(() => {});
+    if (tour) setTimeout(() => (touring = true), 150);
+  }
+  let firstTileGroup = $derived(allTiles.length === 0 && !readOnly ? boardGroups.find((g) => !g.locked) : null);
   $effect(() => {
+    themeMode; // a built-in background follows the switch between dark and light
     const value = board?.background || settings.background || '';
     const every = Number(settings.backgroundEvery) || 0;
     let stopped = false;
@@ -612,15 +646,92 @@
   // Groups in the order of the free layout (phones and the jump list follow it).
   let orderedGroups = $derived(freeOn ? [...boardGroups].sort((a, b) => readingOrder(pagePositions)('g' + a.id, 'g' + b.id)) : boardGroups);
   const groupShown = (g) => g.locked || g.visibility !== 'hidden' || showHidden || editMode;
+  // Parts of the page hidden in the free layout, and its info blocks (clock, weather …).
+  let hiddenParts = $derived(new Set(activeLayout?.hidden || []));
+  let infoBlocks = $derived(
+    Object.entries(activeLayout?.blocks || {}).map(([id, raw]) => ({ id, block: blockOf(raw) })).filter((x) => x.block),
+  );
+  const PART_LABELS = { title: 'Titel', boards: 'Dashboard wechseln', greet: 'Begrüßung', search: 'Suche', tools: 'Knöpfe' };
   let pageBlocks = $derived([
     { id: 'title', label: t('Titel'), size: { w: 3, h: 1 } },
     ...(boards.length > 1 ? [{ id: 'boards', label: t('Dashboard wechseln'), size: { w: 2, h: 1 } }] : []),
     ...(settings.showGreeting !== 'false' ? [{ id: 'greet', label: t('Begrüßung'), size: { w: 4, h: 2 } }] : []),
-    { id: 'search', label: t('Suche'), size: { w: 4, h: 2 }, fixed: true },
+    // Two rows at least: the field (and the icon) is taller than one row.
+    { id: 'search', label: t('Suche'), size: { w: 4, h: 2 }, min: { w: 1, h: 2 }, fixed: true },
     { id: 'tools', label: t('Knöpfe'), size: { w: 3, h: 1 } },
     { id: 'settings', label: t('Einstellungen'), size: { w: 1, h: 1 } },
+    ...infoBlocks.map(({ id, block }) => {
+      const def = BLOCK_TYPES[block.type];
+      // A text cannot get so small that it is no longer readable: its smallest height follows its length.
+      const minH = block.type === 'text' ? (w, colPx) => textRows(block.opt, block.style, w, colPx) : null;
+      // A longer text is never squeezed into a single column.
+      const min = block.type === 'text' && (block.opt.text || '').length > 30 ? { ...def.min, w: 2 } : def.min;
+      return { id, kind: 'info', label: `${def.icon} ${t(def.name)}`, size: def.size, min, minH, fixed: true, info: block };
+    }),
     ...boardGroups.filter(groupShown).map((g) => ({ id: 'g' + g.id, kind: 'group', label: g.name, size: { w: 12, h: 4 }, min: { w: 2, h: 2 }, group: g })),
-  ]);
+  ].filter((b) => !hiddenParts.has(b.id)));
+
+  // ---- info blocks ----
+  // Tiles an info block can take its data from (open groups only).
+  let blockSources = $derived.by(() => {
+    const out = { weather: [], calendar: [] };
+    for (const g of data?.groups || []) {
+      if (g.locked) continue;
+      const bname = boards.find((b) => b.id === g.boardId)?.name || '';
+      for (const x of g.tiles) if (out[x.integration]) out[x.integration].push({ id: x.id, name: x.name, where: `${t(bname)} › ${g.name}` });
+    }
+    return out;
+  });
+  let tileById = $derived(Object.fromEntries((data?.groups || []).flatMap((g) => g.tiles.map((x) => [x.id, x]))));
+  let blockEdit = $state(null); // { id } of the block being changed, or { id: '' } for a new one
+  function saveBlock(block) {
+    const layout = draft.layout;
+    layout.blocks ||= {};
+    let id = blockEdit.id;
+    if (!id) {
+      id = newBlockId(layout.blocks);
+      // The first free spot, so it shows right away where it lands.
+      const size = BLOCK_TYPES[block.type].size;
+      const taken = pageBlocks.map((b) => layout[device]?.[b.id] && { id: b.id, ...layout[device][b.id] }).filter(Boolean);
+      layout[device] = { ...layout[device], [id]: freeSpot(taken, size.w, size.h) };
+    }
+    layout.blocks[id] = block;
+    blockEdit = null;
+  }
+  async function removeBlock(id) {
+    if (!(await confirmDialog(t('Der Block wird von dieser Seite entfernt.'), { title: t('Block entfernen?'), confirmLabel: t('Entfernen'), danger: true }))) return;
+    const layout = draft.layout;
+    delete layout.blocks?.[id];
+    for (const d of ['desktop', 'tablet']) if (layout[d]) delete layout[d][id];
+  }
+  function hidePart(id) {
+    draft.layout.hidden = [...new Set([...(draft.layout.hidden || []), id])];
+  }
+  function showPart(id) {
+    draft.layout.hidden = (draft.layout.hidden || []).filter((x) => x !== id);
+    // Its old place may be taken meanwhile: it comes back on the first free spot.
+    for (const d of ['desktop', 'tablet']) if (draft.layout[d]) delete draft.layout[d][id];
+    if (!draft.layout.hidden.length) {
+      delete draft.layout.hidden;
+      hiddenMenu = false;
+    }
+  }
+  let hiddenMenu = $state(false);
+  // A new weather or calendar tile from the block dialog: into the first open group of this dashboard.
+  function newSourceTile(integration) {
+    const def = defs[integration];
+    const g = boardGroups.find((x) => !x.locked);
+    if (!g) {
+      toast(t('Lege zuerst eine Gruppe an.'), 'bad');
+      return;
+    }
+    editing = { groupId: g.id, integration, name: t(def?.name || integration), icon: def?.icon || '', showWidget: true };
+  }
+  // Phones show the info blocks above the groups, one below the other, at most six rows high.
+  const phoneCell = (id) => {
+    const p = activeLayout?.desktop?.[id] || activeLayout?.tablet?.[id] || { w: 6, h: 3 };
+    return { w: Math.max(4, Math.min(6, p.w)), h: Math.max(1, Math.min(6, p.h)) };
+  };
   // The free layout starts out looking like the automatic one.
   function startPositions() {
     const p = { title: { x: 0, y: 0, w: 3, h: 1 }, greet: { x: 0, y: 1, w: 5, h: 2 }, search: { x: 5, y: 0, w: 4, h: 2 }, tools: { x: 9, y: 0, w: 2, h: 2 }, settings: { x: 11, y: 0, w: 1, h: 2 } };
@@ -737,7 +848,7 @@
 <svelte:window onclick={(e) => boardMenu && !e.target.closest('.boards') && (boardMenu = false)} onkeydown={onShortcut} onscroll={onPageScroll} onresize={onPageScroll} />
 
 {#if data}
-  <div class="page" class:display bind:this={pageEl} onclickcapture={keepOnDisplay} style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
+  <div class="page width-{pageWidth}" class:display bind:this={pageEl} onclickcapture={keepOnDisplay} style:--jump-h={showJumpBar ? `${jumpBarHeight}px` : null}>
     {#snippet boardSwitch()}
             <div class="boards">
               <button class="board-btn" onclick={() => (boardMenu = !boardMenu)} aria-expanded={boardMenu} title={t('Dashboard wechseln')}>
@@ -784,7 +895,7 @@
           <button class="ghost icon" title={t('Dienste automatisch finden')} aria-label={t('Dienste automatisch finden')} onclick={() => (showDiscover = true)}>{data.docker ? '🐳' : '🔍'}</button>
         {/if}
         {#if !readOnly}
-          <button class="ghost icon" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
+          <button class="ghost icon" data-tour="edit" class:on={editMode} title={t('Anordnen & bearbeiten')} aria-label={t('Anordnen & bearbeiten')} onclick={() => (editMode = !editMode)}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
           </button>
         {/if}
@@ -798,7 +909,7 @@
         </button>
     {/snippet}
     {#snippet settingsButton(wide)}
-        <button class="ghost settings-btn" class:icon={!wide} class:wide title={updateStale ? t('Update verfügbar') : t('Einstellungen')} aria-label={updateStale ? t('Einstellungen – Update verfügbar') : t('Einstellungen')} onclick={() => openSettings(updateStale ? 'info' : '')}>
+        <button class="ghost settings-btn" data-tour="settings" class:icon={!wide} class:wide title={updateStale ? t('Update verfügbar') : t('Einstellungen')} aria-label={updateStale ? t('Einstellungen – Update verfügbar') : t('Einstellungen')} onclick={() => openSettings(updateStale ? 'info' : '')}>
           {#if updateStale}<span class="update-dot" aria-hidden="true"></span>{/if}
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
           {#if wide}<span class="btn-label">{t('Einstellungen')}</span>{/if}
@@ -890,6 +1001,19 @@
         {#if draft.scope === 'board' && ownBoards.length > 1}
           <button class="small" onclick={useForAll} title={t('Dieses Layout für alle Dashboards übernehmen')}>{t('Für alle übernehmen')}</button>
         {/if}
+        <button class="small" onclick={() => (blockEdit = { id: '' })} title={t('Uhr, Wetter, Status, Termine, Text oder Countdown auf die Seite legen')}>+ {t('Block')}</button>
+        {#if draft.layout.hidden?.length}
+          <div class="hidden-parts">
+            <button class="small" onclick={() => (hiddenMenu = !hiddenMenu)} aria-expanded={hiddenMenu}>👁 {t('Ausgeblendet ({n})', { n: draft.layout.hidden.length })}</button>
+            {#if hiddenMenu}
+              <div class="board-menu card" role="menu">
+                {#each draft.layout.hidden as id (id)}
+                  <button role="menuitem" onclick={() => showPart(id)}>{t(PART_LABELS[id] || id)} – {t('wieder zeigen')}</button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
         <button class="small" onclick={resetArrange}>{t('Zurücksetzen')}</button>
         <button class="small" onclick={cancelArrange}>{t('Abbrechen')}</button>
         <button class="small primary" onclick={saveArrange}>{t('Fertig')}</button>
@@ -899,7 +1023,7 @@
     {#if allTiles.length === 0 && readOnly}
       <div class="empty card"><p class="muted">{t('Auf diesem geteilten Dashboard gibt es noch nichts zu sehen.')}</p></div>
     {:else if allTiles.length === 0}
-      <div class="empty card">
+      <div class="empty card" data-tour="start">
         <h2>{t("Los geht's")} 👋</h2>
         <p class="muted">{admin ? t('Dein Dashboard ist noch leer. Füge deine Dienste hinzu – am schnellsten automatisch über Docker.') : t('Dein Dashboard ist noch leer. Füge deine Dienste als Kacheln hinzu.')}</p>
         <div class="row center">
@@ -936,6 +1060,9 @@
             <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
           {/if}
         </div>
+      {:else if b.kind === 'info'}
+        <InfoBlock block={b.info} {it} source={tileById[b.info.tile] || null} {status} boardTiles={allTiles} groups={boardGroups} {greeting} onJump={jumpToGroup}
+          onSetup={arranging ? () => (blockEdit = { id: b.id }) : null} />
       {:else if b.group}
         {@render groupBlock(b.group, 0)}
       {/if}
@@ -951,7 +1078,7 @@
           {#if editMode}<span class="help lock-hint">{t('Gruppenpasswort vergessen? Dein Anmelde-Passwort entsperrt die Gruppe auch – danach lässt sie sich löschen oder neu schützen.')}</span>{/if}
         </form>
       {:else}
-        <section class="group" id="group-{group.id}" class:hidden-group={group.visibility === 'hidden'} class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
+        <section class="group" data-tour="group" id="group-{group.id}" class:hidden-group={group.visibility === 'hidden'} class:flash={flashGroup === group.id} aria-label={group.name} ondragover={(e) => editMode && e.preventDefault()} ondrop={(e) => editMode && groupDrop(e, group)}>
           <div class="group-head">
             <h2 class="on-bg">{group.name}</h2>
             {#if group.visibility === 'hidden'}<span class="vis on-bg" title={t('Ausgeblendete Gruppe')}>👁 {t('ausgeblendet')}</span>{/if}
@@ -1000,9 +1127,33 @@
       {/if}
     {/snippet}
 
+    {#snippet blockTools(b)}
+      {#if b.kind === 'info'}
+        <div class="btool" role="button" tabindex="0" title={t('Block einstellen')} aria-label={t('{name} einstellen', { name: b.label })}
+          onclick={() => (blockEdit = { id: b.id })} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (blockEdit = { id: b.id }))}>⚙</div>
+        <div class="btool" role="button" tabindex="0" title={t('Block entfernen')} aria-label={t('{name} entfernen', { name: b.label })}
+          onclick={() => removeBlock(b.id)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), removeBlock(b.id))}>✕</div>
+      {:else if HIDEABLE.includes(b.id)}
+        <div class="btool" role="button" tabindex="0" title={t('Ausblenden')} aria-label={t('{name} ausblenden', { name: b.label })}
+          onclick={() => hidePart(b.id)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), hidePart(b.id))}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18" /><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>
+        </div>
+      {/if}
+    {/snippet}
+
     {#if freePage}
-      <PageGrid bind:this={pageGrid} blocks={pageBlocks} positions={pagePositions} {arranging} onChange={changePositions} block={pageBlock} />
+      <PageGrid bind:this={pageGrid} blocks={pageBlocks} positions={pagePositions} {arranging} onChange={changePositions} block={pageBlock} tools={blockTools} />
     {:else}
+      {#if freeOn && device === 'phone' && !display && infoBlocks.length && allTiles.length}
+        <div class="phone-blocks">
+          {#each [...infoBlocks].sort((a, b) => readingOrder(activeLayout?.desktop)(a.id, b.id)) as x (x.id)}
+            {@const cell = phoneCell(x.id)}
+            <div class="phone-block" style:height="{cell.h * 41 - 12}px">
+              <InfoBlock block={x.block} it={cell} source={tileById[x.block.tile] || null} {status} boardTiles={allTiles} groups={boardGroups} {greeting} onJump={jumpToGroup} />
+            </div>
+          {/each}
+        </div>
+      {/if}
       {#each orderedGroups as group, gi (group.id)}
         {#if groupShown(group)}{@render groupBlock(group, gi)}{/if}
       {/each}
@@ -1043,6 +1194,10 @@
       </div>
     {/if}
   {/if}
+  {#if blockEdit && draft}
+    <BlockEditor block={blockEdit.id ? draft.layout.blocks?.[blockEdit.id] : null} sources={blockSources} onSave={saveBlock} onClose={() => (blockEdit = null)}
+      onNewTile={readOnly ? null : newSourceTile} />
+  {/if}
   {#if editing}
     <TileEditor tile={editing} groups={groupOptions} integrations={data.integrations} onClose={() => { editing = null; discoverAfterSave = false; }} onSaved={saved} />
   {/if}
@@ -1059,7 +1214,15 @@
   <AiChat ai={data.ai} start={chat.start} layout={settings.aiChatLayout === 'side' ? 'side' : 'window'} userId={data.userId} onClose={() => (chat = null)} />
 {/if}
 {#if showSettings}
-    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} ai={data.ai} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved} />
+    <Settings {settings} {boards} boardId={board?.id} section={settingsSection} update={data.update} version={data.version} system={data.system} notify={data.notify} docker={data.docker} username={data.username} role={data.role} sso={data.sso} ai={data.ai} {photoTiles} groups={data.groups} debug={data.debug} debugForced={data.debugForced} onSwitchBoard={switchBoard} onClose={() => (showSettings = false)} onSaved={saved}
+      onTour={() => { showSettings = false; editMode = false; setTimeout(() => (touring = true), 150); }} />
+  {/if}
+  {#if showWelcome}
+    <Welcome username={data.username} background={settings.background || ''} mode={themeMode} discover={data.docker ? 'docker' : data.proxmox ? 'proxmox' : ''}
+      onBackground={chooseBackground} onDone={finishWelcome} />
+  {/if}
+  {#if touring}
+    <Tour onDone={() => (touring = false)} onAdd={firstTileGroup ? () => (editing = { groupId: firstTileGroup.id }) : null} />
   {/if}
   {#if showKeys}
     <Modal title={t('Tastenkürzel')} onClose={() => (showKeys = false)}>
@@ -1077,6 +1240,8 @@
 <style>
   /* Its own layer above the seasonal effects, which run behind the tiles. */
   .page { max-width: 1400px; margin: 0 auto; padding: 28px 24px 80px; display: grid; gap: 28px; position: relative; z-index: 1; }
+  .page.width-wide { max-width: 1920px; }
+  .page.width-full { max-width: none; padding-left: clamp(16px, 2vw, 40px); padding-right: clamp(16px, 2vw, 40px); }
   /* The display view shows only the tiles; DisplayMode sets the top padding and the zoom. */
   .page.display { max-width: none; padding: 0 18px 12px; gap: 12px; align-content: start; transition: opacity .35s; }
   .page.display > :global(:not(.group):not(.empty)), .page.display > :global(.hidden-group), .page.display > :global(.group:not(:has(.tile))) { display: none; }
@@ -1127,6 +1292,18 @@
   .logout-ask { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
   .logout-check { display: none; font-weight: 700; }
   .hidden-hint { justify-self: center; background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); font-size: 13px; padding: 6px 14px; border-radius: 999px; }
+
+  /* Buttons on a block while arranging: settings, remove, hide (divs, as themes style every button). */
+  .btool {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; cursor: pointer; font-size: 13px; line-height: 1;
+    background: var(--surface-solid); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  }
+  .btool:hover, .btool:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+  .hidden-parts { position: relative; }
+  .hidden-parts .board-menu { left: auto; right: 0; }
+  /* Phones: the info blocks of the free layout above the groups, one below the other. */
+  .phone-blocks { display: grid; gap: 12px; }
+  .phone-block { min-width: 0; contain: size; }
 
   /* Free page: the blocks fill their cell. */
   /* Small parts keep their natural size inside their block: title and greeting

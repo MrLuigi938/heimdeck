@@ -88,6 +88,11 @@
     </div>
     {#if setup}
       <p class="muted">{t('Willkommen! Lege zuerst deinen Zugang an. Damit ist dein Dashboard vor fremden Blicken geschützt.')}</p>
+      <ol class="steps" aria-label={t('Einrichtung')}>
+        <li class="on">{t('Zugang anlegen')}</li>
+        <li>{t('Hintergrund wählen')}</li>
+        <li>{t('Kurze Einführung')}</li>
+      </ol>
     {:else if invite && inviteOk === null}
       <p class="muted">{t('Einladung wird geprüft …')}</p>
     {:else if invite && inviteOk}
@@ -141,7 +146,15 @@
   .fallback[open] { display: grid; }
   .fallback summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
   .fallback :global(.field) { margin-bottom: 12px; }
-  .wrap { min-height: 100vh; display: grid; place-items: center; align-content: center; padding: 16px; }
+  /* Heimdeck's own background behind the sign-in, dark or light like the page. */
+  .wrap { min-height: 100vh; display: grid; place-items: center; align-content: center; padding: 16px;
+    background: url('/backgrounds/bifroest-dark.svg') center top / cover no-repeat fixed; }
+  :global(:root[data-theme='light']) .wrap { background-image: url('/backgrounds/bifroest-light.svg'); }
+  .steps { margin: 0; padding: 0; list-style: none; display: flex; gap: 6px; flex-wrap: wrap; counter-reset: step; font-size: 12.5px; }
+  .steps li { counter-increment: step; color: var(--muted); padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--surface-2); display: flex; align-items: center; gap: 6px; }
+  .steps li::before { content: counter(step); display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--border-strong); color: var(--text); font-size: 11px; font-weight: 600; }
+  .steps li.on { color: var(--text); }
+  .steps li.on::before { background: var(--accent); color: var(--on-accent, #fff); }
   .box { width: min(380px, 100%); padding: 32px; display: grid; gap: 16px; }
   h1 { margin: 0; font-size: 24px; }
   .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

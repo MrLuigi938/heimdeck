@@ -11,15 +11,35 @@
 
   // Blocks without a position (new groups, or the layout was just started) go
   // to the first free spot after the placed ones.
-  export function placeBlocks(blocks, positions) {
+  // A stored place smaller than the block's minimum (e.g. the search one row
+  // high, where its field does not fit) grows to it; whatever that overlaps
+  // is pushed down, so no block ever lies over another one.
+  // A block's smallest size at a width: min, and for some (a text) minH(w),
+  // the rows its content needs at that width to stay readable.
+  // colPx: how wide one column is right now, in pixels.
+  export function minSize(b, w, colPx = 100) {
+    const m = b?.min || { w: 1, h: 1 };
+    return b?.minH ? { w: m.w, h: Math.max(m.h, b.minH(Math.max(m.w, w), colPx)) } : m;
+  }
+
+  export function placeBlocks(blocks, positions, colPx = 100) {
     const items = [];
-    for (const b of blocks) if (positions?.[b.id]) items.push({ id: b.id, ...positions[b.id] });
+    let grown = false;
+    for (const b of blocks) {
+      const p = positions?.[b.id];
+      if (!p) continue;
+      const w = Math.min(COLS, Math.max(minSize(b, p.w, colPx).w, p.w));
+      const h = Math.max(minSize(b, w, colPx).h, p.h);
+      grown ||= w !== p.w || h !== p.h;
+      items.push({ id: b.id, ...p, x: Math.min(p.x, COLS - w), w, h });
+    }
+    const placed = grown ? pack(items) : items;
     for (const b of blocks) {
       if (positions?.[b.id]) continue;
       const s = b.size || { w: 3, h: 2 };
-      items.push({ id: b.id, ...freeSpot(items, Math.min(s.w, COLS), s.h) });
+      placed.push({ id: b.id, ...freeSpot(placed, Math.min(s.w, COLS), s.h) });
     }
-    return items;
+    return placed;
   }
 
   // Pushes blocks down until none overlap, top to bottom.
@@ -53,9 +73,12 @@
   // blocks: [{ id, label, size: {w, h}, min: {w, h}, fixed }]; fixed blocks keep
   // their height and scroll inside (the search panel), the others may grow.
   // block: snippet (block, {w, h}) that draws the content.
-  let { blocks, positions = {}, arranging = false, onChange, block } = $props();
+  // tools: optional snippet (block) with small buttons on the block while arranging (settings, hide, remove).
+  let { blocks, positions = {}, arranging = false, onChange, block, tools = null } = $props();
 
-  let items = $derived(placeBlocks(blocks, positions));
+  // The width of one column, for blocks whose smallest height depends on it (a text).
+  let colPx = $state(100);
+  let items = $derived(placeBlocks(blocks, positions, colPx));
   let preview = $state(null);
   let shown = $derived(preview || items);
   let byId = $derived(Object.fromEntries(shown.map((i) => [i.id, i])));
@@ -64,7 +87,17 @@
   let cells = {};
   let action = $state(null); // { kind: 'move' | 'size', it, x0, y0 }
 
-  const minOf = (id) => blocks.find((b) => b.id === id)?.min || { w: 1, h: 1 };
+  // w: the width the block has (or gets) – some blocks need more rows when narrower.
+  const minOf = (id, w = byId[id]?.w || 1) => minSize(blocks.find((b) => b.id === id), w, colPx);
+  $effect(() => {
+    if (!gridEl) return;
+    const ro = new ResizeObserver(() => {
+      const c = Math.round((gridEl.clientWidth - GAP * (COLS - 1)) / COLS);
+      if (c > 0 && c !== colPx) colPx = c;
+    });
+    ro.observe(gridEl);
+    return () => ro.disconnect();
+  });
   // A group grows with its tiles (live data loading, lists getting longer), so
   // nothing is ever cut off. Only a height set by hand stays: then the tiles
   // scroll inside the group.
@@ -136,8 +169,8 @@
     if (kind === 'move') {
       next = { ...it, x: clamp(it.x + dx, 0, COLS - it.w), y: Math.max(0, it.y + dy) };
     } else {
-      const m = minOf(it.id);
-      next = { ...it, w: clamp(it.w + dx, m.w, COLS - it.x), h: Math.max(m.h, it.h + dy) };
+      const w = clamp(it.w + dx, minOf(it.id).w, COLS - it.x);
+      next = { ...it, w, h: Math.max(minOf(it.id, w).h, it.h + dy) };
       if (next.h !== it.h && it.id.startsWith('g')) next.fix = true;
     }
     const now = byId[it.id];
@@ -172,9 +205,9 @@
     const d = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[e.key];
     if (!d) return;
     e.preventDefault();
-    const m = minOf(it.id);
+    const w = e.shiftKey ? clamp(it.w + d[0], minOf(it.id).w, COLS - it.x) : it.w;
     let next = e.shiftKey
-      ? { ...it, w: clamp(it.w + d[0], m.w, COLS - it.x), h: Math.max(m.h, it.h + d[1]) }
+      ? { ...it, w, h: Math.max(minOf(it.id, w).h, it.h + d[1]) }
       : { ...it, x: clamp(it.x + d[0], 0, COLS - it.w), y: Math.max(0, it.y + d[1]) };
     // Moving up or down onto another block jumps past it, instead of pushing
     // that block further down with every key press.
@@ -207,9 +240,13 @@
         {@render block(b, it)}
         {#if arranging}
           <!-- div, not button: themes style every button (gradients, frames) and would cover the block. -->
-          <div class="handle" role="button" tabindex="0" aria-label={t('{name} verschieben (Pfeiltasten, mit Umschalt die Größe)', { name: b.label })}
+          <div class="handle" class:low={it.h <= 1} role="button" tabindex="0" aria-label={t('{name} verschieben (Pfeiltasten, mit Umschalt die Größe)', { name: b.label })}
             onpointerdown={(e) => start(e, it, 'move')} onpointermove={move} onpointerup={end} onpointercancel={cancel} onkeydown={(e) => key(e, it)}>
             <span class="tag">{b.label}{#if tooSmall[b.id]}<span class="more" title={t('Die Höhe ist von Hand gesetzt und die Kacheln brauchen mehr Platz – sie scrollen in der Gruppe. Doppelklick auf die Ecke: wieder mit den Kacheln wachsen.')}> ↕</span>{/if}</span>
+            {#if tools}
+              <!-- A click on a button must not start dragging the block. -->
+              <span class="tools" role="presentation" onpointerdown={(e) => e.stopPropagation()}>{@render tools(b)}</span>
+            {/if}
           </div>
           <div class="resize" aria-hidden="true" title={t('Größe ändern – Doppelklick passt die Höhe an den Inhalt an')}
             onpointerdown={(e) => start(e, it, 'size')} onpointermove={move} onpointerup={end} onpointercancel={cancel} ondblclick={() => fit(b.id)}></div>
@@ -246,6 +283,11 @@
   .pcell.fixed.pb-group > :global(*:hover) { scrollbar-color: var(--border-strong) transparent; }
   .arranging .pcell { min-height: 0; overflow: hidden; border-radius: var(--radius); }
   .arranging .pcell > :global(*) { pointer-events: none; }
+  /* While arranging every group has a fixed height, but it is only a preview:
+     nothing inside scrolls, so the mouse wheel always scrolls the page. */
+  .arranging .pcell.pb-group > :global(*), .arranging .pcell.pb-group :global(.tile), .arranging .pcell.pb-search :global(.panel) {
+    overflow: hidden !important; overscroll-behavior: auto !important;
+  }
   .arranging .pcell.moving { opacity: .5; }
   .handle {
     position: absolute; inset: 0; z-index: 3; padding: 0; border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
@@ -259,6 +301,14 @@
     font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff);
   }
   .tag .more { font-weight: 700; }
+  .tools { position: absolute; right: 6px; top: 6px; display: flex; gap: 4px; cursor: default; }
+  .tools:empty { display: none; }
+  /* A block one row high: name and buttons in the middle and a bit smaller, so they stay inside. */
+  .handle.low .tag, .handle.low .tools { top: 50%; transform: translateY(-50%); }
+  .handle.low .tools { right: 4px; gap: 2px; }
+  .handle.low .tools :global(.btool) { width: 20px; height: 20px; font-size: 11px; }
+  /* A narrow block: the name gives way to the buttons. */
+  .handle:has(.tools:not(:empty)) .tag { max-width: calc(100% - 76px); }
   .resize {
     position: absolute; right: 0; bottom: 0; z-index: 4; width: 24px; height: 24px; padding: 0;
     border: 0; background: none; cursor: nwse-resize; touch-action: none; pointer-events: auto !important;

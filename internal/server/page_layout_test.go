@@ -33,6 +33,14 @@ func TestPageLayoutSetting(t *testing.T) {
 	if got := app.settingsFor(users[0].ID)["pageLayout"]; got != layout {
 		t.Fatalf("stored %q", got)
 	}
+	if code, body := luis.call("PUT", "/api/settings", map[string]string{"pageWidth": "full", "pageWidthBoards": `{"2":"normal","3":"wide"}`}); code != 200 {
+		t.Fatalf("saving the page width: %d %s", code, body)
+	}
+	for _, bad := range []map[string]string{{"pageWidth": "huge"}, {"pageWidthBoards": `{"2":"huge"}`}, {"pageWidthBoards": "{not json"}} {
+		if code, _ := luis.call("PUT", "/api/settings", bad); code != 400 {
+			t.Errorf("%v: got %d, want 400", bad, code)
+		}
+	}
 	for _, bad := range []string{"{not json", `{"all":"free"}`} {
 		if code, _ := luis.call("PUT", "/api/settings", map[string]string{"pageLayout": bad}); code != 400 {
 			t.Errorf("%q: got %d, want 400", bad, code)

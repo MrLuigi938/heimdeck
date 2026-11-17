@@ -82,6 +82,7 @@ func (weather) place(ctx context.Context, in *Instance) (weatherPlace, error) {
 
 type weatherData struct {
 	Current struct {
+		Time     string  `json:"time"`
 		Temp     float64 `json:"temperature_2m"`
 		Feels    float64 `json:"apparent_temperature"`
 		Humidity float64 `json:"relative_humidity_2m"`
@@ -101,6 +102,20 @@ type weatherData struct {
 		Sunset  []string  `json:"sunset"`
 		UV      []float64 `json:"uv_index_max"`
 	} `json:"daily"`
+	// The next day by the hour and the next two hours by the quarter hour, for
+	// the weather block on the page (curve, rain bars, "rain from about …").
+	Hourly struct {
+		Time   []string  `json:"time"`
+		Temp   []float64 `json:"temperature_2m"`
+		Chance []float64 `json:"precipitation_probability"`
+		Precip []float64 `json:"precipitation"`
+		Code   []int     `json:"weather_code"`
+		IsDay  []int     `json:"is_day"`
+	} `json:"hourly"`
+	Minutely struct {
+		Time   []string  `json:"time"`
+		Precip []float64 `json:"precipitation"`
+	} `json:"minutely_15"`
 }
 
 func (w weather) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
@@ -113,12 +128,16 @@ func (w weather) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		api := *in
 		api.BaseURL = weatherAPI
 		q := url.Values{
-			"latitude":      {strconv.FormatFloat(p.Lat, 'f', 4, 64)},
-			"longitude":     {strconv.FormatFloat(p.Lon, 'f', 4, 64)},
-			"current":       {"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m,precipitation,is_day"},
-			"daily":         {"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max"},
-			"timezone":      {"auto"},
-			"forecast_days": {"8"},
+			"latitude":             {strconv.FormatFloat(p.Lat, 'f', 4, 64)},
+			"longitude":            {strconv.FormatFloat(p.Lon, 'f', 4, 64)},
+			"current":              {"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m,precipitation,is_day"},
+			"daily":                {"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max"},
+			"hourly":               {"temperature_2m,precipitation_probability,precipitation,weather_code,is_day"},
+			"forecast_hours":       {"25"},
+			"minutely_15":          {"precipitation"},
+			"forecast_minutely_15": {"8"},
+			"timezone":             {"auto"},
+			"forecast_days":        {"8"},
 		}
 		if imperial {
 			q.Set("temperature_unit", "fahrenheit")
@@ -184,6 +203,7 @@ func (w weather) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if len(out.Items) > 0 {
 		out.ItemsTitle = in.T("Vorhersage für %s", p.Name)
 	}
+	out.Weather = weatherView(in, p, &data, deg, speed)
 	return out, nil
 }
 

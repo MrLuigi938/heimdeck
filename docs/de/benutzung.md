@@ -2,6 +2,7 @@
 
 [← Zurück zur Übersicht](../../README.de.md) · [English](../usage.md)
 
+- [Erster Start](#erster-start)
 - [Umstieg von Heimdall](#umstieg-von-heimdall)
 - [Dashboards und Gruppen](#dashboards-und-gruppen)
 - [Mehrere Benutzer](#mehrere-benutzer)
@@ -19,6 +20,13 @@
 - [Passwort vergessen?](#passwort-vergessen)
 - [Tipps](#tipps)
 
+## Erster Start
+
+![Hintergrund wählen in der Begrüßung](../images/welcome-background.webp)
+<sub>Oberfläche auf Englisch</sub>
+
+Nach dem Anlegen des ersten Zugangs (und bei jedem neuen Konto) zeigt eine kurze Begrüßung, was Heimdeck kann, lässt dich einen der Hintergründe von Heimdeck wählen und erklärt, wie deine Dienste aufs Dashboard kommen. Zum Schluss beleuchtet eine kurze **Tour** nacheinander Suche, Bearbeiten-Modus, Gruppen und Einstellungen – sie lässt sich überspringen und jederzeit unter *Einstellungen → Info → Kurze Tour durch Heimdeck* wiederholen.
+
 ## Umstieg von Heimdall
 
 1. In Heimdall: Einstellungen → **Exportieren** – das lädt `HeimdallExport.json` herunter.
@@ -34,6 +42,9 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
 
   ![Freies Layout: die Suche als hohe Leiste links, die Gruppen daneben](../images/free-layout-sidebar.webp)
   ![Seite anordnen: jedes Teil lässt sich ziehen und in der Größe ändern](../images/free-layout-arrange.webp)
+- **Info-Blöcke** auf der frei angeordneten Seite: Beim Anordnen legt **+ Block** einen Block auf die Seite – eine **Uhr** (digital mit dünnen, kräftigen, Mono- oder Leuchtziffern, analog oder als Wortuhr; mit Sekunden, Datum, Begrüßung und zweiter Zeitzone), das **Wetter** mit den nächsten Stunden als Kurve mit Regenbalken, den nächsten Tagen und einem Satz wie „Regen ab etwa 15:30“ (die Daten kommen von einer Wetter-Kachel, die auch in einer ausgeblendeten Gruppe liegen darf; mit *Stimmung* folgt der Himmel dahinter dem Wetter und der Tageszeit), den **Status** („Alles in Ordnung“ oder welche Dienste gestört sind – ein Klick springt zur Gruppe), die nächsten **Termine** aus einer Kalender-Kachel, einen **Text** (Überschrift, Notiz, Notizzettel oder Zitat, einfaches Markdown) oder einen **Countdown** (Tage bis zu einem Datum, auch jedes Jahr, mit Balken ab einem Startdatum). Wie bei der Suche bestimmt die Größe, was ein Block zeigt: eine Reihe hoch nur den Hauptwert, breiter und höher auch die Kurve und die Tage. Der Inhalt wächst und schrumpft mit dem Block und ragt nie über ihn hinaus. ⚙ an einem Block stellt Inhalt und Aussehen ein (Karte, Glas oder ohne, Schriftgröße, Ausrichtung, eigene Akzentfarbe), ✕ entfernt ihn. Titel, Dashboard-Wechsel, Begrüßung, Suche und die Knöpfe lassen sich mit dem durchgestrichenen Auge ausblenden und unter **Ausgeblendet** zurückholen; die Einstellungen bleiben immer. Auf dem Handy stehen die Blöcke untereinander über den Gruppen.
+
+  ![Info-Blöcke: Uhr, Wetter, Status, Countdown und eine Notiz neben den Gruppen](../images/info-blocks.webp)
 
 - **Ausgeblendete Gruppen** erscheinen erst nach Klick auf 👁 (für die aktuelle Sitzung). **Geschützte Gruppen** brauchen ein eigenes Passwort; ist es vergessen, entsperrt sie auch dein Anmelde-Passwort – danach lassen sie sich löschen oder neu schützen.
 - **Online-Status**: Standardmäßig wird nur die lokale Adresse einer Kachel geprüft. *Auch die öffentliche Adresse prüfen* im Kachel-Editor schaltet das pro Kachel ein, unter *Einstellungen → Netzwerk und Docker* für alle.
@@ -102,7 +113,7 @@ Im Kachel-Editor unter *Weitere Optionen → Auf dem Handy die App öffnen* kann
 
 - **Klassisch**: Heimdeck Dunkel und Hell (oder automatisch wie das System), Nord, Mokka, Retro-Warm, Vampir und Sand – Farbpaletten für jeden Geschmack.
 - **Verspielt**: Terminal (grün auf schwarz), Neon City (abgeschrägte Ecken, Neongelb und Cyan), Luna 2001 (jede Kachel ein Fenster mit blauer Titelleiste), Aero-Glas (Milchglas-Rahmen), Hexer (düstere Fantasy mit Messingrahmen), Gildenhalle (Goldrahmen, Fortschritt als Erfahrungsbalken), Studio (heller Schreibtisch: jede Kachel ein Fenster mit drei bunten Lämpchen) und Flüssigglas (sehr runde, durchscheinende Glaskacheln über buntem Hintergrund).
-- **Stil-Optionen** passen zu jedem Theme: Ecken (eckig oder sehr rund), Kacheln (Glas oder massiv – massiv schont schwache Tablets), Schrift (System oder Monospace) und Abstände (kompakt).
+- **Stil-Optionen** passen zu jedem Theme: Ecken (eckig oder sehr rund), Kacheln (Glas oder massiv – massiv schont schwache Tablets), Schrift (System oder Monospace) und Abstände (kompakt). Die **Seitenbreite** ist normal 1400 px; *Breit* (1920 px) oder *Volle Breite* nutzen große und breite Bildschirme aus – unter *Dashboards* kann jedes Dashboard seine eigene Breite bekommen, z. B. volle Breite fürs Wand-Tablet.
 - Jedes Theme bringt seine **Akzentfarbe** mit; darunter lässt sich eine eigene wählen, ✦ nimmt wieder die des Themes.
 - **Pro Dashboard**: Unter *Einstellungen → Dashboards* bekommt ein Dashboard ein eigenes Theme, z. B. Nord für „Arbeit“.
 - Ein eigenes Hintergrundbild (allgemein oder pro Dashboard) ersetzt den Hintergrund des Themes – siehe [Hintergrundbilder](#hintergrundbilder).
@@ -259,6 +270,7 @@ Namen aus [dashboardicons.com](https://dashboardicons.com) (z. B. `jellyfin`), e
 
 *Einstellungen → Aussehen → Hintergrundbild* (oder pro Dashboard unter *Einstellungen → Dashboards → Eigener Hintergrund*):
 
+- **Von Heimdeck**: *Bifröst* (Nordlicht als Bogen über der Seite), *Himinbjörg* (Sternenhimmel über den Bergen) und *Deck* (ein ruhiges Raster aus leuchtenden Kacheln) – jeweils für dunkle und helle Themes gezeichnet; gezeigt wird der, der zum Theme passt. Ein neues Konto startet mit Bifröst.
 - **Bilder hochladen**: große Fotos werden schon im Browser verkleinert (auf höchstens 2560 Pixel, als WebP), aus einem 10-MB-Foto werden so einige Hundert KB. Hochgeladene Bilder liegen in Heimdecks Datenbank und sind in der Sicherung des Datenordners enthalten.
 - **Adresse**: ein beliebiges Bild aus dem Netz (`https://…`).
 - **Album**: mit einer Immich- oder PhotoPrism-Kachel eines ihrer Alben wählen – seine Fotos werden zu Hintergründen.

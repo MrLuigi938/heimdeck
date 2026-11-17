@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/heimdeck/heimdeck/internal/auth"
 	"github.com/heimdeck/heimdeck/internal/camera"
@@ -401,7 +402,38 @@ var allowedSettings = map[string]bool{
 	"localHosts": true, "showUptime": true, "language": true, "uniformTiles": true, "tileLayout": true,
 	"notifyAfter": true, "notifyRecovery": true, "notifyExternal": true, "ntfyUrl": true, "dockerControl": true, "dockerUpdates": true,
 	"debug": true, "automationsAdmins": true, "telegramChat": true, "telegramAI": true, "telegramReport": true, "notifyAI": true, "updateCheck": true, "shortcuts": true, "shortcutsOff": true,
-	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true, "pageLayout": true,
+	"corners": true, "tileStyle": true, "font": true, "density": true, "seasonal": true, "seasonalMode": true, "seasonalOff": true, "seasonalFx": true, "searchView": true, "searchJump": true, "searchHistory": true, "monitorExternal": true, "jumpBar": true, "jumpButton": true, "backgroundEvery": true, "aiChatLayout": true, "pageLayout": true, "pageWidth": true, "pageWidthBoards": true, "onboarding": true,
+}
+
+// The kinds of info blocks on a freely arranged page, and the page parts that
+// can be hidden there (the settings button never: it is the way back).
+var (
+	infoBlockID    = regexp.MustCompile(`^i[a-z0-9]{1,16}$`)
+	infoBlockTypes = map[string]bool{"clock": true, "weather": true, "status": true, "agenda": true, "text": true, "countdown": true}
+	hideableBlocks = map[string]bool{"title": true, "boards": true, "greet": true, "search": true, "tools": true}
+)
+
+// infoBlockValues: options of an info block are plain values – texts (a note
+// up to 5000 characters), numbers and switches, nothing nested.
+func infoBlockValues(m map[string]any) bool {
+	if len(m) > 30 {
+		return false
+	}
+	for k, v := range m {
+		if len(k) > 30 {
+			return false
+		}
+		switch x := v.(type) {
+		case string:
+			if utf8.RuneCountInString(x) > 5000 {
+				return false
+			}
+		case float64, bool, nil:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // checkSettings checks the addresses among the settings – from the settings
@@ -413,10 +445,19 @@ func checkSettings(m map[string]string) error {
 	// The free page layout: positions of the page's parts, as JSON.
 	if v, ok := m["pageLayout"]; ok && v != "" {
 		type place struct{ X, Y, W, H int }
+		// Info blocks: clock, weather … with their options and look.
+		type infoBlock struct {
+			Type  string         `json:"type"`
+			Tile  int64          `json:"tile"`
+			Opt   map[string]any `json:"opt"`
+			Style map[string]any `json:"style"`
+		}
 		type pageLayout struct {
-			Mode    string           `json:"mode"`
-			Desktop map[string]place `json:"desktop"`
-			Tablet  map[string]place `json:"tablet"`
+			Mode    string                `json:"mode"`
+			Desktop map[string]place      `json:"desktop"`
+			Tablet  map[string]place      `json:"tablet"`
+			Blocks  map[string]*infoBlock `json:"blocks"`
+			Hidden  []string              `json:"hidden"`
 		}
 		var layout struct {
 			All    *pageLayout            `json:"all"`
@@ -424,12 +465,37 @@ func checkSettings(m map[string]string) error {
 		}
 		bad := len(v) > 128<<10 || json.Unmarshal([]byte(v), &layout) != nil
 		for _, l := range append([]*pageLayout{layout.All}, slices.Collect(maps.Values(layout.Boards))...) {
-			if l != nil && l.Mode != "" && l.Mode != "auto" && l.Mode != "free" {
+			if l == nil {
+				continue
+			}
+			if l.Mode != "" && l.Mode != "auto" && l.Mode != "free" {
 				bad = true
+			}
+			bad = bad || len(l.Blocks) > 40 || len(l.Hidden) > 10
+			for id, b := range l.Blocks {
+				bad = bad || b == nil || !infoBlockID.MatchString(id) || !infoBlockTypes[b.Type] || !infoBlockValues(b.Opt) || !infoBlockValues(b.Style)
+			}
+			for _, h := range l.Hidden {
+				bad = bad || !hideableBlocks[h]
 			}
 		}
 		if bad {
 			return errors.New("Das Seitenlayout ist ungültig")
+		}
+	}
+	// Page width: normal (1400 px), wide (1920 px) or full; per dashboard as JSON {"id": width}.
+	widths := map[string]bool{"": true, "normal": true, "wide": true, "full": true}
+	if v, ok := m["pageWidth"]; ok && !widths[v] {
+		return errors.New("Die Seitenbreite ist ungültig")
+	}
+	if v, ok := m["pageWidthBoards"]; ok && v != "" {
+		var per map[string]string
+		bad := len(v) > 8<<10 || json.Unmarshal([]byte(v), &per) != nil
+		for _, w := range per {
+			bad = bad || !widths[w]
+		}
+		if bad {
+			return errors.New("Die Seitenbreite ist ungültig")
 		}
 	}
 	if u := strings.TrimSpace(m["ntfyUrl"]); u != "" {

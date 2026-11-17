@@ -169,6 +169,9 @@ type Widget struct {
 	Camera *CameraView `json:"camera,omitempty"`
 	// Embed makes the tile show a web page (an iframe in the browser).
 	Embed *EmbedView `json:"embed,omitempty"`
+	// Weather carries the weather in a form the weather block on the page draws
+	// (curve by the hour, days, animated symbols); the tile shows Stats and Items.
+	Weather *WeatherView `json:"weather,omitempty"`
 }
 
 type Integration interface {

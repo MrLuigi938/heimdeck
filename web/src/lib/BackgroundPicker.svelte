@@ -7,7 +7,7 @@
   import { toast } from './toast.svelte.js';
   import { t } from './i18n.svelte.js';
   import { uploadImage } from './upload.js';
-  import { parseBackgrounds, joinBackgrounds } from './backgrounds.js';
+  import { parseBackgrounds, joinBackgrounds, BUILTIN_BACKGROUNDS, builtinUrl } from './backgrounds.js';
 
   let { value = '', photoTiles = [], onChange, compact = false } = $props();
 
@@ -23,6 +23,9 @@
 
   const save = (list) => onChange?.(joinBackgrounds(list));
   const remove = (i) => save(entries.filter((_, j) => j !== i));
+  // Heimdeck's own backgrounds: a click adds one, a second click takes it away.
+  const hasBuiltin = (id) => entries.some((e) => e.kind === 'builtin' && e.id === id);
+  const toggleBuiltin = (id) => save(hasBuiltin(id) ? entries.filter((e) => !(e.kind === 'builtin' && e.id === id)) : [...entries, { kind: 'builtin', id }]);
 
   async function upload(e) {
     const chosen = [...(e.currentTarget.files || [])];
@@ -91,7 +94,7 @@
   {#if entries.length}
     <div class="thumbs">
       {#each entries as e, i (i)}
-        <div class="thumb" title={e.kind === 'album' ? e.name : e.url}>
+        <div class="thumb" title={e.kind === 'album' || e.kind === 'builtin' ? e.name : e.url}>
           {#if e.kind === 'album'}
             <span class="album">📷<small>{e.name}</small></span>
           {:else}
@@ -102,6 +105,13 @@
       {/each}
     </div>
   {/if}
+  <div class="builtins" role="group" aria-label={t('Hintergründe von Heimdeck')}>
+    {#each BUILTIN_BACKGROUNDS as b (b.id)}
+      <button type="button" class="builtin" class:on={hasBuiltin(b.id)} aria-pressed={hasBuiltin(b.id)} title={t(b.text)} onclick={() => toggleBuiltin(b.id)}>
+        <img src={builtinUrl(b.id)} alt="" loading="lazy" /><span>{b.name}</span>
+      </button>
+    {/each}
+  </div>
   <div class="row wrap">
     <button type="button" class="small" disabled={uploading > 0} onclick={() => files.click()}>⬆ {uploading ? t('Lade hoch … ({n})', { n: uploading }) : t('Bilder hochladen')}</button>
     <input type="file" accept="image/*" multiple hidden bind:this={files} onchange={upload} />
@@ -148,5 +158,11 @@
   .row { display: flex; gap: 8px; align-items: center; }
   .row input { flex: 1; min-width: 0; }
   .wrap { flex-wrap: wrap; }
+  .builtins { display: flex; flex-wrap: wrap; gap: 8px; }
+  .builtin { display: grid; gap: 4px; padding: 4px; border-radius: var(--r-sm); font-size: 12px; justify-items: start; background: var(--surface-2); }
+  .builtin img { width: 96px; height: 60px; object-fit: cover; border-radius: var(--r-xs); display: block; }
+  .compact .builtin img { width: 72px; height: 45px; }
+  .builtin span { padding: 0 2px; }
+  .builtin.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
   .on { border-color: var(--accent); color: var(--accent-text); }
 </style>

@@ -51,7 +51,7 @@ func (cameraTile) Def() Definition {
 			{Key: "list", Label: "Ereignisliste", Type: "select", Options: []string{"3", "0", "5", "10"}, Display: true,
 				Help: "Wie viele der letzten Ereignisse unter dem Bild stehen (0 = nur das letzte im Bild)."},
 			{Key: "blur", Label: "Bild verschwommen zeigen", Type: "checkbox", Display: true,
-				Help: "Für die Privatsphäre: Bild und Livebild sind unscharf, bis du auf „Aufdecken“ tippst. Nur die Anzeige – das Bild wird trotzdem geladen."},
+				Help: "Für die Privatsphäre: Bild und Livebild sind unscharf, bis du auf „Aufdecken“ tippst, das Livebild startest oder ein Ereignis öffnest. Nur die Anzeige – das Bild wird trotzdem geladen."},
 			{Key: "blurAgain", Label: "Wieder verdecken", Type: "select", Options: []string{"nach 1 Minute", "nach 5 Minuten", "nach 15 Minuten", "nur von Hand"}, Display: true,
 				Help: "Nur mit „Bild verschwommen zeigen“. Verlässt du die Seite, wird das Bild immer wieder verdeckt."},
 		},

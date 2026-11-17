@@ -238,11 +238,11 @@
 <svelte:window onpageshow={onPageShow} />
 
 {#if shape === 'icon'}
-<button class="search-icon" onclick={focus} title={t('Suche') + (shortcut ? ` ( ${shortcut} )` : '')} aria-label={t('Suche')}>
+<button class="search-icon" data-tour="search" onclick={focus} title={t('Suche') + (shortcut ? ` ( ${shortcut} )` : '')} aria-label={t('Suche')}>
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
 </button>
 {:else}
-<div class="search" class:wide={view === 'columns'} class:tall={shape === 'panel'} onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
+<div class="search" data-tour="search" class:wide={view === 'columns'} class:tall={shape === 'panel'} onfocusout={(e) => !e.currentTarget.contains(e.relatedTarget) && setTimeout(() => (open = false), 150)}>
   <svg class="glass" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
   <input
     bind:this={input}
