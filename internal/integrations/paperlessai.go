@@ -34,7 +34,7 @@ func (paperlessAI) Def() Definition {
 		Description: "KI-Verarbeitung (Warteschlange, verarbeitet, fehlgeschlagen, Tokens), Archiv mit Vorschaubildern, KI-Index, Scan starten und pausieren, Dokumentsuche – auch nach Bedeutung",
 		Fields: []Field{
 			{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
-				Help: "In Paperless-AI unter Einstellungen → API-Schlüssel einen eigenen Schlüssel anlegen (Recht „Dokumente lesen“; für die Suche nach Bedeutung „Fragen & Chat“, für Scan, Pause und Wiederholen „Administration“). Bei Version 3 der API_KEY aus den Einstellungen."},
+				Help: "In Paperless-AI unter Settings → API keys einen Schlüssel anlegen (beginnt mit pai_; Vorlage „Read only“ genügt, für die Suche nach Bedeutung zusätzlich „chat“, für Scan, Pause und Wiederholen ein Admin-Konto) – oder den Global API key aus Settings → Integrations. Nicht den Token von Paperless-ngx. Bei Version 3 der API_KEY aus den Einstellungen."},
 			{Key: "list", Label: "Liste", Type: "select", Options: []string{"zuletzt hinzugefügt", "Probleme", "keine"}, Display: true,
 				Help: "Was die Kachel unter den Zahlen zeigt; laufende Analysen stehen immer oben"},
 			{Key: "aiSearch", Label: "Suche nach Bedeutung", Type: "checkbox",
@@ -55,7 +55,7 @@ func (p paperlessAI) call(ctx context.Context, in *Instance, method, path string
 	if errors.As(err, &he) {
 		switch {
 		case he.Status == 401:
-			return in.Errorf("Paperless-AI lehnt den API-Key ab (401) – Schlüssel prüfen")
+			return paiUnauthorized(in, he.Body)
 		case he.Status == 403 && strings.Contains(he.Body, "admin_required"):
 			return in.Errorf("Dafür braucht der API-Key das Recht „Administration“")
 		case he.Status == 403 && strings.Contains(he.Body, "scope_missing"):
@@ -65,6 +65,36 @@ func (p paperlessAI) call(ctx context.Context, in *Instance, method, path string
 		}
 	}
 	return err
+}
+
+var (
+	paiKeyRe     = regexp.MustCompile(`^pai_[a-z0-9]{8}_[A-Za-z0-9_-]{20,}$`)
+	paiGlobalRe  = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	ngxTokenRe   = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	aiProviderRe = regexp.MustCompile(`^(sk-|sk_|AIza|gsk_)`)
+)
+
+// paiUnauthorized tells why the key was refused: a key of another kind (the
+// Paperless-ngx token, the AI provider's key), a key Paperless-AI does not
+// know, or a proxy in front that asks for its own login.
+func paiUnauthorized(in *Instance, body string) error {
+	key := strings.TrimSpace(in.V("apiKey"))
+	// Paperless-AI answers with JSON; a login page of a proxy (Authentik, Authelia, basic auth) with HTML.
+	low := strings.ToLower(body)
+	proxy := strings.Contains(low, "<html") || strings.Contains(low, "<!doctype")
+	switch {
+	case proxy:
+		return in.Errorf("Die Anmeldung wird vor Paperless-AI abgelehnt (401) – steht ein Proxy mit eigener Anmeldung davor? Dann als lokale Adresse Paperless-AI direkt eintragen, z. B. http://192.168.1.20:3000")
+	case ngxTokenRe.MatchString(key):
+		return in.Errorf("Das ist der Token von Paperless-ngx – Paperless-AI hat eigene Schlüssel: unter Settings → API keys einen anlegen (beginnt mit pai_) oder den Global API key aus Settings → Integrations nehmen")
+	case aiProviderRe.MatchString(key):
+		return in.Errorf("Das ist der Schlüssel des KI-Anbieters – Heimdeck braucht einen Schlüssel von Paperless-AI: unter Settings → API keys einen anlegen (beginnt mit pai_)")
+	case paiKeyRe.MatchString(key):
+		return in.Errorf("Paperless-AI kennt diesen API-Key nicht (401) – wurde er gelöscht, oder ist das Konto gesperrt? Unter Settings → API keys einen neuen anlegen")
+	case paiGlobalRe.MatchString(key):
+		return in.Errorf("Paperless-AI kennt diesen Schlüssel nicht (401) – der Global API key wurde vielleicht neu erzeugt: unter Settings → Integrations nachsehen oder unter Settings → API keys einen eigenen anlegen")
+	}
+	return in.Errorf("Paperless-AI lehnt den API-Key ab (401) – unter Settings → API keys einen Schlüssel anlegen (beginnt mit pai_) oder den Global API key aus Settings → Integrations nehmen")
 }
 
 // paiMessage is the "error" text of a Paperless-AI error answer.

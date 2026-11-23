@@ -197,3 +197,21 @@ func TestPaperlessAIDiscovery(t *testing.T) {
 		t.Error("Paperless-ngx lost")
 	}
 }
+
+// A refused key says why: another kind of key, an unknown one, or a proxy in front.
+func TestPaperlessAIUnauthorized(t *testing.T) {
+	pai := `{"error":"Authentication required"}`
+	for _, c := range []struct{ key, body, want string }{
+		{"0123456789abcdef0123456789abcdef01234567", pai, "Token von Paperless-ngx"},
+		{"sk-proj-abc", pai, "KI-Anbieters"},
+		{"pai_abcdefgh_" + strings.Repeat("x", 30), pai, "kennt diesen API-Key nicht"},
+		{strings.Repeat("ab", 32), pai, "Global API key wurde vielleicht neu erzeugt"},
+		{"irgendwas", pai, "Settings → API keys"},
+		{"pai_abcdefgh_" + strings.Repeat("x", 30), "<html>401 Authorization Required</html>", "Proxy"},
+	} {
+		in := &Instance{Values: map[string]string{"apiKey": c.key}, Lang: "de"}
+		if err := paiUnauthorized(in, c.body); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%q: %v, want %q", c.key, err, c.want)
+		}
+	}
+}
