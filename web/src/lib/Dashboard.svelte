@@ -917,7 +917,13 @@
         {#if hasExternal}
           <button class="ghost net" onclick={toggleNetwork}
             title={`${local ? t('Zuhause: lokale Adressen werden geöffnet') : t('Unterwegs: öffentliche Adressen werden geöffnet')} (${network.override ? t('manuell gewählt') : t('automatisch erkannt')}) – ${t('klicken zum Umschalten')}`}>
-            {local ? '🏠' : '🌐'}<span class="net-label">{local ? t('Zuhause') : t('Unterwegs')}</span>{#if network.override}<span class="manual">•</span>{/if}
+            <!-- A line symbol like the other buttons (not an emoji); a dot in the corner when chosen by hand. -->
+            {#if local}
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9" /><path d="M10 20v-6h4v6" /></svg>
+            {:else}
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" /></svg>
+            {/if}
+            <span class="net-label">{local ? t('Zuhause') : t('Unterwegs')}</span>{#if network.override}<span class="manual" aria-hidden="true"></span>{/if}
           </button>
         {/if}
         {#if hasHidden}
@@ -1389,6 +1395,7 @@
   .fit-tools > .logout.armed { width: auto; padding: 0 calc(var(--b) * .3); }
   .fit-tools .logout-ask { font-size: calc(var(--b) * .34); }
   .fit-tools .update-dot { top: 10%; right: 10%; width: calc(var(--b) * .24); height: calc(var(--b) * .24); }
+  .fit-tools .manual { top: 10%; right: 10%; width: calc(var(--b) * .18); height: calc(var(--b) * .18); }
   .fit-tools > .settings-btn.wide { width: auto; max-width: 100%; display: inline-flex; gap: calc(var(--b) * .25); padding: 0 calc(var(--b) * .4); }
   .fit-tools .btn-label { font-size: calc(var(--b) * .36); }
   /* The dashboard switch fills its block: taller block, larger button and name. */
@@ -1438,8 +1445,9 @@
   .lock-name { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
   .locked input { width: 180px; padding: 6px 10px; }
   .lock-hint { flex-basis: 100%; }
-  .net { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
-  .manual { color: var(--accent-text); }
+  .net { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+  /* Chosen by hand: a small dot in the corner, never a line of its own. */
+  .manual { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface-solid); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; grid-auto-flow: dense; align-items: start; }
   /* Uniform: every tile one column of the same width; tiles in a row share the tallest one's height. */
   .grid.uniform { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: stretch; }
