@@ -53,14 +53,14 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | FRITZ!Box (TR-064, Benutzer + Passwort) | wählbar: Internet (Verbindung, Datenrate, Leitung, externe IP), Geräte online, Anrufliste mit verpassten Anrufen, Smart Home (DECT-Steckdosen und Thermostate), WLAN-Netze | | DECT-Steckdosen schalten |
 | Wake-on-LAN (MAC-Adresse) | mit FRITZ!Box-Kachel: ob der Rechner an ist, Name, IP | | Rechner einschalten – über die FRITZ!Box (auch aus Docker) oder ein Magic Packet |
 | UniFi Protect (API-Schlüssel) | Kameras online, aktuelle Standbilder | ✓ Kameras | |
-| Hivornet-Honeypot (Benutzer + Passwort, Rolle „viewer“ reicht) | Verbindungen, Logins, Befehle, Downloads, Angreifer, Länder, aktive Tarpits im gewählten Zeitraum; häufigste Länder; die letzten Angriffe | ✓ Angriffe nach IP, Benutzername, Passwort | |
+| Hivornet-Honeypot (Benutzer + Passwort, Rolle „viewer“ reicht) | Verbindungen, Logins, Befehle, Downloads, Angreifer, Länder, aktive Tarpits im gewählten Zeitraum; häufigste Länder; die letzten Angriffe; Diagramme: Angriffe über die Zeit (gestapelt nach Art, mit der Änderung zum Zeitraum davor) und häufigste Länder | ✓ Angriffe nach IP, Benutzername, Passwort | |
 | Kamera (RTSP und/oder ONVIF) | Standbild mit Timer, Livebild, Ereignisse (Bewegung, Person, Klingel …) mit Bild des Moments; auf Wunsch verschwommen, bis du es aufdeckst | | |
 | Webseite einbetten (Adresse) | die Seite selbst in der Kachel – Höhe, Zoom, Neuladen und „nur ansehen“ einstellbar; sagt es, wenn eine Seite das Einbetten verbietet | | |
-| Speedtest Tracker | Download, Upload, Ping, Verlauf | | Test starten |
+| Speedtest Tracker | Download, Upload, Ping, Verlauf; Diagramm von Download und Upload | | Test starten |
 | Anubis (Metrik-Port, z. B. `http://anubis:9090`) | Challenges, gelöst, fehlgeschlagen, häufigste Regeln | | |
 | **System** | | | |
 | Docker (eingebundener Socket) | laufende/gestoppte Container, optional Updates | ✓ Container | optional starten, stoppen, neu starten |
-| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, Liste der Gäste bzw. Nodes sortiert nach Name, VMID, Status, Auslastung oder Node | ✓ VMs und Container | starten, herunterfahren, neu starten |
+| Proxmox VE (API-Token) | CPU, RAM, Speicher, Laufzeit, Gäste aktiv, Liste der Gäste bzw. Nodes sortiert nach Name, VMID, Status, Auslastung oder Node; Diagramm der CPU der letzten Stunde je Knoten | ✓ VMs und Container | starten, herunterfahren, neu starten |
 | openmediavault (Administrator) | CPU, RAM, Laufzeit, Updates, Dateisysteme, Festplatten-Zustand (S.M.A.R.T.) | | |
 | **Smart Home & Energie** | | | |
 | Home Assistant (Langlebiges Zugriffstoken) | gewählte Sensoren/Schalter mit eigenen Namen oder Übersicht (Lichter an, Updates, nicht verfügbare Geräte) | ✓ alle Entitäten | umschalten, Szenen und Skripte ausführen, Rollläden, Schlösser |
@@ -71,6 +71,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | **Sonstige** | | | |
 | Eigene API | beliebige Werte, Liste und Knöpfe aus einer JSON-Antwort | ✓ wenn eingerichtet | eigene Knöpfe |
 | Szene | die Schritte einer Szene aus *Einstellungen → Automationen*, wann sie zuletzt lief | | ein Knopf, der die Szene startet |
+| Datenquelle (eigene Werte) | Zahlen, die Skripte und Dienste an die eigene Adresse der Kachel schicken – JSON (`{"temperatur": 21.4}`), InfluxDB-Zeilen (wie Telegraf sie schickt) oder `?name=wert`; die neuesten Werte und ein Diagramm (Linie, Fläche oder Balken, 1 Stunde bis 30 Tage), Einheiten je Wert; bis zu 20 Werte, 90 Tage gespeichert | | |
 | Webhook | Meldungen, die andere Dienste an die eigene Adresse der Kachel schicken (JSON, Formular, Text, Uptime Kuma) | | Knöpfe, die Webhooks aufrufen (Shelly, Home Assistant, Node-RED, IFTTT …) |
 | Wetter | aktuelles Wetter und 3–7 Tage Vorhersage für jeden Ort (Open-Meteo, ohne Key), Hinweise zu Sturm und UV | | |
 | Kalender | anstehende Termine aus iCal-Links (Nextcloud, Google, Outlook, Proton …), auch wiederkehrende, dazu neue Folgen und Filme aus deinen Sonarr- und Radarr-Kacheln | | |

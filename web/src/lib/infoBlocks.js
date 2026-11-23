@@ -15,10 +15,16 @@ export const BLOCK_TYPES = {
     opt: { text: '', look: 'plain' } },
   countdown: { icon: '⏳', name: 'Countdown', text: 'Tage bis zu einem Datum – Urlaub, Geburtstag, Feiertag', size: { w: 3, h: 3 }, min: { w: 1, h: 1 },
     opt: { label: '', date: '', yearly: false, start: '' } },
+  chart: { icon: '📈', name: 'Diagramm', text: 'Ein Diagramm einer Kachel – z. B. Angriffe von Hivornet, CPU von Proxmox, Tempo vom Speedtest oder eigene Werte einer Datenquelle', size: { w: 6, h: 5 }, min: { w: 2, h: 2 }, source: 'chart',
+    opt: { chart: '' } },
 };
 
+// Kachel-Arten, die Diagramme liefern (Quelle für den Diagramm-Block).
+export const CHART_SOURCES = ['hivornet', 'proxmox', 'speedtest', 'datasource'];
+
 // align '': as the kind of block does it (clock and countdown centred, text and lists left).
-export const BLOCK_STYLE = { bg: 'card', scale: 1, align: '', accent: '' };
+// phone: also shown on phones (above the groups).
+export const BLOCK_STYLE = { bg: 'card', scale: 1, align: '', accent: '', phone: true };
 
 export function newBlockId(taken) {
   let id;

@@ -28,7 +28,7 @@
   import { freeSpot } from './FreeGrid.svelte';
   import InfoBlock from './InfoBlock.svelte';
   import BlockEditor from './BlockEditor.svelte';
-  import { BLOCK_TYPES, HIDEABLE, blockOf, newBlockId, textRows } from './infoBlocks.js';
+  import { BLOCK_TYPES, HIDEABLE, CHART_SOURCES, blockOf, newBlockId, textRows } from './infoBlocks.js';
   import { confirmDialog } from './dialog.svelte.js';
   import { tick } from 'svelte';
 
@@ -652,14 +652,17 @@
     Object.entries(activeLayout?.blocks || {}).map(([id, raw]) => ({ id, block: blockOf(raw) })).filter((x) => x.block),
   );
   const PART_LABELS = { title: 'Titel', boards: 'Dashboard wechseln', greet: 'Begrüßung', search: 'Suche', tools: 'Knöpfe' };
+  // The settings button sits with the other buttons, unless it was made a block of its own (L.settingsApart).
+  let settingsApart = $derived(!!activeLayout?.settingsApart);
   let pageBlocks = $derived([
     { id: 'title', label: t('Titel'), size: { w: 3, h: 1 } },
-    ...(boards.length > 1 ? [{ id: 'boards', label: t('Dashboard wechseln'), size: { w: 2, h: 1 } }] : []),
+    // Buttons, dashboard switch and settings keep the size they are given and grow and shrink with it.
+    ...(boards.length > 1 ? [{ id: 'boards', label: t('Dashboard wechseln'), size: { w: 2, h: 1 }, fixed: true }] : []),
     ...(settings.showGreeting !== 'false' ? [{ id: 'greet', label: t('Begrüßung'), size: { w: 4, h: 2 } }] : []),
     // Two rows at least: the field (and the icon) is taller than one row.
     { id: 'search', label: t('Suche'), size: { w: 4, h: 2 }, min: { w: 1, h: 2 }, fixed: true },
-    { id: 'tools', label: t('Knöpfe'), size: { w: 3, h: 1 } },
-    { id: 'settings', label: t('Einstellungen'), size: { w: 1, h: 1 } },
+    { id: 'tools', label: t('Knöpfe'), size: { w: 3, h: 1 }, fixed: true },
+    ...(settingsApart ? [{ id: 'settings', label: t('Einstellungen'), size: { w: 1, h: 1 }, fixed: true }] : []),
     ...infoBlocks.map(({ id, block }) => {
       const def = BLOCK_TYPES[block.type];
       // A text cannot get so small that it is no longer readable: its smallest height follows its length.
@@ -669,16 +672,40 @@
       return { id, kind: 'info', label: `${def.icon} ${t(def.name)}`, size: def.size, min, minH, fixed: true, info: block };
     }),
     ...boardGroups.filter(groupShown).map((g) => ({ id: 'g' + g.id, kind: 'group', label: g.name, size: { w: 12, h: 4 }, min: { w: 2, h: 2 }, group: g })),
-  ].filter((b) => !hiddenParts.has(b.id)));
+  ].filter((b) => !hiddenParts.has(b.id) || (b.id === 'tools' && !settingsApart)));
+  // How many buttons the buttons block holds: they share its width.
+  let toolCount = $derived(
+    (hasExternal ? 1 : 0) + (hasHidden ? 1 : 0) + ((data?.docker || data?.proxmox) && !readOnly ? 1 : 0) + (readOnly ? 0 : 1) + 1 + (settingsApart ? 0 : 1),
+  );
+  // Settings as a block of their own, or back with the buttons.
+  function setSettingsApart(apart) {
+    const layout = draft.layout;
+    if (apart) {
+      layout.settingsApart = true;
+      // A new place next to the buttons if there is room there, otherwise the first free one.
+      for (const d of ['desktop', 'tablet']) if (layout[d]) delete layout[d].settings;
+    } else {
+      delete layout.settingsApart;
+      layout.hidden = (layout.hidden || []).filter((x) => x !== 'tools');
+      if (!layout.hidden.length) delete layout.hidden;
+      if (pageGrid) layout[device] = { ...layout[device], ...pageGrid.without('settings') };
+      for (const d of ['desktop', 'tablet']) if (layout[d]) delete layout[d].settings;
+    }
+  }
 
   // ---- info blocks ----
   // Tiles an info block can take its data from (open groups only).
   let blockSources = $derived.by(() => {
-    const out = { weather: [], calendar: [] };
+    const out = { weather: [], calendar: [], chart: [] };
     for (const g of data?.groups || []) {
       if (g.locked) continue;
       const bname = boards.find((b) => b.id === g.boardId)?.name || '';
-      for (const x of g.tiles) if (out[x.integration]) out[x.integration].push({ id: x.id, name: x.name, where: `${t(bname)} › ${g.name}` });
+      for (const x of g.tiles) {
+        const entry = { id: x.id, name: x.name, where: `${t(bname)} › ${g.name}` };
+        if (out[x.integration]) out[x.integration].push(entry);
+        // Tiles with charts of their own, and any tile that records a value's history.
+        if (CHART_SOURCES.includes(x.integration) || x.hide?.some((h) => h.startsWith('~rec:'))) out.chart.push(entry);
+      }
     }
     return out;
   });
@@ -690,10 +717,14 @@
     let id = blockEdit.id;
     if (!id) {
       id = newBlockId(layout.blocks);
-      // The first free spot, so it shows right away where it lands.
+      // Where you are looking: a free spot in the visible part of the page, or
+      // at its top with the rest moving down – not somewhere far below.
       const size = BLOCK_TYPES[block.type].size;
-      const taken = pageBlocks.map((b) => layout[device]?.[b.id] && { id: b.id, ...layout[device][b.id] }).filter(Boolean);
-      layout[device] = { ...layout[device], [id]: freeSpot(taken, size.w, size.h) };
+      if (pageGrid) layout[device] = { ...layout[device], ...pageGrid.insert(id, size.w, size.h) };
+      else {
+        const taken = pageBlocks.map((b) => layout[device]?.[b.id] && { id: b.id, ...layout[device][b.id] }).filter(Boolean);
+        layout[device] = { ...layout[device], [id]: freeSpot(taken, size.w, size.h) };
+      }
     }
     layout.blocks[id] = block;
     blockEdit = null;
@@ -701,10 +732,13 @@
   async function removeBlock(id) {
     if (!(await confirmDialog(t('Der Block wird von dieser Seite entfernt.'), { title: t('Block entfernen?'), confirmLabel: t('Entfernen'), danger: true }))) return;
     const layout = draft.layout;
+    // What was below moves up into the gap.
+    if (pageGrid) layout[device] = { ...layout[device], ...pageGrid.without(id) };
     delete layout.blocks?.[id];
     for (const d of ['desktop', 'tablet']) if (layout[d]) delete layout[d][id];
   }
   function hidePart(id) {
+    if (pageGrid) draft.layout[device] = { ...draft.layout[device], ...pageGrid.without(id) };
     draft.layout.hidden = [...new Set([...(draft.layout.hidden || []), id])];
   }
   function showPart(id) {
@@ -1046,15 +1080,23 @@
       {#if b.id === 'title'}
         <div class="brand on-bg pb"><h1>{settings.title || 'Heimdeck'}</h1></div>
       {:else if b.id === 'boards'}
-        <div class="pb title-row">{@render boardSwitch()}</div>
+        <div class="pb title-row fit-board">{@render boardSwitch()}</div>
       {:else if b.id === 'greet'}
         <div class="brand on-bg pb">{@render greetBlock()}</div>
       {:else if b.id === 'search'}
         {@render searchBlock(searchShape(it))}
       {:else if b.id === 'tools'}
-        <div class="tools on-bg pb" class:column={it.h > it.w * 2}>{@render toolButtons()}</div>
+        <div class="tools on-bg pb fit-tools" style:--n={toolCount}>
+          {@render toolButtons()}
+          {#if !settingsApart}
+            {@render settingsButton(false)}
+            {#if updateBubble}
+              <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
+            {/if}
+          {/if}
+        </div>
       {:else if b.id === 'settings'}
-        <div class="tools on-bg pb settings-block">
+        <div class="tools on-bg pb fit-tools settings-block" style:--n={1}>
           {@render settingsButton(it.w >= 2)}
           {#if updateBubble}
             <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
@@ -1133,6 +1175,12 @@
           onclick={() => (blockEdit = { id: b.id })} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (blockEdit = { id: b.id }))}>⚙</div>
         <div class="btool" role="button" tabindex="0" title={t('Block entfernen')} aria-label={t('{name} entfernen', { name: b.label })}
           onclick={() => removeBlock(b.id)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), removeBlock(b.id))}>✕</div>
+      {:else if b.id === 'settings'}
+        <div class="btool" role="button" tabindex="0" title={t('Zu den Knöpfen legen')} aria-label={t('Einstellungen zu den Knöpfen legen')}
+          onclick={() => setSettingsApart(false)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSettingsApart(false))}>⇤</div>
+      {:else if b.id === 'tools' && !settingsApart}
+        <div class="btool" role="button" tabindex="0" title={t('Einstellungen als eigenen Block')} aria-label={t('Einstellungen als eigenen Block anordnen')}
+          onclick={() => setSettingsApart(true)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSettingsApart(true))}>⇥</div>
       {:else if HIDEABLE.includes(b.id)}
         <div class="btool" role="button" tabindex="0" title={t('Ausblenden')} aria-label={t('{name} ausblenden', { name: b.label })}
           onclick={() => hidePart(b.id)} onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), hidePart(b.id))}>
@@ -1144,9 +1192,9 @@
     {#if freePage}
       <PageGrid bind:this={pageGrid} blocks={pageBlocks} positions={pagePositions} {arranging} onChange={changePositions} block={pageBlock} tools={blockTools} />
     {:else}
-      {#if freeOn && device === 'phone' && !display && infoBlocks.length && allTiles.length}
+      {#if freeOn && device === 'phone' && !display && infoBlocks.some((x) => x.block.style.phone !== false) && allTiles.length}
         <div class="phone-blocks">
-          {#each [...infoBlocks].sort((a, b) => readingOrder(activeLayout?.desktop)(a.id, b.id)) as x (x.id)}
+          {#each infoBlocks.filter((x) => x.block.style.phone !== false).sort((a, b) => readingOrder(activeLayout?.desktop)(a.id, b.id)) as x (x.id)}
             {@const cell = phoneCell(x.id)}
             <div class="phone-block" style:height="{cell.h * 41 - 12}px">
               <InfoBlock block={x.block} it={cell} source={tileById[x.block.tile] || null} {status} boardTiles={allTiles} groups={boardGroups} {greeting} onJump={jumpToGroup} />
@@ -1324,6 +1372,30 @@
     .settings-btn.wide .btn-label { display: none; }
     .settings-btn.wide { padding: 8px; }
   }
+  /* Buttons (and the settings) on the free page grow and shrink with their
+     block: --b is the size of one button – as high as the block allows and as
+     wide as the block shared by all buttons (--n). Taller than wide: one column. */
+  .tools.pb.fit-tools {
+    --b: clamp(24px, min(76cqh, calc((100cqw - (var(--n) - 1) * 6px) / var(--n)), 72px), 72px);
+    width: 100%; height: 100%; align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;
+  }
+  @container (orientation: portrait) {
+    .tools.pb.fit-tools { --b: clamp(24px, min(76cqw, calc((100cqh - (var(--n) - 1) * 6px) / var(--n)), 72px), 72px); flex-direction: column; }
+  }
+  .fit-tools > button { width: var(--b); height: var(--b); min-width: 0; padding: 0; display: inline-grid; place-items: center; flex: none;
+    border-radius: calc(var(--b) * .3); font-size: calc(var(--b) * .44); }
+  .fit-tools > button :global(svg) { width: calc(var(--b) * .5); height: calc(var(--b) * .5); }
+  .fit-tools .net-label { display: none; }
+  .fit-tools > .logout.armed { width: auto; padding: 0 calc(var(--b) * .3); }
+  .fit-tools .logout-ask { font-size: calc(var(--b) * .34); }
+  .fit-tools .update-dot { top: 10%; right: 10%; width: calc(var(--b) * .24); height: calc(var(--b) * .24); }
+  .fit-tools > .settings-btn.wide { width: auto; max-width: 100%; display: inline-flex; gap: calc(var(--b) * .25); padding: 0 calc(var(--b) * .4); }
+  .fit-tools .btn-label { font-size: calc(var(--b) * .36); }
+  /* The dashboard switch fills its block: taller block, larger button and name. */
+  .fit-board { width: 100%; height: 100%; align-self: stretch; display: flex; align-items: center; --bh: clamp(28px, 74cqh, 64px); }
+  .fit-board .boards { width: 100%; }
+  .fit-board .board-btn { width: 100%; height: var(--bh); font-size: calc(var(--bh) * .4); padding: 0 calc(var(--bh) * .4); gap: calc(var(--bh) * .2); justify-content: flex-start; }
+  .fit-board .caret { margin-left: auto; font-size: .7em; }
   .arrangebar { position: sticky; top: 8px; z-index: 40; background: var(--surface-solid); border-color: var(--accent); }
   .arrange-text { display: grid; gap: 2px; }
   .arrange-text .muted { font-size: 12.5px; }

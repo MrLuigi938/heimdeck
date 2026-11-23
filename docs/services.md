@@ -53,14 +53,14 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | FRITZ!Box (TR-064, user + password) | choose: internet (connection, data rate, line, public IP), devices online, call list with missed calls, smart home (DECT sockets and thermostats), Wi-Fi networks | | switch DECT sockets |
 | Wake-on-LAN (MAC address) | with a FRITZ!Box tile: whether the computer is on, name, IP | | switch a computer on – through the FRITZ!Box (also from Docker) or a magic packet |
 | UniFi Protect (API key) | cameras online, current snapshots | ✓ cameras | |
-| Hivornet honeypot (user + password, role “viewer” is enough) | connections, logins, commands, downloads, attackers, countries, active tarpits in a chosen time; top countries; the latest attacks | ✓ attacks by IP, user name, password | |
+| Hivornet honeypot (user + password, role “viewer” is enough) | connections, logins, commands, downloads, attackers, countries, active tarpits in a chosen time; top countries; the latest attacks; charts: attacks over time (stacked by kind, with the change against the time before) and top countries | ✓ attacks by IP, user name, password | |
 | Camera (RTSP and/or ONVIF) | still picture on a timer, live stream, events (motion, person, doorbell …) with a picture of the moment; optionally blurred until you uncover it | | |
 | Embed a web page (address) | the page itself inside the tile – height, zoom, reload and view only adjustable; says so when a page forbids being embedded | | |
-| Speedtest Tracker | download, upload, ping, history | | start test |
+| Speedtest Tracker | download, upload, ping, history; chart of download and upload | | start test |
 | Anubis (metrics port, e.g. `http://anubis:9090`) | challenges, solved, failed, top rules | | |
 | **System** | | | |
 | Docker (mounted socket) | running/stopped containers, optional updates | ✓ containers | optional start, stop, restart |
-| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, list of guests or nodes sorted by name, VMID, status, load or node | ✓ VMs and containers | start, shut down, reboot |
+| Proxmox VE (API token) | CPU, RAM, storage, uptime, active guests, list of guests or nodes sorted by name, VMID, status, load or node; chart of the CPU of the last hour per node | ✓ VMs and containers | start, shut down, reboot |
 | openmediavault (admin user) | CPU, RAM, uptime, updates, file systems, disk health (S.M.A.R.T.) | | |
 | **Smart home & energy** | | | |
 | Home Assistant (long-lived access token) | chosen sensors/switches with your own names, or overview (lights on, updates, unavailable devices) | ✓ all entities | toggle, run scenes and scripts, covers, locks |
@@ -71,6 +71,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | **Other** | | | |
 | Custom API | any values, list and buttons from a JSON response | ✓ if configured | custom buttons |
 | Scene | the steps of a scene from *Settings → Automations*, when it last ran | | a button that starts the scene |
+| Data source (your own values) | numbers that scripts and services send to the tile's own address – JSON (`{"temperature": 21.4}`), InfluxDB lines (as Telegraf sends them) or `?name=value`; the newest values and a chart (line, area or bars, 1 hour to 30 days), units per value; up to 20 values, kept 90 days | | |
 | Webhook | messages other services post to the tile's own address (JSON, form, text, Uptime Kuma) | | buttons that call webhooks (Shelly, Home Assistant, Node-RED, IFTTT …) |
 | Weather | current weather and a 3–7 day forecast for any place (Open-Meteo, no key), storm and UV hints | | |
 | Calendar | upcoming events from iCal links (Nextcloud, Google, Outlook, Proton …), repeating ones too, plus new episodes and films from your Sonarr and Radarr tiles | | |

@@ -129,6 +129,22 @@ func (s speedtest) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			w.Stats = append(w.Stats, Stat{Label: in.T("Ø Ping"), Value: fmt.Sprintf("%.0f ms", ping/float64(pings))})
 		}
 		w.Stats = append(w.Stats, Stat{Label: in.T("Fehlgeschlagen"), Value: in.Num(failed), Tone: toneIf(failed > 0, "warn")})
+		// The measurements as a line, oldest first.
+		ch := Chart{ID: "speed", Title: in.T("Download und Upload"), Kind: "line", Unit: "Mbit/s",
+			Series: []ChartSeries{{Name: in.T("Download")}, {Name: in.T("Upload"), Color: "#22c55e"}}}
+		for i := len(list.Data) - 1; i >= 0; i-- {
+			h := list.Data[i]
+			t, err := time.ParseInLocation("2006-01-02 15:04:05", h.CreatedAt, time.Local)
+			if err != nil || h.Download == nil || h.Upload == nil || h.Failed || h.Status == "failed" {
+				continue
+			}
+			ch.Times = append(ch.Times, t.UnixMilli())
+			ch.Series[0].Values = append(ch.Series[0].Values, *h.Download*8/1e6)
+			ch.Series[1].Values = append(ch.Series[1].Values, *h.Upload*8/1e6)
+		}
+		if len(ch.Times) > 1 {
+			w.Charts = append(w.Charts, ch)
+		}
 		w.ItemsTitle = in.T("Verlauf")
 		for _, h := range list.Data[:min(5, len(list.Data))] {
 			it := Item{Title: "↓ " + mbit(h.Download, true) + "  ↑ " + mbit(h.Upload, true), URL: in.Link("/admin/results")}

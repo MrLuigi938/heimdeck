@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/heimdeck/heimdeck/internal/integrations"
+	"github.com/heimdeck/heimdeck/internal/store"
 )
 
 // handleHook receives a message for a webhook tile: /hook/<key>, without a
@@ -26,15 +27,21 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var tileID int64
+	data := false
 	for _, t := range tiles {
-		if t.Integration == "webhook" && integrations.HookKeyMatches(t.Config["hookKey"], key) {
-			tileID = t.ID
+		if (t.Integration == "webhook" || t.Integration == "datasource") && integrations.HookKeyMatches(t.Config["hookKey"], key) {
+			tileID, data = t.ID, t.Integration == "datasource"
 			break
 		}
 	}
 	if tileID == 0 {
 		time.Sleep(200 * time.Millisecond) // slow down guessing
 		writeErr(w, 404, errors.New("nicht gefunden"))
+		return
+	}
+	// A data source keeps numbers instead of messages.
+	if data {
+		s.receivePoints(w, r, tileID)
 		return
 	}
 	m, err := hookMessage(r)
@@ -118,4 +125,35 @@ func cut(s string) string {
 		return string(r[:hookFieldMax]) + "…"
 	}
 	return s
+}
+
+// receivePoints stores the values sent to a data source tile.
+func (s *Server) receivePoints(w http.ResponseWriter, r *http.Request, tileID int64) {
+	var body []byte
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
+		var err error
+		if body, err = io.ReadAll(io.LimitReader(r.Body, 64<<10)); err != nil {
+			writeErr(w, 400, errors.New("ungültige Anfrage"))
+			return
+		}
+	}
+	pts, err := integrations.ParseDataPoints(body, r.URL.Query(), time.Now())
+	if err != nil {
+		writeErr(w, 400, errors.New(tr(r, err.Error())))
+		return
+	}
+	if len(pts) > 200 {
+		pts = pts[:200]
+	}
+	list := make([]store.Point, len(pts))
+	for i, p := range pts {
+		list[i] = store.Point{Name: p.Name, T: p.T, Value: p.Value}
+	}
+	if err := s.store.AddPoints(tileID, list); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	s.forget(tileID)
+	slog.Debug("Werte empfangen", "kachel", tileID, "anzahl", len(pts))
+	writeJSON(w, map[string]any{"ok": true, "values": len(pts)})
 }

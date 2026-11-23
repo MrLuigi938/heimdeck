@@ -16,6 +16,7 @@ const (
 	partItems   = "#items"
 	partAlerts  = "#alerts"
 	partActions = "#actions"
+	partCharts  = "#charts"
 )
 
 // hideParts returns the widget without the parts the tile leaves out. The
@@ -47,6 +48,9 @@ func hideParts(w *integrations.Widget, hide []string, lang string) *integrations
 	}
 	if slices.Contains(hide, partActions) {
 		out.Actions = nil
+	}
+	if slices.Contains(hide, partCharts) {
+		out.Charts = nil
 	}
 	return &out
 }
@@ -109,6 +113,9 @@ func (s *Server) handleTileParts(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(widget.Actions) > 0 {
 		parts = append(parts, tilePart{Key: partActions, Label: tr(r, "Knöpfe"), Section: true})
+	}
+	if len(widget.Charts) > 0 {
+		parts = append(parts, tilePart{Key: partCharts, Label: tr(r, "Diagramme"), Section: true})
 	}
 	writeJSON(w, map[string]any{"parts": parts})
 }

@@ -68,6 +68,30 @@ func New(s *store.Store, a *auth.Auth, d *docker.Client, web fs.FS) *Server {
 		recheck: make(chan int64, 16), unlocked: map[string]map[int64]time.Time{}, started: time.Now(),
 		tg:    tgBots{bots: map[string]*tgBot{}, kick: make(chan struct{}, 1)},
 		rules: ruleEngine{state: map[string]*ruleState{}, pending: map[string]*ruleAsk{}, running: map[string]context.CancelFunc{}}}
+	// Data source tiles read their stored values through these.
+	integrations.DataPoints = func(tileID int64, since time.Time) (map[string][]integrations.DataPoint, error) {
+		pts, err := s.Points(tileID, since)
+		out := make(map[string][]integrations.DataPoint, len(pts))
+		for name, list := range pts {
+			if strings.HasPrefix(name, recSeries) {
+				continue // recorded values of the tile itself
+			}
+			for _, p := range list {
+				out[name] = append(out[name], integrations.DataPoint{Name: p.Name, T: p.T, Value: p.Value})
+			}
+		}
+		return out, err
+	}
+	integrations.DataPointsLatest = func(tileID int64) ([]integrations.DataPoint, error) {
+		pts, err := s.LatestPoints(tileID)
+		var out []integrations.DataPoint
+		for _, p := range pts {
+			if !strings.HasPrefix(p.Name, recSeries) {
+				out = append(out, integrations.DataPoint{Name: p.Name, T: p.T, Value: p.Value})
+			}
+		}
+		return out, err
+	}
 	integrations.Register(dockerTile{srv})
 	integrations.Register(sceneTile{srv})
 	srv.migrateSettings()

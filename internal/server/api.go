@@ -409,7 +409,7 @@ var allowedSettings = map[string]bool{
 // can be hidden there (the settings button never: it is the way back).
 var (
 	infoBlockID    = regexp.MustCompile(`^i[a-z0-9]{1,16}$`)
-	infoBlockTypes = map[string]bool{"clock": true, "weather": true, "status": true, "agenda": true, "text": true, "countdown": true}
+	infoBlockTypes = map[string]bool{"clock": true, "weather": true, "status": true, "agenda": true, "text": true, "countdown": true, "chart": true}
 	hideableBlocks = map[string]bool{"title": true, "boards": true, "greet": true, "search": true, "tools": true}
 )
 
@@ -1126,7 +1126,7 @@ func (s *Server) handleWidget(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeJSON(w, map[string]any{"error": tr(r, logging.Public(err.Error()))})
 	default:
-		data = hideParts(data, t.Hide, langOf(r))
+		data = s.withHistory(hideParts(data, t.Hide, langOf(r)), t, langOf(r))
 		if !acc.Act {
 			data = withoutActions(data)
 		}

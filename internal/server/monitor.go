@@ -38,6 +38,10 @@ type Check struct {
 // dashboard can show the current status and the uptime history.
 func (s *Server) Monitor(ctx context.Context) {
 	s.moveCameraLogins()
+	// Hivornet had a bee as its symbol before its own logo.
+	if hv, ok := integrations.Get("hivornet"); ok {
+		logErr("Hivornet-Symbol", s.store.ReplaceTileIcon("hivornet", "🐝", hv.Def().Icon))
+	}
 	// Give containers started together with Heimdeck a moment to come up.
 	select {
 	case <-ctx.Done():
@@ -46,6 +50,7 @@ func (s *Server) Monitor(ctx context.Context) {
 	}
 	s.runChecks(ctx, nil)
 	s.syncCameraWatchers(ctx)
+	go s.historyLoop(ctx)
 	tick := time.NewTicker(checkInterval)
 	defer tick.Stop()
 	prune := time.NewTicker(time.Hour)
@@ -62,6 +67,7 @@ func (s *Server) Monitor(ctx context.Context) {
 			s.syncCameraWatchers(ctx)
 		case <-prune.C:
 			logErr("Statusverlauf aufräumen", s.store.PruneChecks(time.Now().Add(-historyKeep)))
+			logErr("Werte aufräumen", s.store.PrunePoints(time.Now().Add(-90*24*time.Hour)))
 			s.sweep(time.Now())
 		}
 	}

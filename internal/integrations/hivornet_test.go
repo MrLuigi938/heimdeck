@@ -48,6 +48,8 @@ func TestHivornet(t *testing.T) {
 				return
 			}
 			io.WriteString(w, `{"events":5000,"connect":4200,"login":610,"command":95,"download":3,"request":90,"unique_ips":312,"countries":41,"active_tarpits":2}`)
+		case "/api/stats/series":
+			fmt.Fprintf(w, `{"from":%d,"bucket_hours":6,"series":{"connect":[10,20,30,40],"login":[1,2,3,4],"command":[0,1,0,2],"download":[0,0,1,0],"ips":[5,6,7,8]},"totals":{"connect":4200},"prev":{"connect":3500}}`, now-4*6*3600000)
 		case "/api/stats/top":
 			io.WriteString(w, `[{"key":"CN","label":"China","n":1200},{"key":"US","label":"USA","n":800}]`)
 		case "/api/events":
@@ -86,6 +88,18 @@ func TestHivornet(t *testing.T) {
 	}
 	if !strings.Contains(s["Häufigste Länder"], "CN 1.200") {
 		t.Errorf("countries: %q", s["Häufigste Länder"])
+	}
+	// Charts: attacks stacked per six hours with the comparison, and the countries.
+	if len(w.Charts) != 2 {
+		t.Fatalf("charts: %+v", w.Charts)
+	}
+	at := w.Charts[0]
+	if at.ID != "attacks" || at.Kind != "stacked" || at.Title != "Angriffe je 6 Stunden" || len(at.Times) != 4 || len(at.Series) != 4 ||
+		at.Series[0].Values[3] != 40 || at.Step != 6*3600000 || !strings.Contains(at.Note, "+20 %") {
+		t.Errorf("attack chart: %+v", at)
+	}
+	if co := w.Charts[1]; co.Kind != "bar" || len(co.Labels) != 2 || co.Series[0].Values[0] != 1200 {
+		t.Errorf("country chart: %+v", co)
 	}
 	if len(w.Items) != 3 || w.Items[0].Title != "203.0.113.9 · ssh :22" || !strings.Contains(w.Items[0].Subtitle, "$ uname -a") ||
 		!strings.Contains(w.Items[1].Subtitle, "Login root / 123456") || !strings.Contains(w.Items[2].Subtitle, "bad.example") {

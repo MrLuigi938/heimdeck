@@ -24,6 +24,7 @@ func TestProxmox(t *testing.T) {
 		"GET /api2/json/nodes/pve/lxc/101/interfaces":                    obj{"data": []obj{{"name": "lo", "inet": "127.0.0.1/8"}, {"name": "eth0", "inet": "192.168.1.51/24"}}},
 		"GET /api2/json/nodes/pve/qemu/200/agent/network-get-interfaces": obj{"data": obj{"result": []obj{{"name": "lo", "ip-addresses": []obj{{"ip-address-type": "ipv4", "ip-address": "127.0.0.1"}}}, {"name": "enp0s18", "ip-addresses": []obj{{"ip-address-type": "ipv6", "ip-address": "fe80::1"}, {"ip-address-type": "ipv4", "ip-address": "192.168.1.60"}}}}}},
 		"POST /api2/json/nodes/pve/lxc/102/status/start":                 obj{"data": "UPID:pve:..."},
+		"GET /api2/json/nodes/pve/rrddata":                               obj{"data": []obj{{"time": 1700000000, "cpu": 0.1}, {"time": 1700000060, "cpu": 0.35}, {"time": 1700000120}}},
 	}, func(r *http.Request) bool {
 		return r.Header.Get("Authorization") == "PVEAPIToken=root@pam!heimdeck=abc-123"
 	})
@@ -38,6 +39,11 @@ func TestProxmox(t *testing.T) {
 	s := stats(w)
 	if s["CPU"] != "25 %" || s["RAM"] != "25 %" || s["VMs und Container an"] != "2/3" || s["Speicher"] != "50 %" || s["Laufzeit"] != "4 Tage" {
 		t.Fatalf("stats %v", s)
+	}
+	// The CPU of the last hour from the round-robin data, in percent (a gap counts as 0).
+	if len(w.Charts) != 1 || w.Charts[0].Kind != "area" || len(w.Charts[0].Times) != 3 || w.Charts[0].Times[1] != 1700000060000 ||
+		w.Charts[0].Series[0].Values[1] != 35 || w.Charts[0].Series[0].Name != "pve" {
+		t.Fatalf("chart %+v", w.Charts)
 	}
 	// running guests first (busiest on top), then the stopped one; local-lvm is nearly full
 	if len(w.Items) != 3 || w.Items[0].Title != "jellyfin" || w.Items[2].Title != "adguard-home" || w.Items[2].Actions[0].Label != "Starten" || len(w.Alerts) != 1 {

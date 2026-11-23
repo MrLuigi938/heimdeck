@@ -1,6 +1,7 @@
 <script>
   import { t } from './i18n.svelte.js';
   import { confirmDialog } from './dialog.svelte.js';
+  import Chart from './Chart.svelte';
   // Renders the generic widget format every integration returns. Long content
   // is folded: one warning (two lines) and three list entries, with an arrow
   // to show the rest.
@@ -79,6 +80,12 @@
       </div>
     {/if}
 
+    {#if widget.charts?.length}
+      <div class="charts">
+        {#each widget.charts as c, i (c.id || i)}<Chart chart={c} height={c.kind === 'bar' || c.kind === 'donut' ? 0 : 118} />{/each}
+      </div>
+    {/if}
+
     {#if alerts.length}
       <ul class="alerts" class:clamped={compact && !expanded}>
         {#each alerts.slice(0, alerts.length - hiddenAlerts) as a}<li title={a}>⚠ {a}</li>{/each}
@@ -146,6 +153,7 @@
 {/if}
 
 <style>
+  .charts { display: grid; gap: 12px; min-width: 0; }
   /* minmax(0, 1fr) keeps long, unbreakable text from widening the tile. */
   .widget { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }

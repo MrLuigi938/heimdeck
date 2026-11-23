@@ -2,6 +2,7 @@
   import Modal from './Modal.svelte';
   import { t } from './i18n.svelte.js';
   import { BLOCK_TYPES, BLOCK_STYLE, blockOf } from './infoBlocks.js';
+  import { get } from './api.js';
 
   // Adding an info block (first its kind, then its options) or changing one.
   // block: the stored block, or null for a new one.
@@ -25,6 +26,28 @@
   // A source tile added meanwhile (or the chosen one deleted): take the first one there is.
   $effect(() => {
     if (form && def?.source && list.length && !list.some((x) => x.id === Number(form.tile))) form.tile = list[0].id;
+  });
+
+  // A chart block: the charts the chosen tile delivers, to pick one.
+  let charts = $state(null);
+  $effect(() => {
+    if (form?.type !== 'chart' || !form.tile) return;
+    const id = Number(form.tile);
+    let stopped = false;
+    charts = null;
+    const load = async () => {
+      try {
+        const res = await get(`/tiles/${id}/widget`);
+        if (stopped) return;
+        if (res.pending) return setTimeout(load, 1500);
+        charts = (res.widget?.charts || []).map((c, i) => ({ id: c.id || String(i), title: c.title }));
+        if (charts.length && !charts.some((c) => c.id === form.opt.chart)) form.opt.chart = charts[0].id;
+      } catch {
+        if (!stopped) charts = [];
+      }
+    };
+    load();
+    return () => (stopped = true);
   });
 
   // Time zones the browser knows, for the second clock.
@@ -72,9 +95,17 @@
               {#each list as x (x.id)}<option value={x.id}>{x.name}{x.where ? ` – ${x.where}` : ''}</option>{/each}
             </select>
           {:else}
-            <span class="help">{form.type === 'weather' ? t('Noch keine Wetter-Kachel. Sie liefert die Daten (Open-Meteo, ohne Konto) und darf in einer ausgeblendeten Gruppe liegen.') : t('Noch keine Kalender-Kachel. Sie liefert die Termine und darf in einer ausgeblendeten Gruppe liegen.')}</span>
+            <span class="help">{form.type === 'weather' ? t('Noch keine Wetter-Kachel. Sie liefert die Daten (Open-Meteo, ohne Konto) und darf in einer ausgeblendeten Gruppe liegen.') : form.type === 'chart' ? t('Noch keine Kachel mit Diagrammen – z. B. Hivornet, Proxmox, Speedtest Tracker oder eine Datenquelle für eigene Werte.') : t('Noch keine Kalender-Kachel. Sie liefert die Termine und darf in einer ausgeblendeten Gruppe liegen.')}</span>
           {/if}
-          {#if onNewTile}<button type="button" class="small new-tile" onclick={() => onNewTile(def.source)}>+ {t('Neue {name}-Kachel', { name: t(SOURCE_NAME[def.source]) })}</button>{/if}
+          {#if form.type === 'chart'}
+            {#if list.length}
+              <select bind:value={form.opt.chart} aria-label={t('Diagramm')} disabled={!charts?.length}>
+                {#if charts === null}<option value={form.opt.chart}>{t('Lade …')}</option>{/if}
+                {#each charts || [] as c (c.id)}<option value={c.id}>{c.title}</option>{/each}
+              </select>
+              {#if charts && !charts.length}<span class="help">{t('Diese Kachel liefert gerade keine Diagramme.')}</span>{/if}
+            {/if}
+          {:else if onNewTile}<button type="button" class="small new-tile" onclick={() => onNewTile(def.source)}>+ {t('Neue {name}-Kachel', { name: t(SOURCE_NAME[def.source]) })}</button>{/if}
         </label>
       {/if}
 
@@ -173,6 +204,8 @@
           <label class="check"><input type="checkbox" checked={!!form.style.accent} onchange={(e) => (form.style.accent = e.currentTarget.checked ? '#5b8cff' : '')} /> {t('Eigene Akzentfarbe')}</label>
           {#if form.style.accent}<input type="color" bind:value={form.style.accent} aria-label={t('Akzentfarbe')} />{/if}
         </div>
+        <label class="check"><input type="checkbox" bind:checked={form.style.phone} /> {t('Auf dem Handy zeigen')}</label>
+        <span class="help">{t('Auf dem Handy stehen die Blöcke untereinander über den Gruppen – z. B. eine große Überschrift dort lieber weglassen.')}</span>
       </fieldset>
     </form>
   {/if}

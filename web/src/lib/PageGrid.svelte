@@ -33,7 +33,9 @@
       grown ||= w !== p.w || h !== p.h;
       items.push({ id: b.id, ...p, x: Math.min(p.x, COLS - w), w, h });
     }
-    const placed = grown ? pack(items) : items;
+    // Stored places that overlap (an older layout, a block grown to its minimum) are pushed apart.
+    const clash = grown || items.some((a, i) => items.some((b, j) => j > i && overlaps(a, b)));
+    const placed = clash ? pack(items) : items;
     for (const b of blocks) {
       if (positions?.[b.id]) continue;
       const s = b.size || { w: 3, h: 2 };
@@ -51,6 +53,35 @@
       placed.push(it);
     }
     return placed;
+  }
+
+  // Moving up into space a change has just freed: `after` is the layout after a
+  // block was moved, resized, added or removed, `before` the one before it.
+  // A block moves up one row at a time, only into cells that are free now but
+  // were taken before (where the moved block or a block that just moved up
+  // was) – so whatever was below a moved block follows up and blocks pushed
+  // aside go back, while gaps that were empty before stay as they are. The
+  // block that was placed (keep) stays exactly where it was put.
+  export function closeGaps(before, after, keep = null) {
+    const taken = new Set();
+    for (const b of before) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) taken.add(x + ',' + y);
+    const list = after.map((i) => ({ ...i })).sort((a, b) => a.y - b.y || a.x - b.x);
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const it of list) {
+        if (it.id === keep) continue;
+        while (it.y > 0) {
+          const y = it.y - 1;
+          let ok = true;
+          for (let x = it.x; x < it.x + it.w && ok; x++) ok = taken.has(x + ',' + y);
+          if (!ok || list.some((o) => o !== it && overlaps(o, { ...it, y }))) break;
+          it.y = y;
+          moved = true;
+        }
+      }
+    }
+    return list;
   }
 
   // fix: the height was set by hand (groups only) – kept, the content scrolls inside.
@@ -85,7 +116,10 @@
   let rows = $derived(Math.max(1, ...shown.map((i) => i.y + i.h)) + (arranging ? 4 : 0));
   let gridEl;
   let cells = {};
-  let action = $state(null); // { kind: 'move' | 'size', it, x0, y0 }
+  let action = $state(null); // { kind: 'move' | 'size', it, x0, y0 } – y0 in page coordinates (scrolling while dragging counts)
+  // Puts a block in place, pushes what it covers down and lets everything move up again.
+  // The block goes exactly where it is put; what it pushed away and what was below its old place move up again.
+  const arrange = (list, moving) => closeGaps(list, settle(list, moving), moving.id);
 
   // w: the width the block has (or gets) – some blocks need more rows when narrower.
   const minOf = (id, w = byId[id]?.w || 1) => minSize(blocks.find((b) => b.id === id), w, colPx);
@@ -99,9 +133,10 @@
     return () => ro.disconnect();
   });
   // A group grows with its tiles (live data loading, lists getting longer), so
-  // nothing is ever cut off. Only a height set by hand stays: then the tiles
-  // scroll inside the group.
-  const isFixed = (b) => b.fixed || (b.kind === 'group' && (arranging || !!positions?.[b.id]?.fix));
+  // nothing is ever cut off and nothing on the page scrolls by itself – a
+  // scrolling group would catch the mouse wheel. A height set by hand is the
+  // least it takes. Only while arranging all groups keep their rows.
+  const isFixed = (b) => b.fixed || (b.kind === 'group' && arranging);
 
   // Rows a block's content needs at its current width.
   function needRows(id) {
@@ -126,7 +161,7 @@
   function fit(id) {
     const it = items.find((i) => i.id === id);
     const h = Math.max(minOf(id).h, needRows(id));
-    if (it && h && (h !== it.h || it.fix)) onChange(toPositions(settle(items, { ...it, h, fix: false })));
+    if (it && h && (h !== it.h || it.fix)) onChange(toPositions(arrange(items, { ...it, h, fix: false })));
   }
 
   function steps() {
@@ -151,20 +186,67 @@
     return toPositions(pack(out));
   }
 
+  // A place for a new block: in the part of the page that is on the screen
+  // (below the arrange bar), on a free spot there if there is one, otherwise at
+  // its top, pushing the rest down. Returns the positions of all blocks.
+  export function insert(id, w, h) {
+    const r = gridEl.getBoundingClientRect();
+    const step = ROW + GAP;
+    const top = Math.max(0, Math.ceil((120 - r.top) / step));
+    const bottom = Math.max(top + h, Math.floor((innerHeight - r.top) / step));
+    w = Math.min(w, COLS);
+    for (let y = top; y + h <= bottom; y++) {
+      for (let x = 0; x + w <= COLS; x++) {
+        const c = { id, x, y, w, h };
+        if (!items.some((i) => overlaps(i, c))) return toPositions([...items, c]);
+      }
+    }
+    return toPositions(arrange(items, { id, x: 0, y: top, w, h }));
+  }
+
+  // The positions after a block left the page (removed or hidden): the rest moves up.
+  export function without(id) {
+    return toPositions(closeGaps(items, items.filter((i) => i.id !== id)));
+  }
+
   function start(e, it, kind) {
     if (e.button !== 0 || !arranging) return;
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    action = { kind, it, x0: e.clientX, y0: e.clientY };
+    action = { kind, it, x0: e.clientX, y0: e.clientY + scrollY };
+    last = e;
+  }
+
+  // Near the top or bottom edge of the window the page scrolls by itself while
+  // dragging, faster the closer the pointer is – a block can travel the whole page in one go.
+  let last = null;
+  let scrolling = 0;
+  const EDGE = 80;
+  function autoScroll() {
+    scrolling = 0;
+    if (!action || !last) return;
+    const y = last.clientY;
+    const v = y < EDGE ? y - EDGE : y > innerHeight - EDGE ? y - (innerHeight - EDGE) : 0;
+    if (!v) return;
+    const before = scrollY;
+    scrollBy(0, Math.max(-28, Math.min(28, Math.round(v / 2.5))));
+    if (scrollY !== before) update(last);
+    scrolling = requestAnimationFrame(autoScroll);
   }
 
   function move(e) {
     if (!action) return;
+    last = e;
+    update(e);
+    if (!scrolling) scrolling = requestAnimationFrame(autoScroll);
+  }
+
+  function update(e) {
     const { colStep, rowStep } = steps();
     const { it, kind } = action;
     const dx = Math.round((e.clientX - action.x0) / colStep);
-    const dy = Math.round((e.clientY - action.y0) / rowStep);
+    const dy = Math.round((e.clientY + scrollY - action.y0) / rowStep);
     let next;
     if (kind === 'move') {
       next = { ...it, x: clamp(it.x + dx, 0, COLS - it.w), y: Math.max(0, it.y + dy) };
@@ -174,8 +256,9 @@
       if (next.h !== it.h && it.id.startsWith('g')) next.fix = true;
     }
     const now = byId[it.id];
-    if (preview && now.x === next.x && now.y === next.y && now.w === next.w && now.h === next.h) return;
-    preview = settle(items, next);
+    if (preview && action.at && action.at.x === next.x && action.at.y === next.y && action.at.w === next.w && action.at.h === next.h) return;
+    action.at = { x: next.x, y: next.y, w: next.w, h: next.h };
+    preview = arrange(items, next);
   }
 
   async function end() {
@@ -184,6 +267,9 @@
     const result = preview;
     action = null;
     preview = null;
+    last = null;
+    cancelAnimationFrame(scrolling);
+    scrolling = 0;
     if (!result) return;
     onChange(toPositions(result));
     // A group only made wider or narrower (height not set by hand) takes the height its tiles now need.
@@ -198,6 +284,9 @@
   function cancel() {
     action = null;
     preview = null;
+    last = null;
+    cancelAnimationFrame(scrolling);
+    scrolling = 0;
   }
 
   // Keys: arrows move the block, with Shift they change its size.
@@ -221,11 +310,13 @@
       }
     }
     if (e.shiftKey && d[1] && next.h !== it.h && it.id.startsWith('g')) next.fix = true;
-    if (next.x !== it.x || next.y !== it.y || next.w !== it.w || next.h !== it.h) onChange(toPositions(settle(items, next)));
+    if (next.x !== it.x || next.y !== it.y || next.w !== it.w || next.h !== it.h) onChange(toPositions(arrange(items, next)));
   }
 
   const area = (it) => `${it.y + 1} / ${it.x + 1} / span ${it.h} / span ${it.w}`;
 </script>
+
+<svelte:window onscroll={() => action && last && update(last)} />
 
 <div class="pgrid" class:arranging bind:this={gridEl} style:--rows={rows}>
   {#if arranging}
@@ -242,7 +333,7 @@
           <!-- div, not button: themes style every button (gradients, frames) and would cover the block. -->
           <div class="handle" class:low={it.h <= 1} role="button" tabindex="0" aria-label={t('{name} verschieben (Pfeiltasten, mit Umschalt die Größe)', { name: b.label })}
             onpointerdown={(e) => start(e, it, 'move')} onpointermove={move} onpointerup={end} onpointercancel={cancel} onkeydown={(e) => key(e, it)}>
-            <span class="tag">{b.label}{#if tooSmall[b.id]}<span class="more" title={t('Die Höhe ist von Hand gesetzt und die Kacheln brauchen mehr Platz – sie scrollen in der Gruppe. Doppelklick auf die Ecke: wieder mit den Kacheln wachsen.')}> ↕</span>{/if}</span>
+            <span class="tag">{b.label}{#if tooSmall[b.id]}<span class="more" title={t('Die Kacheln brauchen mehr Platz als diese Höhe – auf der Seite wird die Gruppe so hoch, wie sie es braucht. Doppelklick auf die Ecke: Höhe an die Kacheln anpassen.')}> ↕</span>{/if}</span>
             {#if tools}
               <!-- A click on a button must not start dragging the block. -->
               <span class="tools" role="presentation" onpointerdown={(e) => e.stopPropagation()}>{@render tools(b)}</span>
@@ -273,14 +364,17 @@
   .pcell > :global(*) { min-width: 0; }
   /* Fixed blocks keep the height they were given and scroll inside. */
   /* contain: size – their content must not make the rows taller. */
-  .pcell.fixed { min-height: 0; justify-content: flex-start; contain: size; }
+  .pcell.fixed { min-height: 0; justify-content: flex-start; contain: size; container-type: size; }
   .pcell.fixed > :global(*) { flex: 1; min-height: 0; }
   /* The plain search field keeps its own height, in the middle of its block (only the tall panel fills it). */
   .pcell.fixed > :global(.search:not(.tall)), .pcell.fixed > :global(.search-icon) { flex: none; margin: auto 0; }
-  .pcell.fixed > :global(.search-icon) { height: min(100%, 44px); }
-  /* A group smaller than its tiles scrolls inside; the scrollbar shows on hover. */
-  .pcell.fixed.pb-group > :global(*) { padding: 4px; margin: -4px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: transparent transparent; align-content: start; }
-  .pcell.fixed.pb-group > :global(*:hover) { scrollbar-color: var(--border-strong) transparent; }
+  /* The search follows its block: the field as wide as the block and taller with more rows. */
+  .pcell.pb-search > :global(.search:not(.tall)) { max-width: none; --field-h: clamp(40px, 62cqh, 64px); }
+  .pcell.pb-search > :global(.search:not(.tall) > input) { height: var(--field-h); font-size: clamp(14px, calc(var(--field-h) * .36), 21px); padding-left: calc(var(--field-h) * .9); }
+  .pcell.pb-search > :global(.search:not(.tall) .glass) { left: calc(var(--field-h) * .32); }
+  .pcell.fixed > :global(.search-icon) { height: clamp(36px, 80cqh, 64px); }
+  /* While arranging a group shows what fits into its rows (a preview, it never scrolls). */
+  .pcell.fixed.pb-group > :global(*) { overflow: hidden; align-content: start; }
   .arranging .pcell { min-height: 0; overflow: hidden; border-radius: var(--radius); }
   .arranging .pcell > :global(*) { pointer-events: none; }
   /* While arranging every group has a fixed height, but it is only a preview:

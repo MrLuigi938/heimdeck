@@ -19,9 +19,13 @@ type hivornet struct{}
 
 func init() { register(hivornet{}) }
 
+// hivornetIcon is Hivornet's logo from its website (blum.ing/hivornet); it is
+// not part of the dashboard-icons collection.
+const hivornetIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHRpdGxlPkhpdm9ybmV0PC90aXRsZT48cGF0aCBkPSJNMzIgNCA1NSAxNXYxOWMwIDEzLTEwIDIyLTIzIDI2QzE5IDU2IDkgNDcgOSAzNFYxNXoiIGZpbGw9IiMyYzJjMmEiIHN0cm9rZT0iI2VkYTEwMCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTMyIDUuMiA1NCAxNS43VjM0YzAgMTIuNC05LjQgMjEtMjIgMjQuOHoiIGZpbGw9IiM0NDQ0NDEiLz48cGF0aCBkPSJNMjEgMTloMjJMMzIgNTF6IiBmaWxsPSIjZWRhMTAwIi8+PHBhdGggZD0iTTIzLjEgMjUuMUg0MC45TDM5Ljk0IDI3LjlIMjQuMDZ6TTI1LjUgMzIuMUgzOC41TDM3LjUzIDM0LjlIMjYuNDd6TTI3LjkxIDM5LjFIMzYuMDlMMzUuMTMgNDEuOUgyOC44N3oiIGZpbGw9IiMyYzJjMmEiLz48L3N2Zz4K"
+
 func (hivornet) Def() Definition {
 	return Definition{
-		ID: "hivornet", Name: "Hivornet", Icon: "🐝", Category: "Netzwerk",
+		ID: "hivornet", Name: "Hivornet", Icon: hivornetIcon, Category: "Netzwerk",
 		Description: "Honeypot: Angriffe, Logins, Befehle und Angreifer im gewählten Zeitraum, die letzten Angriffe und eine Suche nach IPs",
 		Setup: []string{
 			"Als lokale Adresse die Web-Oberfläche des Hive eintragen, z. B. http://192.168.178.20:8088.",
@@ -209,6 +213,9 @@ func (hv hivornet) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if t := sum["active_tarpits"]; t > 0 {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Im Tarpit"), Value: in.Num(int(t)), Tone: "ok"})
 	}
+	if c := hv.attackChart(ctx, in, rng); c != nil {
+		w.Charts = append(w.Charts, *c)
+	}
 	if in.V("showCountries") == "true" {
 		var top []struct {
 			Key   string  `json:"key"`
@@ -222,6 +229,16 @@ func (hv hivornet) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 				parts = append(parts, strings.TrimSpace(flag(c.Key)+" "+c.Key)+" "+in.Num(int(c.N)))
 			}
 			w.Stats = append(w.Stats, Stat{Label: in.T("Häufigste Länder"), Value: strings.Join(parts, " · ")})
+			ch := Chart{ID: "countries", Title: in.T("Häufigste Länder"), Kind: "bar", Series: []ChartSeries{{Name: in.T("Verbindungen")}}}
+			for _, c := range top {
+				name := c.Label
+				if name == "" {
+					name = c.Key
+				}
+				ch.Labels = append(ch.Labels, strings.TrimSpace(flag(c.Key)+" "+name))
+				ch.Series[0].Values = append(ch.Series[0].Values, c.N)
+			}
+			w.Charts = append(w.Charts, ch)
 		}
 	}
 	var evs []hvEvent
@@ -232,6 +249,61 @@ func (hv hivornet) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		}
 	}
 	return w, nil
+}
+
+// hvSeries is /api/stats/series: per type one count per bucket from "from"
+// on, and the totals of this and of the time before (for the comparison).
+type hvSeries struct {
+	From        int64              `json:"from"`
+	BucketHours int64              `json:"bucket_hours"`
+	Series      map[string][]int64 `json:"series"`
+	Totals      map[string]int64   `json:"totals"`
+	Prev        map[string]int64   `json:"prev"`
+}
+
+// attackChart: connections, logins, commands and downloads per hour (per six
+// hours or per day over longer times), stacked; nil for a single bucket.
+func (hv hivornet) attackChart(ctx context.Context, in *Instance, rng string) *Chart {
+	var sr hvSeries
+	if hv.get(ctx, in, "/api/stats/series", url.Values{"range": {rng}}, &sr) != nil || sr.BucketHours <= 0 {
+		return nil
+	}
+	kinds := []struct{ key, name, color string }{
+		{"connect", in.T("Verbindungen"), "#5b8cff"},
+		{"login", in.T("Logins"), "#eda100"},
+		{"command", in.T("Befehle"), "#e5484d"},
+		{"download", in.T("Downloads"), "#a855f7"},
+	}
+	n := len(sr.Series["connect"])
+	if n < 2 {
+		return nil
+	}
+	step := sr.BucketHours * 3600000
+	title := map[int64]string{1: in.T("Angriffe je Stunde"), 6: in.T("Angriffe je 6 Stunden"), 24: in.T("Angriffe je Tag")}[sr.BucketHours]
+	if title == "" {
+		title = in.T("Angriffe")
+	}
+	c := &Chart{ID: "attacks", Title: title, Kind: "stacked", Step: step}
+	for i := 0; i < n; i++ {
+		c.Times = append(c.Times, sr.From+int64(i)*step)
+	}
+	for _, k := range kinds {
+		vals := sr.Series[k.key]
+		if len(vals) != n {
+			continue
+		}
+		s := ChartSeries{Name: k.name, Color: k.color}
+		for _, v := range vals {
+			s.Values = append(s.Values, float64(v))
+		}
+		c.Series = append(c.Series, s)
+	}
+	// Compared with the same time before.
+	if now, before := sr.Totals["connect"], sr.Prev["connect"]; before > 0 {
+		pct := float64(now-before) / float64(before) * 100
+		c.Note = in.T("Verbindungen %+.0f %% gegenüber dem Zeitraum davor", pct)
+	}
+	return c
 }
 
 // Search finds attacks by IP, user name, password or content (last 7 days).

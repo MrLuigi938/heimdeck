@@ -169,13 +169,20 @@ CREATE TABLE IF NOT EXISTS invites (
 );
 `
 
+// ReplaceTileIcon gives the tiles of an integration that still carry its old
+// symbol the new one (a tile keeps the symbol it was created with).
+func (s *Store) ReplaceTileIcon(integration, old, icon string) error {
+	_, err := s.db.Exec(`UPDATE tiles SET icon = ? WHERE integration = ? AND icon = ?`, icon, integration, old)
+	return err
+}
+
 func Open(path string, box *secret.Box) (*Store, error) {
 	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema + uploadSchema + groupShareSchema); err != nil {
+	if _, err := db.Exec(schema + uploadSchema + groupShareSchema + pointSchema); err != nil {
 		return nil, err
 	}
 	// Columns added after the first release; "duplicate column" errors mean they already exist.

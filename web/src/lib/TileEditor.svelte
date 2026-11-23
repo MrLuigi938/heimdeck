@@ -7,6 +7,7 @@
   // Tools by Heimdeck's own developer, pointed out in the service picker.
   const OWN = {
     tubesy: { repo: 'https://github.com/MrLuigi938/tubesy', note: 'Vom Heimdeck-Entwickler: Videos herunterladen – auch direkt aus der Suche, einfach den Link einfügen.' },
+    hivornet: { repo: 'https://github.com/MrLuigi938/hivornet', note: 'Vom Heimdeck-Entwickler: ein Honeypot, der Angreifer anlockt und zeigt, wer es versucht – Angriffe, Logins und Herkunft direkt auf dem Dashboard, IPs in der Suche.' },
   };
   import Widget from './Widget.svelte';
   import { APPS, ANDROID_APPS, androidApp, packageOf, shortcutLink } from './apps.js';
@@ -128,8 +129,13 @@
   function togglePart(key, show) {
     form.hide = show ? form.hide.filter((k) => k !== key) : [...form.hide, key];
   }
+  // Values whose history Heimdeck records are marked in the same list ("~rec:<value>").
+  const REC = '~rec:';
+  let hidden = $derived(form.hide.filter((k) => !k.startsWith(REC)));
+  const recording = (key) => form.hide.includes(REC + key);
+  const toggleRec = (key) => (form.hide = recording(key) ? form.hide.filter((k) => k !== REC + key) : [...form.hide, REC + key]);
   // Hidden parts the service does not deliver right now (e.g. an empty list) stay listed.
-  let hiddenElsewhere = $derived(parts ? form.hide.filter((k) => !parts.some((p) => p.key === k)) : []);
+  let hiddenElsewhere = $derived(parts ? hidden.filter((k) => !parts.some((p) => p.key === k)) : []);
   let displayFields = $derived((def?.fields || []).filter((f) => f.display));
   // Display options: sections to show (checkboxes, e.g. FRITZ!Box) and
   // choices like how many entries or days (selects, e.g. RSS, calendar).
@@ -357,7 +363,12 @@
               <button type="button" onclick={() => copy(hookUrl(f.key))}>{t('Kopieren')}</button>
               <button type="button" onclick={() => (form.config[f.key] = newHookKey())} title={t('Die alte Adresse funktioniert danach nicht mehr')}>{t('Neu erzeugen')}</button>
             </div>
-            <span class="help">{t('POST mit JSON {"title": "…", "message": "…"}, als Formular oder Text – oder GET mit ?title=…&message=…. Gilt nach dem Speichern.')}</span>
+            {#if form.integration === 'datasource'}
+              <span class="help">{t('POST mit JSON {"temperatur": 21.4}, als InfluxDB-Zeile (temperatur value=21.4) – oder GET mit ?temperatur=21.4. Gilt nach dem Speichern.')}</span>
+              <code class="example">curl -d '&#123;"temperatur": 21.4&#125;' {hookUrl(f.key)}</code>
+            {:else}
+              <span class="help">{t('POST mit JSON {"title": "…", "message": "…"}, als Formular oder Text – oder GET mit ?title=…&message=…. Gilt nach dem Speichern.')}</span>
+            {/if}
           {:else if f.pick}
             <div class="row">
               <input bind:value={form.config[f.key]} autocomplete="off" />
@@ -420,7 +431,8 @@
           <details class="setup parts" ontoggle={(e) => e.currentTarget.open && !parts && !partsLoading && loadParts()}>
             <summary>
               {t('Live-Daten auswählen')}
-              {#if form.hide.length}<span class="muted">· {t('{n} ausgeblendet', { n: form.hide.length })}</span>{/if}
+              {#if hidden.length}<span class="muted">· {t('{n} ausgeblendet', { n: hidden.length })}</span>{/if}
+              {#if hidden.length !== form.hide.length}<span class="muted">· 📈 {form.hide.length - hidden.length}</span>{/if}
             </summary>
             {#if displayChoices.length}
               <div class="part-group">{t('Anzeige')}</div>
@@ -458,6 +470,11 @@
                   <input type="checkbox" checked={!form.hide.includes(p.key)} onchange={(e) => togglePart(p.key, e.currentTarget.checked)} />
                   <span class:section={p.section}>{p.label}</span>
                   {#if p.value}<span class="pval">{p.value}</span>{/if}
+                  {#if !p.section && /^\s*[-+]?\d/.test(p.value || '') && form.integration !== 'datasource'}
+                    <button type="button" class="ghost rec" class:on={recording(p.key)} aria-pressed={recording(p.key)}
+                      title={recording(p.key) ? t('Verlauf wird aufgezeichnet – klicken zum Beenden') : t('Verlauf aufzeichnen: Heimdeck merkt sich den Wert alle 5 Minuten und zeigt ihn als Diagramm')}
+                      onclick={(e) => { e.preventDefault(); toggleRec(p.key); }}>📈</button>
+                  {/if}
                 </label>
               {/each}
               {#each hiddenElsewhere as k (k)}
@@ -616,10 +633,13 @@
   .choices { max-height: 280px; overflow: auto; display: grid; gap: 2px; }
   .parts { display: grid; gap: 8px; }
   .parts[open] summary { margin-bottom: 4px; }
+  .example { display: block; font-size: 12px; padding: 6px 8px; border-radius: var(--r-xs); background: var(--surface-2); overflow-x: auto; white-space: nowrap; }
   .choice-field { max-width: 260px; }
   .part-group { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }
   .part { display: flex; align-items: center; gap: 8px; }
   .part .section { font-style: italic; }
+  .rec { padding: 2px 6px; font-size: 13px; opacity: .45; filter: grayscale(1); }
+  .rec.on { opacity: 1; filter: none; border-color: var(--accent); }
   .pval { margin-left: auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
   .entries { display: grid; gap: 6px; margin-top: -6px; }
   .entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }

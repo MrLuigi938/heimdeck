@@ -221,8 +221,12 @@ func TestBazarr(t *testing.T) {
 
 func TestSpeedtest(t *testing.T) {
 	f := newFake(t, map[string]any{
-		"GET /api/v1/results/latest":  obj{"data": obj{"id": 5, "ping": 12.4, "download": 31250000, "upload": 5000000, "healthy": true, "status": "completed", "created_at": "2026-10-19 08:00:00"}},
-		"GET /api/v1/results":         obj{"data": []obj{{"id": 5, "download": 31250000, "upload": 5000000, "status": "completed"}, {"id": 4, "download": 30000000, "upload": 5000000, "status": "failed"}}},
+		"GET /api/v1/results/latest": obj{"data": obj{"id": 5, "ping": 12.4, "download": 31250000, "upload": 5000000, "healthy": true, "status": "completed", "created_at": "2026-10-19 08:00:00"}},
+		"GET /api/v1/results": obj{"data": []obj{
+			{"id": 5, "download": 31250000, "upload": 5000000, "status": "completed", "created_at": "2026-10-19 08:00:00"},
+			{"id": 4, "download": 30000000, "upload": 5000000, "status": "failed", "created_at": "2026-10-19 07:00:00"},
+			{"id": 3, "download": 25000000, "upload": 2500000, "status": "completed", "created_at": "2026-10-19 06:00:00"},
+		}},
 		"GET /api/speedtest/latest":   obj{"data": obj{"id": 5, "ping": 12.4, "download": 250.0, "upload": 40.0}},
 		"POST /api/v1/speedtests/run": obj{"message": "ok"},
 	}, nil)
@@ -231,8 +235,13 @@ func TestSpeedtest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s := stats(w); s["Download"] != "250 Mbit/s" || s["Upload"] != "40 Mbit/s" || s["Ping"] != "12 ms" || len(w.Items) != 2 || len(w.Actions) != 1 {
+	if s := stats(w); s["Download"] != "250 Mbit/s" || s["Upload"] != "40 Mbit/s" || s["Ping"] != "12 ms" || len(w.Items) != 3 || len(w.Actions) != 1 {
 		t.Fatalf("%+v", w)
+	}
+	// The completed measurements as a chart, oldest first, in Mbit/s.
+	if len(w.Charts) != 1 || len(w.Charts[0].Times) != 2 || w.Charts[0].Times[0] >= w.Charts[0].Times[1] ||
+		w.Charts[0].Series[0].Values[0] != 200 || w.Charts[0].Series[0].Values[1] != 250 || w.Charts[0].Series[1].Values[1] != 40 {
+		t.Fatalf("chart %+v", w.Charts)
 	}
 	in.Values["apiKey"] = ""
 	w, _ = speedtest{}.Fetch(context.Background(), in)

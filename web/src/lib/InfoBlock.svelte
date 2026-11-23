@@ -8,6 +8,7 @@
   import AgendaBlock from './AgendaBlock.svelte';
   import TextBlock from './TextBlock.svelte';
   import CountdownBlock from './CountdownBlock.svelte';
+  import Chart from './Chart.svelte';
 
   // One info block on the page. It keeps the size the grid gives it – the
   // content scales with that size (container units) and is cut off inside
@@ -57,6 +58,8 @@
   });
 
   const ALIGN = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  // The chart chosen in a chart block (or the tile's first one).
+  let chart = $derived(block.type === 'chart' ? widget?.charts?.find((c) => c.id === block.opt?.chart) || widget?.charts?.[0] || null : null);
 </script>
 
 <div class="ib bg-{style.bg} type-{block.type}" class:card={style.bg === 'card'} style:--ib-scale={style.scale || 1} style:--ib-accent={style.accent || null} style:--ib-align={style.align || null} style:--ib-items={ALIGN[style.align] || null}>
@@ -70,13 +73,15 @@
     <CountdownBlock opt={block.opt} {shape} />
   {:else if def?.source && !source}
     <div class="hint">
-      <span>{def.icon} {block.type === 'weather' ? t('Wähle eine Wetter-Kachel als Quelle.') : t('Wähle eine Kalender-Kachel als Quelle.')}</span>
+      <span>{def.icon} {block.type === 'weather' ? t('Wähle eine Wetter-Kachel als Quelle.') : block.type === 'chart' ? t('Wähle eine Kachel mit Diagrammen als Quelle.') : t('Wähle eine Kalender-Kachel als Quelle.')}</span>
       {#if onSetup}<button type="button" class="small" onclick={onSetup}>{t('Einrichten')}</button>{/if}
     </div>
   {:else if !loaded}
     <div class="hint muted">{def.icon} {t('Lade …')}</div>
   {:else if block.type === 'weather' && widget?.weather}
     <WeatherBlock w={widget.weather} opt={block.opt} {shape} />
+  {:else if block.type === 'chart' && chart}
+    <div class="chartbox"><Chart {chart} /></div>
   {:else if block.type === 'agenda' && widget}
     <AgendaBlock {widget} {shape} />
   {:else}
@@ -95,5 +100,6 @@
   /* Without a card the text stands on the page; on a picture a soft shadow keeps it readable. */
   .bg-none { background: none; border: 0; }
   :global(body.has-bg) .bg-none { text-shadow: 0 1px 3px color-mix(in srgb, var(--bg) 85%, transparent), 0 0 12px color-mix(in srgb, var(--bg) 60%, transparent); }
+  .chartbox { height: 100%; padding: clamp(6px, 3cqmin, 14px); box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; }
   .hint { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center; font-size: 13px; opacity: .8; box-sizing: border-box; overflow: hidden; }
 </style>

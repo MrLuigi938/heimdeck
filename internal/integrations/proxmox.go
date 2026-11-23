@@ -247,7 +247,56 @@ func (p proxmox) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 			w.Items = append(w.Items, p.guestItem(in, r))
 		}
 	}
+	if c := p.cpuChart(ctx, in, nodes); c != nil {
+		w.Charts = append(w.Charts, *c)
+	}
 	return w, nil
+}
+
+// cpuChart: the CPU load of the last hour per online node (at most four),
+// from Proxmox' own round-robin data – one point a minute.
+func (p proxmox) cpuChart(ctx context.Context, in *Instance, nodes []pveResource) *Chart {
+	c := &Chart{ID: "cpu", Title: in.T("CPU der letzten Stunde"), Kind: "area", Unit: "%"}
+	var times []int64
+	for _, n := range nodes {
+		if n.Status != "online" || len(c.Series) == 4 {
+			continue
+		}
+		var rrd struct {
+			Data []struct {
+				Time int64    `json:"time"`
+				CPU  *float64 `json:"cpu"`
+			} `json:"data"`
+		}
+		if p.call(ctx, in, "GET", "/nodes/"+url.PathEscape(n.Node)+"/rrddata?timeframe=hour&cf=AVERAGE", &rrd) != nil || len(rrd.Data) < 2 {
+			continue
+		}
+		s := ChartSeries{Name: n.Node}
+		var ts []int64
+		for _, d := range rrd.Data {
+			ts = append(ts, d.Time*1000)
+			v := 0.0
+			if d.CPU != nil {
+				v = *d.CPU * 100
+			}
+			s.Values = append(s.Values, v)
+		}
+		// All series share the times of the first node; another length is left out.
+		if times == nil {
+			times = ts
+		} else if len(ts) != len(times) {
+			continue
+		}
+		c.Series = append(c.Series, s)
+	}
+	if len(c.Series) == 0 {
+		return nil
+	}
+	c.Times = times
+	if len(c.Series) > 1 {
+		c.Kind = "line"
+	}
+	return c
 }
 
 func (p proxmox) guestItem(in *Instance, r pveResource) Item {

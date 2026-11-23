@@ -172,6 +172,41 @@ type Widget struct {
 	// Weather carries the weather in a form the weather block on the page draws
 	// (curve by the hour, days, animated symbols); the tile shows Stats and Items.
 	Weather *WeatherView `json:"weather,omitempty"`
+	// Charts are drawn by Heimdeck itself (Chart.svelte), below the values.
+	Charts []Chart `json:"charts,omitempty"`
+}
+
+// Chart is a diagram Heimdeck draws without Grafana. A time series has Times
+// (milliseconds, one per point) and Series with as many Values; a chart of
+// categories (bar, donut) has Labels instead of Times.
+type Chart struct {
+	ID    string `json:"id"`              // stable key, e.g. "attacks" (for diagram blocks)
+	Title string `json:"title"`           // "Angriffe je Stunde"
+	Kind  string `json:"kind"`            // line | area | stacked | bar | donut
+	Unit  string `json:"unit,omitempty"`  // "%", "B/s" … shown with the values
+	Bytes bool   `json:"bytes,omitempty"` // values are bytes (per second with Unit "/s")
+	// Step is the width of one point in milliseconds (bars of a time series).
+	Step   int64         `json:"step,omitempty"`
+	Times  []int64       `json:"times,omitempty"`
+	Labels []string      `json:"labels,omitempty"`
+	Series []ChartSeries `json:"series"`
+	Lines  []ChartLine   `json:"lines,omitempty"`
+	// Note: one line below the chart, e.g. "+12 % gegenüber dem Zeitraum davor".
+	Note string `json:"note,omitempty"`
+}
+
+type ChartSeries struct {
+	Name   string    `json:"name"`
+	Values []float64 `json:"values"`
+	// Color: a CSS colour; empty takes the next colour of the theme's palette.
+	Color string `json:"color,omitempty"`
+}
+
+// ChartLine is a level drawn across the chart (a limit, a target).
+type ChartLine struct {
+	Value float64 `json:"value"`
+	Label string  `json:"label,omitempty"`
+	Tone  string  `json:"tone,omitempty"` // warn | bad
 }
 
 type Integration interface {
