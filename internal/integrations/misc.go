@@ -23,13 +23,48 @@ func (paperless) Def() Definition {
 		ID: "paperless", Name: "Paperless-ngx", Icon: "paperless-ngx", Category: "Dokumente",
 		Description: "Dokumente, Posteingang mit Vorschaubildern, Korrespondenten, Tags, fehlgeschlagene Importe, Volltextsuche",
 		Fields: []Field{{Key: "apiKey", Label: "API-Token", Type: "password", Required: true, Secret: true,
-			Help: "Profil (oben rechts) → API-Auth-Token"}},
+			Help: "Profil (oben rechts) → API-Auth-Token. Auch für Paperless-AI ab 4.5 mit eingebautem Archiv: dann dessen Adresse und einen API-Schlüssel von Paperless-AI eintragen"}},
 		HasWidget: true, HasSearch: true, Images: []string{"paperless"}, Port: 8000,
 	}
 }
 
 func (paperless) get(ctx context.Context, in *Instance, path string, q url.Values, out any) error {
 	return in.do(ctx, request{path: path, query: q, headers: map[string]string{"Authorization": "Token " + in.V("apiKey")}}, out)
+}
+
+// getAuto is get for the first call of a fetch or search: if the address is a
+// Paperless-AI 4.5 with built-in archive, its Paperless-ngx compatible API
+// lives under /ngx/api/, so a 404 is tried again there and prefix remembers it.
+func (p paperless) getAuto(ctx context.Context, in *Instance, prefix *string, path string, q url.Values, out any) error {
+	err := p.get(ctx, in, *prefix+path, q, out)
+	if *prefix != "" || !isStatus(err, 404) || paperlessAIURL(in) {
+		return err
+	}
+	err2 := p.get(ctx, in, "/ngx"+path, q, out)
+	if err2 == nil {
+		*prefix = "/ngx"
+		return nil
+	}
+	var he *HTTPError
+	if errors.As(err2, &he) && he.Status == 404 && strings.Contains(he.Body, "built-in archive") {
+		return in.Errorf("Das ist Paperless-AI mit Paperless-ngx als Archiv – hier bitte die Adresse von Paperless-ngx eintragen oder die Kachel Paperless-AI nehmen")
+	}
+	return err
+}
+
+// paperlessAIURL: the tile's address already points at the compatible API
+// of Paperless-AI (https://host/ngx), as the mobile apps use it.
+func paperlessAIURL(in *Instance) bool {
+	return strings.HasSuffix(strings.TrimRight(in.BaseURL, "/"), "/ngx") || strings.HasSuffix(strings.TrimRight(in.PublicURL, "/"), "/ngx")
+}
+
+// paperlessDocLink opens a document: in Paperless-ngx its details page, in
+// Paperless-AI (built-in archive) its own document page.
+func paperlessDocLink(in *Instance, prefix string, id int) string {
+	if prefix == "/ngx" || paperlessAIURL(in) {
+		return strings.TrimSuffix(strings.TrimRight(in.PublicURL, "/"), "/ngx") + fmt.Sprintf("/documents/%d", id)
+	}
+	return in.Link(fmt.Sprintf("/documents/%d/details", id))
 }
 
 func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
@@ -43,7 +78,8 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		StoragePaths   int  `json:"storage_path_count"`
 		Characters     int  `json:"character_count"`
 	}
-	if err := p.get(ctx, in, "/api/statistics/", nil, &st); err != nil {
+	prefix := ""
+	if err := p.getAuto(ctx, in, &prefix, "/api/statistics/", nil, &st); err != nil {
 		return nil, err
 	}
 	w := &Widget{Stats: []Stat{
@@ -60,24 +96,13 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Zeichen erkannt"), Value: in.Num(st.Characters)})
 	}
 	// Consumption tasks that failed (e.g. a broken PDF), still to be acknowledged.
-	var tasks []struct {
-		Status       string `json:"status"`
-		TaskFileName string `json:"task_file_name"`
-		Acknowledged bool   `json:"acknowledged"`
-	}
-	if p.get(ctx, in, "/api/tasks/", url.Values{"status": {"FAILURE"}}, &tasks) == nil {
-		failed := 0
-		for _, t := range tasks {
-			if t.Status == "FAILURE" && !t.Acknowledged {
-				failed++
-				if failed <= 3 {
-					w.Alerts = append(w.Alerts, in.T("Import fehlgeschlagen: %s", t.TaskFileName))
-				}
+	if failed := p.failedTasks(ctx, in, prefix); len(failed) > 0 {
+		for i, name := range failed {
+			if i < 3 {
+				w.Alerts = append(w.Alerts, in.T("Import fehlgeschlagen: %s", name))
 			}
 		}
-		if failed > 0 {
-			w.Stats = append(w.Stats, Stat{Label: in.T("Import-Fehler"), Value: in.Num(failed), Tone: "bad"})
-		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Import-Fehler"), Value: in.Num(len(failed)), Tone: "bad"})
 	}
 	// The inbox, or else the documents added last, with their thumbnails.
 	var docs struct {
@@ -94,16 +119,52 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		q.Set("tags__id__all", fmt.Sprint(*st.InboxTag))
 		w.ItemsTitle = in.T("Posteingang")
 	}
-	if p.get(ctx, in, "/api/documents/", q, &docs) == nil {
+	if p.get(ctx, in, prefix+"/api/documents/", q, &docs) == nil {
 		for _, d := range docs.Results {
 			w.Items = append(w.Items, Item{Title: d.Title, Subtitle: in.Date(firstNonEmpty(d.Added, d.Created)),
-				URL: in.Link(fmt.Sprintf("/documents/%d/details", d.ID)), Image: in.Proxy(fmt.Sprintf("/api/documents/%d/thumb/", d.ID))})
+				URL: paperlessDocLink(in, prefix, d.ID), Image: in.Proxy(fmt.Sprintf("%s/api/documents/%d/thumb/", prefix, d.ID))})
 		}
 	}
 	return w, nil
 }
 
-var paperlessThumbRe = regexp.MustCompile(`^/api/documents/\d+/thumb/$`)
+// failedTasks returns the file names of failed, unacknowledged imports. It
+// asks for API version 9, which Paperless-ngx 2.x and 3.x both serve as a
+// plain list; version 10 (default since 3.0) pages the list, writes the state
+// in lower case and moved the file name to input_data – read that too.
+func (p paperless) failedTasks(ctx context.Context, in *Instance, prefix string) []string {
+	var raw json.RawMessage
+	err := in.do(ctx, request{path: prefix + "/api/tasks/", query: url.Values{"status": {"FAILURE"}, "acknowledged": {"false"}},
+		headers: map[string]string{"Authorization": "Token " + in.V("apiKey"), "Accept": "application/json; version=9"}}, &raw)
+	if err != nil {
+		return nil
+	}
+	type task struct {
+		Status       string `json:"status"`
+		TaskFileName string `json:"task_file_name"`
+		InputData    struct {
+			Filename string `json:"filename"`
+		} `json:"input_data"`
+		Acknowledged bool `json:"acknowledged"`
+	}
+	var list []task
+	if json.Unmarshal(raw, &list) != nil {
+		var page struct {
+			Results []task `json:"results"`
+		}
+		json.Unmarshal(raw, &page)
+		list = page.Results
+	}
+	var out []string
+	for _, t := range list {
+		if strings.EqualFold(t.Status, "FAILURE") && !t.Acknowledged {
+			out = append(out, firstNonEmpty(t.TaskFileName, t.InputData.Filename))
+		}
+	}
+	return out
+}
+
+var paperlessThumbRe = regexp.MustCompile(`^(/ngx)?/api/documents/\d+/thumb/$`)
 
 func (paperless) ImageRequest(ctx context.Context, in *Instance, path string) (string, map[string]string, error) {
 	if !paperlessThumbRe.MatchString(path) {
@@ -122,10 +183,11 @@ func (p paperless) Search(ctx context.Context, in *Instance, query string) ([]It
 	}
 	// Full-text search needs Paperless' search index; if it finds nothing (or the
 	// index is missing), fall back to a plain title/content filter.
-	err := p.get(ctx, in, "/api/documents/", url.Values{"query": {query}, "page_size": {"8"}}, &res)
+	prefix := ""
+	err := p.getAuto(ctx, in, &prefix, "/api/documents/", url.Values{"query": {query}, "page_size": {"8"}}, &res)
 	if err != nil || len(res.Results) == 0 {
 		res.Results = nil
-		if err2 := p.get(ctx, in, "/api/documents/", url.Values{"title_content": {query}, "page_size": {"8"}, "ordering": {"-created"}}, &res); err2 != nil {
+		if err2 := p.get(ctx, in, prefix+"/api/documents/", url.Values{"title_content": {query}, "page_size": {"8"}, "ordering": {"-created"}}, &res); err2 != nil {
 			if err != nil {
 				return nil, err
 			}
@@ -138,7 +200,7 @@ func (p paperless) Search(ctx context.Context, in *Instance, query string) ([]It
 		if len(created) >= 10 {
 			created = created[8:10] + "." + created[5:7] + "." + created[:4]
 		}
-		out = append(out, Item{Title: d.Title, Subtitle: in.T("Dokument") + " · " + created, URL: in.Link(fmt.Sprintf("/documents/%d/details", d.ID))})
+		out = append(out, Item{Title: d.Title, Subtitle: in.T("Dokument") + " · " + created, URL: paperlessDocLink(in, prefix, d.ID)})
 	}
 	return out, nil
 }

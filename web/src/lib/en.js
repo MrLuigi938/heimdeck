@@ -1331,4 +1331,7 @@ export const en = {
   'Ein Diagramm einer Kachel – z. B. Angriffe von Hivornet, CPU von Proxmox, Tempo vom Speedtest oder eigene Werte einer Datenquelle': 'A chart of a tile – e.g. attacks from Hivornet, CPU from Proxmox, speed from the speed test or your own values from a data source',
   'Verlauf wird aufgezeichnet – klicken zum Beenden': 'History is being recorded – click to stop',
   'Verlauf aufzeichnen: Heimdeck merkt sich den Wert alle 5 Minuten und zeigt ihn als Diagramm': 'Record history: Heimdeck keeps the value every 5 minutes and shows it as a chart',
+  'zuletzt hinzugefügt': 'recently added',
+  'Probleme': 'Problems',
+  'keine': 'none',
 };

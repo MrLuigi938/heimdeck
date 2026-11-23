@@ -62,6 +62,8 @@ func (qbittorrent) Def() Definition {
 		ID: "qbittorrent", Name: "qBittorrent", Icon: "qbittorrent", Category: "Downloads",
 		Description: "Tempo, aktive Torrents mit Fortschritt, alle pausieren/fortsetzen, Torrent-Suche",
 		Fields: []Field{
+			{Key: "apiKey", Label: "API-Key", Type: "password", Secret: true,
+				Help: "Ab qBittorrent 5.2: Einstellungen → Web-UI → API-Schlüssel. Dann bleiben Benutzername und Passwort leer."},
 			{Key: "username", Label: "Benutzername", Type: "text", Help: "Leer lassen, wenn Heimdeck in der Whitelist („Authentifizierung überspringen“) steht"},
 			{Key: "password", Label: "Passwort", Type: "password", Secret: true},
 		},
@@ -79,7 +81,9 @@ func (q qbittorrent) login(ctx context.Context, in *Instance) (string, error) {
 	if status == 403 {
 		return "", in.Errorf("qBittorrent hat Heimdeck nach zu vielen Fehlversuchen gesperrt – später erneut versuchen")
 	}
-	if status != 200 || strings.TrimSpace(string(body)) == "Fails." {
+	// Up to 5.1 the answer is 200 with "Ok." or "Fails."; since 5.2 a success
+	// is 204 without text and wrong credentials are 401.
+	if status < 200 || status > 299 || strings.TrimSpace(string(body)) == "Fails." {
 		return "", in.Errorf("Benutzername oder Passwort falsch")
 	}
 	// The cookie is called SID or, since 5.2, QBT_SID_<port>.
@@ -96,7 +100,9 @@ func (q qbittorrent) login(ctx context.Context, in *Instance) (string, error) {
 func (q qbittorrent) call(ctx context.Context, in *Instance, method, path string, form url.Values, out any) error {
 	for attempt := 0; attempt < 2; attempt++ {
 		h := map[string]string{}
-		if c, ok := sessions.Load(sessionKey(in, "qbt")); ok {
+		if key := in.V("apiKey"); key != "" {
+			h["Authorization"] = "Bearer " + key
+		} else if c, ok := sessions.Load(sessionKey(in, "qbt")); ok {
 			h["Cookie"] = c.(string)
 		}
 		var body io.Reader
@@ -107,6 +113,9 @@ func (q qbittorrent) call(ctx context.Context, in *Instance, method, path string
 		status, _, b, err := in.rawDo(ctx, method, path, body, h)
 		if err != nil {
 			return err
+		}
+		if (status == 401 || status == 403) && in.V("apiKey") != "" {
+			return in.Errorf("qBittorrent lehnt den API-Key ab (%d)", status)
 		}
 		if (status == 401 || status == 403) && attempt == 0 {
 			if _, err := q.login(ctx, in); err != nil {

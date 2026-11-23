@@ -249,5 +249,9 @@ func (j jellyfin) ImageRequest(ctx context.Context, in *Instance, path string) (
 	if !jellyfinImageRe.MatchString(path) {
 		return "", nil, in.Errorf("nicht gefunden")
 	}
-	return path, map[string]string{"X-Emby-Token": in.V("apiKey")}, nil
+	if j.emby {
+		return path, map[string]string{"X-Emby-Token": in.V("apiKey")}, nil
+	}
+	// Jellyfin 12 switched the legacy X-Emby-Token off by default.
+	return path, map[string]string{"Authorization": `MediaBrowser Client="Heimdeck", Token="` + in.V("apiKey") + `"`}, nil
 }
