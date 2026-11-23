@@ -1316,4 +1316,7 @@ export const en = {
   'Nordlicht als Bogen über der Seite': 'Northern lights arching over the page',
   'Sternenhimmel über den Bergen': 'A starry sky over the mountains',
   'Ein ruhiges Raster aus leuchtenden Kacheln': 'A calm grid of glowing tiles',
+  'zuletzt hinzugefügt': 'recently added',
+  'Probleme': 'Problems',
+  'keine': 'none',
 };

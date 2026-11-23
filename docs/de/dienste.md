@@ -42,7 +42,8 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher, Größe der Bibliothek, zuletzt fertige Downloads | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
 | **Dokumente** | | | |
-| Paperless-ngx | Dokumente, Posteingang | ✓ | |
+| Paperless-ngx (API-Token; auch Paperless-AI ab 4.5 mit eingebautem Archiv, siehe unten) | Dokumente, Posteingang mit Vorschaubildern, Korrespondenten, Tags, Dokumenttypen, fehlgeschlagene Importe | ✓ Volltext | |
+| Paperless-AI (API-Key) | Dokumente, verarbeitet, heute, Warteschlange, fehlgeschlagen, übersprungen, Tokens, KI-Modell, KI-Index, Archiv (Paperless-ngx oder eingebaut); zuletzt hinzugefügt oder die Probleme; Dokumente in Analyse | ✓ Volltext mit Suchsyntax (`tag:`, `from:`, `created:` …), wahlweise nach Bedeutung (RAG) | jetzt scannen, pausieren/fortsetzen, Fehlgeschlagene wiederholen (Schlüssel mit „Administration“) |
 | Norish (API-Schlüssel) | heute geplante Gerichte, offene Einkäufe, Anzahl Rezepte | ✓ Rezepte | |
 | Nextcloud (App-Passwort) | Dateien, Benutzer, aktive Nutzer, freier Speicher (ohne Admin: eigener Speicher) | ✓ Dateien, Kalender, Kontakte, Talk, Notizen, Deck … | |
 | **Netzwerk** | | | |
@@ -130,6 +131,14 @@ Das Video wird so weitergegeben, wie es kommt (kein Umrechnen, kaum CPU): **H.26
 2. In Heimdeck: Startseite → **Proxmox verbinden** (oder Proxmox-Kachel anlegen) und das Token im Format `benutzer@pam!name=geheimnis` eintragen.
 
 Danach findet 🔍 die Dienste in deinen VMs und Containern: am Namen bzw. an den Tags (z. B. `jellyfin`, `adguard`, `paperless-ngx` – so heißen auch die Container der Proxmox-Community-Skripte), mit der IP-Adresse des Gasts und dem üblichen Port. VMs brauchen dafür den QEMU-Gast-Agenten.
+
+## Paperless-AI
+
+Die Kachel kann mit jeder Version von Paperless-AI: ab 4.0 zeigt sie die Zahlen des Dashboards, die Warteschlange und die Dokumente, bei 3.x nur den Verarbeitungsstand von heute.
+
+- **API-Key**: in Paperless-AI unter Einstellungen → API-Schlüssel einen eigenen Schlüssel anlegen. Für Zahlen, Liste und Suche reicht „Dokumente lesen“; für die Suche nach Bedeutung braucht er „Fragen & Chat“, für die Knöpfe „Administration“. Der globale `API_KEY` geht auch (mit Admin-Rechten).
+- **Suche nach Bedeutung**: in der Kachel einschalten, dann fragt 🔍 zusätzlich den KI-Index von Paperless-AI – er findet Dokumente, die zur Frage passen, auch ohne das genaue Wort. Volltext-Treffer stehen vorn, KI-Treffer sind mit „KI“ markiert.
+- **Paperless-AI 4.5 wie Paperless-ngx**: Mit dem eingebauten Archiv bietet Paperless-AI auch die API von Paperless-ngx unter `/ngx/api/`. Eine **Paperless-ngx-Kachel** mit der Adresse von Paperless-AI (oder `https://…/ngx`, wie die Handy-Apps sie nutzen) und einem API-Schlüssel von Paperless-AI funktioniert dann genau wie mit Paperless-ngx – Zahlen, Vorschaubilder, Suche; Treffer öffnen das Dokument in Paperless-AI. Mit Paperless-ngx als Archiv verbindest du die Paperless-ngx-Kachel mit Paperless-ngx selbst.
 
 ## Docker-Kachel
 

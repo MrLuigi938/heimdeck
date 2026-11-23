@@ -42,7 +42,8 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | MeTube | active, finished, failed downloads | | |
 | Tubesy (API key from Tubesy → Account) | speed, active, queued, failed downloads, free space, library size, last finished downloads | ✓ library; paste a URL to download | cancel download, download URL |
 | **Documents** | | | |
-| Paperless-ngx | documents, inbox | ✓ | |
+| Paperless-ngx (API token; also Paperless-AI 4.5+ with the built-in archive, see below) | documents, inbox with thumbnails, correspondents, tags, document types, failed imports | ✓ full text | |
+| Paperless-AI (API key) | documents, processed, today, queue, failed, skipped, tokens, AI model, AI index, archive (Paperless-ngx or built-in); recently added or the problems; documents being analysed | ✓ full text with search syntax (`tag:`, `from:`, `created:` …), optionally by meaning (RAG) | scan now, pause/resume, retry failed (key with “Administration”) |
 | Norish (API key) | meals planned today, open groceries, number of recipes | ✓ recipes | |
 | Nextcloud (app password) | files, users, active users, free space (without admin: own storage) | ✓ files, calendar, contacts, Talk, notes, Deck … | |
 | **Network** | | | |
@@ -128,6 +129,14 @@ Video is passed on as it comes (no re-encoding, hardly any CPU): **H.264** plays
 2. In Heimdeck: start page → **Connect Proxmox** (or add a Proxmox tile) and enter the token as `user@pam!name=secret`.
 
 After that, 🔍 finds the services running in your VMs and containers: by name or tags (e.g. `jellyfin`, `adguard`, `paperless-ngx` – the containers of the Proxmox community scripts are named like this), with the IP address of the VM or container and the usual port. VMs need the QEMU guest agent for this.
+
+## Paperless-AI
+
+The tile works with every Paperless-AI version: 4.x shows the dashboard numbers, the queue and the documents; 3.x only the processing state of today.
+
+- **API key**: in Paperless-AI under Settings → API keys create a key of its own. “Read documents” is enough for the numbers, list and search; “Ask & chat” for the search by meaning, “Administration” for the buttons. The global `API_KEY` also works (with admin rights).
+- **Search by meaning**: switch it on in the tile, and 🔍 also asks Paperless-AI's AI index – it finds documents that fit the question without the exact word. Full-text hits come first, AI hits are marked “AI”.
+- **Paperless-AI 4.5 like Paperless-ngx**: with the built-in archive, Paperless-AI also offers the Paperless-ngx API under `/ngx/api/`. A **Paperless-ngx tile** with the address of Paperless-AI (or `https://…/ngx`, as the mobile apps use it) and a Paperless-AI API key then works just like with Paperless-ngx – numbers, thumbnails, search; hits open the document in Paperless-AI. With Paperless-ngx as the archive, connect the Paperless-ngx tile to Paperless-ngx itself.
 
 ## Docker tile
 
