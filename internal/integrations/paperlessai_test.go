@@ -207,6 +207,8 @@ func TestPaperlessAIUnauthorized(t *testing.T) {
 		{"pai_abcdefgh_" + strings.Repeat("x", 30), pai, "kennt diesen API-Key nicht"},
 		{strings.Repeat("ab", 32), pai, "Global API key wurde vielleicht neu erzeugt"},
 		{"irgendwas", pai, "Settings → API keys"},
+		{"pai_ab12cd34_…", pai, "nur ein Teil des Schlüssels"},
+		{"pai_ab12cd34", pai, "nur ein Teil des Schlüssels"},
 		{"pai_abcdefgh_" + strings.Repeat("x", 30), "<html>401 Authorization Required</html>", "Proxy"},
 	} {
 		in := &Instance{Values: map[string]string{"apiKey": c.key}, Lang: "de"}

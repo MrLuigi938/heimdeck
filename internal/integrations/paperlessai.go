@@ -125,8 +125,10 @@ func paiUnauthorized(in *Instance, body string) error {
 		return in.Errorf("Das ist der Token von Paperless-ngx – Paperless-AI hat eigene Schlüssel: unter Settings → API keys einen anlegen (beginnt mit pai_) oder den Global API key aus Settings → Integrations nehmen")
 	case aiProviderRe.MatchString(key):
 		return in.Errorf("Das ist der Schlüssel des KI-Anbieters – Heimdeck braucht einen Schlüssel von Paperless-AI: unter Settings → API keys einen anlegen (beginnt mit pai_)")
+	case strings.HasPrefix(key, "pai_") && !paiKeyRe.MatchString(key):
+		return in.Errorf("Das ist nur ein Teil des Schlüssels – die Liste in Paperless-AI zeigt ihn gekürzt. Den ganzen Schlüssel zeigt Paperless-AI nur einmal beim Anlegen: unter Settings → API keys einen neuen anlegen und gleich kopieren")
 	case paiKeyRe.MatchString(key):
-		return in.Errorf("Paperless-AI kennt diesen API-Key nicht (401) – wurde er gelöscht, oder ist das Konto gesperrt? Unter Settings → API keys einen neuen anlegen")
+		return in.Errorf("Paperless-AI kennt diesen API-Key nicht (401) – ist er abgelaufen, widerrufen, nicht vollständig kopiert, oder ist das Konto gesperrt? Unter Settings → API keys einen neuen anlegen und gleich ganz kopieren")
 	case paiGlobalRe.MatchString(key):
 		return in.Errorf("Paperless-AI kennt diesen Schlüssel nicht (401) – der Global API key wurde vielleicht neu erzeugt: unter Settings → Integrations nachsehen oder unter Settings → API keys einen eigenen anlegen")
 	}
