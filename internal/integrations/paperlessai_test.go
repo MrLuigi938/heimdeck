@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -18,9 +19,13 @@ func paiDashboardRoutes() map[string]any {
 			"version": "4.5.1",
 			"archive": obj{"mode": "builtin", "label": "Archive", "connected": true, "documents": 1234, "tags": 40, "correspondents": 55, "documentTypes": 12, "storageBytes": 2 * 1024 * 1024 * 1024},
 			"processing": obj{"running": true, "paused": false, "queued": 3, "processedToday": 7,
-				"current":          []obj{{"documentId": 77, "title": "Stromrechnung", "stage": "ocr"}},
+				// Times as 4.x sends them: milliseconds or null.
+				"current":          []obj{{"documentId": 77, "title": "Stromrechnung", "source": "scan", "stage": "ocr", "startedAt": 1763900000000}},
+				"lastScanAt":       1763900000000,
+				"nextScanAt":       1763900300000,
 				"lastError":        "Timeout beim Modell",
 				"rateLimitedUntil": nil,
+				"lastProcessed":    obj{"documentId": 76, "title": nil, "processedAt": 1763899000000},
 				"counts":           obj{"processed": 1100, "failed": 2, "skipped": 5}},
 			"usage": obj{"totalTokens": 987654, "calls": 1200},
 			"ai":    obj{"provider": "ollama", "model": "qwen3:8b"},
@@ -31,7 +36,7 @@ func paiDashboardRoutes() map[string]any {
 			{"id": 9, "title": "Kfz-Versicherung", "added": "2026-11-20T10:00:00Z", "status": "processed"},
 			{"id": 8, "title": "Mietvertrag", "added": "2026-11-19T10:00:00Z", "status": nil},
 		}},
-		"GET /api/processing/problems": []obj{{"documentId": 5, "title": "Scan 0815", "status": "failed", "reason": "kein Text erkannt", "attempts": 3}},
+		"GET /api/processing/problems": []obj{{"documentId": 5, "title": "Scan 0815", "status": "failed", "reason": "kein Text erkannt", "attempts": 3, "updatedAt": 1763899000000, "url": "http://x/documents/5"}},
 		"POST /api/processing/scan":    obj{"queued": 4},
 		"POST /api/processing/retry":   obj{"queued": 1},
 		"POST /api/rag/search": obj{"mode": "hybrid", "tookMs": 40, "sources": []obj{
@@ -237,5 +242,18 @@ func TestPaperlessAIRedirect(t *testing.T) {
 	_, err := paperlessAI{}.Fetch(context.Background(), in)
 	if err == nil || !strings.Contains(err.Error(), "leitet auf http://localhost:") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// Times come as milliseconds, seconds, ISO text or null – never an error.
+func TestPaiTime(t *testing.T) {
+	for in, want := range map[string]int64{`1763900000000`: 1763900000000, `1763900000`: 1763900000000, `"2025-11-23T12:13:20Z"`: 1763900000000, `null`: 0, `"bald"`: 0} {
+		var pt paiTime
+		if err := json.Unmarshal([]byte(in), &pt); err != nil {
+			t.Fatalf("%s: %v", in, err)
+		}
+		if got := map[bool]int64{true: 0, false: pt.UnixMilli()}[pt.IsZero()]; got != want {
+			t.Errorf("%s: %d, want %d", in, got, want)
+		}
 	}
 }

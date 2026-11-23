@@ -160,6 +160,41 @@ func isStatus(err error, codes ...int) bool {
 	return false
 }
 
+// paiTime reads a time as Paperless-AI sends it: since 4.0 milliseconds
+// (or null), before that an ISO text. Anything else is no time rather than
+// an error, so one odd field never breaks the whole tile.
+type paiTime struct{ time.Time }
+
+func (t *paiTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	t.Time = time.Time{}
+	if s == "" || s == "null" {
+		return nil
+	}
+	if n, err := strconv.ParseFloat(s, 64); err == nil {
+		if n < 1e11 { // seconds
+			n *= 1000
+		}
+		t.Time = time.UnixMilli(int64(n))
+		return nil
+	}
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05", "2006-01-02T15:04:05", "2006-01-02"} {
+		if v, err := time.Parse(layout, s); err == nil {
+			t.Time = v
+			return nil
+		}
+	}
+	return nil
+}
+
+// since: "5 min ago" – or nothing without a time.
+func (t paiTime) since(in *Instance) string {
+	if t.IsZero() {
+		return ""
+	}
+	return in.Since(t.Time)
+}
+
 type paiProcessing struct {
 	Running   bool `json:"running"`
 	Paused    bool `json:"paused"`
@@ -169,17 +204,17 @@ type paiProcessing struct {
 		DocumentID int    `json:"documentId"`
 		Title      string `json:"title"`
 		Stage      string `json:"stage"`
-		StartedAt  string `json:"startedAt"`
+		StartedAt  paiTime `json:"startedAt"`
 	} `json:"current"`
 	Queued           int     `json:"queued"`
-	LastScanAt       string  `json:"lastScanAt"`
-	NextScanAt       string  `json:"nextScanAt"`
+	LastScanAt       paiTime `json:"lastScanAt"`
+	NextScanAt       paiTime `json:"nextScanAt"`
 	LastError        *string `json:"lastError"`
-	RateLimitedUntil *string `json:"rateLimitedUntil"`
+	RateLimitedUntil paiTime `json:"rateLimitedUntil"`
 	LastProcessed    *struct {
 		DocumentID  int    `json:"documentId"`
 		Title       string `json:"title"`
-		ProcessedAt string `json:"processedAt"`
+		ProcessedAt paiTime `json:"processedAt"`
 	} `json:"lastProcessed"`
 	ProcessedToday int `json:"processedToday"`
 	Counts         struct {
@@ -273,10 +308,8 @@ func (p paperlessAI) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 	if pr.LastError != nil && *pr.LastError != "" {
 		w.Alerts = append(w.Alerts, in.T("Letzter Fehler: %s", *pr.LastError))
 	}
-	if pr.RateLimitedUntil != nil {
-		if t, err := time.Parse(time.RFC3339, *pr.RateLimitedUntil); err == nil && t.After(time.Now()) {
-			w.Alerts = append(w.Alerts, in.T("Der KI-Anbieter bremst (Rate-Limit) bis %s", t.Local().Format("15:04")))
-		}
+	if t := pr.RateLimitedUntil.Time; t.After(time.Now()) {
+		w.Alerts = append(w.Alerts, in.T("Der KI-Anbieter bremst (Rate-Limit) bis %s", t.Local().Format("15:04")))
 	}
 
 	// Buttons: they need a key with the "Administration" right.
@@ -402,7 +435,7 @@ type paiProblem struct {
 	Status     string `json:"status"`
 	Reason     string `json:"reason"`
 	Attempts   int    `json:"attempts"`
-	UpdatedAt  string `json:"updatedAt"`
+	UpdatedAt  paiTime `json:"updatedAt"`
 }
 
 func (p paperlessAI) problemItems(ctx context.Context, in *Instance, w *Widget) {
@@ -440,7 +473,7 @@ func (p paperlessAI) fetchLegacy(ctx context.Context, in *Instance) (*Widget, er
 		LastProcessed *struct {
 			DocumentID  int    `json:"documentId"`
 			Title       string `json:"title"`
-			ProcessedAt string `json:"processed_at"`
+			ProcessedAt paiTime `json:"processed_at"`
 		} `json:"lastProcessed"`
 		ProcessedToday int  `json:"processedToday"`
 		IsProcessing   bool `json:"isProcessing"`
@@ -469,7 +502,7 @@ func (p paperlessAI) fetchLegacy(ctx context.Context, in *Instance) (*Widget, er
 		w.Items = append(w.Items, Item{Title: firstNonEmpty(c.Title, in.T("Dokument %d", c.DocumentID)), Subtitle: in.T("wird analysiert")})
 	}
 	if l := st.LastProcessed; l != nil && l.DocumentID > 0 {
-		w.Items = append(w.Items, Item{Title: firstNonEmpty(l.Title, in.T("Dokument %d", l.DocumentID)), Subtitle: in.Date(l.ProcessedAt), Badge: in.T("verarbeitet")})
+		w.Items = append(w.Items, Item{Title: firstNonEmpty(l.Title, in.T("Dokument %d", l.DocumentID)), Subtitle: l.ProcessedAt.since(in), Badge: in.T("verarbeitet")})
 	}
 	if len(w.Items) > 0 {
 		w.ItemsTitle = in.T("Verarbeitung")
