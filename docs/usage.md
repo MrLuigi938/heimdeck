@@ -46,6 +46,9 @@ Tags become groups; tiles without a tag go to the group “Heimdall”. Services
   ![Info blocks: clock, weather, status, countdown and a note next to the groups](images/info-blocks.webp)
 
 - **Charts**: tiles such as Hivornet, Proxmox and Speedtest Tracker show charts that Heimdeck draws itself – no Grafana needed. Hover or tap for the values; *Choose live data* in the tile editor can hide them. On a freely arranged page **+ Block → Chart** shows one of them as large as you like. Numbers of your own (temperatures, power, counters …) go to a **Data source** tile: scripts, Home Assistant, Node-RED or Telegraf send them to its address, and it shows the newest values and a chart. And any number of any tile can get a history: in the tile editor under *Choose live data*, 📈 next to a value makes Heimdeck record it every five minutes (kept 90 days) and show the last 24 hours as a chart – also for services that keep no history themselves.
+
+  ![Charts on a free page: attacks from Hivornet, top countries and values of a data source](images/charts-page.webp)
+
 - **Hidden groups** are only shown after clicking 👁 (for the current session). **Protected groups** need their own password; if you forget it, your login password unlocks them too, so they can still be deleted or get a new password.
 - **Online status**: by default only the local address of a tile is checked. Turn on *Check the public address too* in the tile editor, or for all tiles under *Settings → Network and Docker*.
 - **Link-only tiles**: every tile can be a plain link and still shows whether the service is reachable. The status check can be turned off per tile.

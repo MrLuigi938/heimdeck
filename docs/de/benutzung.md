@@ -47,6 +47,9 @@ Tags werden zu Gruppen, Kacheln ohne Tag landen in der Gruppe „Heimdall“. Di
   ![Info-Blöcke: Uhr, Wetter, Status, Countdown und eine Notiz neben den Gruppen](../images/info-blocks.webp)
 
 - **Diagramme**: Kacheln wie Hivornet, Proxmox und Speedtest Tracker zeigen Diagramme, die Heimdeck selbst zeichnet – ganz ohne Grafana. Darüberfahren oder Antippen zeigt die Werte; unter *Live-Daten auswählen* im Kachel-Editor lassen sie sich ausblenden. Auf einer frei angeordneten Seite zeigt **+ Block → Diagramm** eines davon in beliebiger Größe. Eigene Zahlen (Temperaturen, Strom, Zähler …) nimmt eine Kachel **Datenquelle** an: Skripte, Home Assistant, Node-RED oder Telegraf schicken sie an ihre Adresse, und sie zeigt die neuesten Werte und ein Diagramm. Und jede Zahl jeder Kachel kann einen Verlauf bekommen: im Kachel-Editor unter *Live-Daten auswählen* lässt 📈 neben einem Wert Heimdeck ihn alle fünf Minuten aufzeichnen (90 Tage gespeichert) und die letzten 24 Stunden als Diagramm zeigen – auch bei Diensten, die selbst keinen Verlauf haben.
+
+  ![Diagramme auf einer freien Seite: Angriffe von Hivornet, häufigste Länder und Werte einer Datenquelle](../images/charts-page.webp)
+
 - **Ausgeblendete Gruppen** erscheinen erst nach Klick auf 👁 (für die aktuelle Sitzung). **Geschützte Gruppen** brauchen ein eigenes Passwort; ist es vergessen, entsperrt sie auch dein Anmelde-Passwort – danach lassen sie sich löschen oder neu schützen.
 - **Online-Status**: Standardmäßig wird nur die lokale Adresse einer Kachel geprüft. *Auch die öffentliche Adresse prüfen* im Kachel-Editor schaltet das pro Kachel ein, unter *Einstellungen → Netzwerk und Docker* für alle.
 - **Nur-Link-Kacheln**: Jede Kachel kann ein einfacher Link sein und zeigt trotzdem an, ob der Dienst erreichbar ist. Die Statusprüfung lässt sich pro Kachel abschalten.
