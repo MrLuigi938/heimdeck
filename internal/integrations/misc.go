@@ -96,24 +96,13 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		w.Stats = append(w.Stats, Stat{Label: in.T("Zeichen erkannt"), Value: in.Num(st.Characters)})
 	}
 	// Consumption tasks that failed (e.g. a broken PDF), still to be acknowledged.
-	var tasks []struct {
-		Status       string `json:"status"`
-		TaskFileName string `json:"task_file_name"`
-		Acknowledged bool   `json:"acknowledged"`
-	}
-	if p.get(ctx, in, prefix+"/api/tasks/", url.Values{"status": {"FAILURE"}}, &tasks) == nil {
-		failed := 0
-		for _, t := range tasks {
-			if t.Status == "FAILURE" && !t.Acknowledged {
-				failed++
-				if failed <= 3 {
-					w.Alerts = append(w.Alerts, in.T("Import fehlgeschlagen: %s", t.TaskFileName))
-				}
+	if failed := p.failedTasks(ctx, in, prefix); len(failed) > 0 {
+		for i, name := range failed {
+			if i < 3 {
+				w.Alerts = append(w.Alerts, in.T("Import fehlgeschlagen: %s", name))
 			}
 		}
-		if failed > 0 {
-			w.Stats = append(w.Stats, Stat{Label: in.T("Import-Fehler"), Value: in.Num(failed), Tone: "bad"})
-		}
+		w.Stats = append(w.Stats, Stat{Label: in.T("Import-Fehler"), Value: in.Num(len(failed)), Tone: "bad"})
 	}
 	// The inbox, or else the documents added last, with their thumbnails.
 	var docs struct {
@@ -137,6 +126,42 @@ func (p paperless) Fetch(ctx context.Context, in *Instance) (*Widget, error) {
 		}
 	}
 	return w, nil
+}
+
+// failedTasks returns the file names of failed, unacknowledged imports. It
+// asks for API version 9, which Paperless-ngx 2.x and 3.x both serve as a
+// plain list; version 10 (default since 3.0) pages the list, writes the state
+// in lower case and moved the file name to input_data – read that too.
+func (p paperless) failedTasks(ctx context.Context, in *Instance, prefix string) []string {
+	var raw json.RawMessage
+	err := in.do(ctx, request{path: prefix + "/api/tasks/", query: url.Values{"status": {"FAILURE"}, "acknowledged": {"false"}},
+		headers: map[string]string{"Authorization": "Token " + in.V("apiKey"), "Accept": "application/json; version=9"}}, &raw)
+	if err != nil {
+		return nil
+	}
+	type task struct {
+		Status       string `json:"status"`
+		TaskFileName string `json:"task_file_name"`
+		InputData    struct {
+			Filename string `json:"filename"`
+		} `json:"input_data"`
+		Acknowledged bool `json:"acknowledged"`
+	}
+	var list []task
+	if json.Unmarshal(raw, &list) != nil {
+		var page struct {
+			Results []task `json:"results"`
+		}
+		json.Unmarshal(raw, &page)
+		list = page.Results
+	}
+	var out []string
+	for _, t := range list {
+		if strings.EqualFold(t.Status, "FAILURE") && !t.Acknowledged {
+			out = append(out, firstNonEmpty(t.TaskFileName, t.InputData.Filename))
+		}
+	}
+	return out
 }
 
 var paperlessThumbRe = regexp.MustCompile(`^(/ngx)?/api/documents/\d+/thumb/$`)

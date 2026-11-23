@@ -23,7 +23,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | Lidarr | Warteschlange, neue und fehlende Alben, Warnungen | ✓ Künstler | fehlende Alben suchen |
 | Bazarr | fehlende Untertitel (Folgen/Filme), gedrosselte Anbieter | ✓ Serien und Filme | fehlende Untertitel suchen |
 | Prowlarr | aktive und gestörte Indexer | | |
-| Immich | Fotos, Videos, Speicher pro Benutzer; Alben als Dashboard-Hintergrund | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
+| Immich | Fotos, Videos, Speicher pro Benutzer, freier Speicher und Hintergrundaufgaben (Admin-Schlüssel); neueste Fotos der Zeitleiste; Alben als Dashboard-Hintergrund | ✓ Personen, Dateinamen, optional KI-Suche nach Bildinhalt | |
 | PhotoPrism (App-Passwort) | Fotos, Videos, Alben, Personen, zuletzt hinzugefügt; Alben als Dashboard-Hintergrund | ✓ Fotos (Ort, Person, Motiv, Datum) | |
 | Audiobookshelf | Hörbücher, Podcasts, Stunden, Weiterhören | ✓ Titel, Autoren, Serien | |
 | Kavita | Serien, Bände, Dateien, Weiterlesen | ✓ mit Covern | |
@@ -38,7 +38,7 @@ Kachel hinzufügen, Dienst wählen und Adresse sowie API-Key (oder Benutzer und 
 | **Downloads** | | | |
 | SABnzbd | Tempo, Warteschlange, Restzeit | | pausieren, fortsetzen |
 | NZBGet | Tempo, Warteschlange, Restgröße, Restzeit | | pausieren, fortsetzen |
-| qBittorrent, Transmission, Deluge | ↓/↑-Tempo, lädt/seedet, aktive Torrents mit Fortschritt | ✓ Torrents | alle pausieren/fortsetzen |
+| qBittorrent (Benutzer + Passwort oder ab 5.2 ein API-Key), Transmission, Deluge | ↓/↑-Tempo, lädt/seedet, aktive Torrents mit Fortschritt | ✓ Torrents | alle pausieren/fortsetzen |
 | MeTube | aktive, fertige, fehlgeschlagene Downloads | | |
 | Tubesy (API-Schlüssel aus Tubesy → Konto) | Tempo, aktive, wartende, fehlgeschlagene Downloads, freier Speicher, Größe der Bibliothek, zuletzt fertige Downloads | ✓ Bibliothek; eingefügte URLs herunterladen | Download abbrechen, URL herunterladen |
 | **Dokumente** | | | |

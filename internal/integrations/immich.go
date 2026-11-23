@@ -22,7 +22,7 @@ func (immich) Def() Definition {
 		Description: "Fotos, Videos und Speicherplatz, Suche nach Personen und Fotos (auf Wunsch per Beschreibung, z. B. „Strand bei Sonnenuntergang“)",
 		Fields: []Field{
 			{Key: "apiKey", Label: "API-Key", Type: "password", Required: true, Secret: true,
-				Help: "Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read, album.read (für die Gesamtstatistik, freien Speicher und Hintergrundaufgaben als Admin: server.statistics, server.storage, job.read)."},
+				Help: "Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read, album.read (für die Gesamtstatistik, freien Speicher und Hintergrundaufgaben als Admin: server.statistics, server.storage, queue.read – vor Immich 2.4 job.read)."},
 			{Key: "smartSearch", Label: "Fotos nach Inhalt suchen (KI-Suche)", Type: "checkbox",
 				Help: "Findet Fotos per Beschreibung, z. B. „Hund am Strand“. Braucht den Machine-Learning-Container von Immich und zeigt zu fast jedem Suchbegriff ähnliche Fotos. Ohne: Suche nach Personen und Dateinamen."},
 		},
@@ -115,19 +115,7 @@ func (i immich) more(ctx context.Context, in *Instance, w *Widget, admin bool) {
 			w.Stats = append(w.Stats, Stat{Label: in.T("Frei"), Value: in.Bytes(disk.DiskAvailableRaw), Tone: toneIf(disk.DiskUsagePercentage >= 90, "warn")})
 		}
 		// Background jobs (thumbnails, faces, smart search …) still to do.
-		var jobs map[string]struct {
-			JobCounts struct {
-				Active  int `json:"active"`
-				Waiting int `json:"waiting"`
-				Failed  int `json:"failed"`
-			} `json:"jobCounts"`
-		}
-		if i.call(ctx, in, "GET", "/jobs", nil, nil, &jobs) == nil {
-			open, failed := 0, 0
-			for _, j := range jobs {
-				open += j.JobCounts.Active + j.JobCounts.Waiting
-				failed += j.JobCounts.Failed
-			}
+		if open, failed, ok := i.jobs(ctx, in); ok {
 			w.Stats = append(w.Stats, Stat{Label: in.T("Aufgaben"), Value: in.Num(open), Tone: toneIf(open > 0, "warn")})
 			if failed > 0 {
 				w.Alerts = append(w.Alerts, in.T("%d Aufgaben fehlgeschlagen", failed))
@@ -136,13 +124,57 @@ func (i immich) more(ctx context.Context, in *Instance, w *Widget, admin bool) {
 	}
 	// The newest photos as small pictures.
 	var res immichAssets
-	if i.call(ctx, in, "POST", "/search/metadata", nil, map[string]any{"size": 6, "order": "desc", "type": "IMAGE"}, &res) == nil && len(res.Assets.Items) > 0 {
+	if i.search(ctx, in, "/search/metadata", map[string]any{"size": 6, "order": "desc", "type": "IMAGE"}, &res) == nil && len(res.Assets.Items) > 0 {
 		w.ItemsTitle, w.Thumbs = in.T("Neueste Fotos"), true
 		for _, a := range res.Assets.Items {
 			w.Items = append(w.Items, Item{Title: a.OriginalFileName, Subtitle: in.Date(firstNonEmpty(a.LocalDateTime, a.FileCreatedAt)),
 				URL: in.Link("/photos/" + a.ID), Image: in.Proxy("/api/assets/" + a.ID + "/thumbnail?size=thumbnail")})
 		}
 	}
+}
+
+// jobs counts the open and failed background jobs: /queues since Immich 2.4
+// (right queue.read), /jobs before (deprecated since 2.4).
+func (i immich) jobs(ctx context.Context, in *Instance) (open, failed int, ok bool) {
+	type counts struct {
+		Active  int `json:"active"`
+		Waiting int `json:"waiting"`
+		Failed  int `json:"failed"`
+	}
+	var queues []struct {
+		Statistics counts `json:"statistics"`
+	}
+	if i.call(ctx, in, "GET", "/queues", nil, nil, &queues) == nil {
+		for _, q := range queues {
+			open += q.Statistics.Active + q.Statistics.Waiting
+			failed += q.Statistics.Failed
+		}
+		return open, failed, true
+	}
+	var jobs map[string]struct {
+		JobCounts counts `json:"jobCounts"`
+	}
+	if i.call(ctx, in, "GET", "/jobs", nil, nil, &jobs) != nil {
+		return 0, 0, false
+	}
+	for _, j := range jobs {
+		open += j.JobCounts.Active + j.JobCounts.Waiting
+		failed += j.JobCounts.Failed
+	}
+	return open, failed, true
+}
+
+// search asks a search endpoint for photos of the timeline only: since
+// Immich 3 the search also returns archived ones unless visibility says so.
+// Versions without that field refuse it (400), then it is asked without.
+func (i immich) search(ctx context.Context, in *Instance, path string, body map[string]any, out *immichAssets) error {
+	body["visibility"] = "timeline"
+	err := i.call(ctx, in, "POST", path, nil, body, out)
+	if isStatus(err, 400) {
+		delete(body, "visibility")
+		err = i.call(ctx, in, "POST", path, nil, body, out)
+	}
+	return err
 }
 
 type immichAssets struct {
@@ -186,11 +218,11 @@ func (i immich) Search(ctx context.Context, in *Instance, query string) ([]Item,
 	var res immichAssets
 	var err error
 	if in.V("smartSearch") == "true" {
-		err = i.call(ctx, in, "POST", "/search/smart", nil, map[string]any{"query": query, "size": 6}, &res)
+		err = i.search(ctx, in, "/search/smart", map[string]any{"query": query, "size": 6}, &res)
 	}
 	if err != nil || len(res.Assets.Items) == 0 {
 		var meta immichAssets
-		if err2 := i.call(ctx, in, "POST", "/search/metadata", nil, map[string]any{"originalFileName": query, "size": 8, "withExif": true}, &meta); err2 == nil {
+		if err2 := i.search(ctx, in, "/search/metadata", map[string]any{"originalFileName": query, "size": 8, "withExif": true}, &meta); err2 == nil {
 			res, err = meta, nil
 		}
 	}

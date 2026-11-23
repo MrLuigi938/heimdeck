@@ -23,7 +23,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | Lidarr | queue, new and missing albums, warnings | ✓ artists | search missing albums |
 | Bazarr | missing subtitles (episodes/movies), throttled providers | ✓ series and movies | search missing subtitles |
 | Prowlarr | active and failing indexers | | |
-| Immich | photos, videos, storage per user; albums as dashboard backgrounds | ✓ people, file names, optional smart search by image content | |
+| Immich | photos, videos, storage per user, free space and background jobs (admin key); latest photos of the timeline; albums as dashboard backgrounds | ✓ people, file names, optional smart search by image content | |
 | PhotoPrism (app password) | photos, videos, albums, people, recently added; albums as dashboard backgrounds | ✓ photos (place, person, subject, date) | |
 | Audiobookshelf | audiobooks, podcasts, hours, continue listening | ✓ titles, authors, series | |
 | Kavita | series, volumes, files, continue reading | ✓ with covers | |
@@ -38,7 +38,7 @@ Add a tile, choose the service and enter its address and API key (or user and pa
 | **Downloads** | | | |
 | SABnzbd | speed, queue, time left | | pause, resume |
 | NZBGet | speed, queue, size left, time left | | pause, resume |
-| qBittorrent, Transmission, Deluge | ↓/↑ speed, downloading/seeding, active torrents with progress | ✓ torrents | pause/resume all |
+| qBittorrent (user + password, or from 5.2 an API key), Transmission, Deluge | ↓/↑ speed, downloading/seeding, active torrents with progress | ✓ torrents | pause/resume all |
 | MeTube | active, finished, failed downloads | | |
 | Tubesy (API key from Tubesy → Account) | speed, active, queued, failed downloads, free space, library size, last finished downloads | ✓ library; paste a URL to download | cancel download, download URL |
 | **Documents** | | | |

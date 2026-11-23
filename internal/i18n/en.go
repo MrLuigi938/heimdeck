@@ -285,8 +285,8 @@ var en = map[string]string{
 	"Drücken":                   "Press",
 
 	// ---- Immich ----
-	"Fotos, Videos und Speicherplatz, Suche nach Fotos (auch per Beschreibung, z. B. „Strand bei Sonnenuntergang“) und Personen":                                                      "Photos, videos and storage, search photos (also by description, e.g. “beach at sunset”) and people",
-	"Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read (für die Gesamtstatistik als Admin: server.statistics).": "Account settings → API Keys → New API key. Permissions: asset.read, asset.view, asset.statistics, person.read (as admin for the server totals: server.statistics).",
+	"Fotos, Videos und Speicherplatz, Suche nach Fotos (auch per Beschreibung, z. B. „Strand bei Sonnenuntergang“) und Personen":                                                                                                                                                                 "Photos, videos and storage, search photos (also by description, e.g. “beach at sunset”) and people",
+	"Kontoeinstellungen → API-Schlüssel → Neuer API-Schlüssel. Rechte: asset.read, asset.view, asset.statistics, person.read, album.read (für die Gesamtstatistik, freien Speicher und Hintergrundaufgaben als Admin: server.statistics, server.storage, queue.read – vor Immich 2.4 job.read).": "Account settings → API Keys → New API key. Permissions: asset.read, asset.view, asset.statistics, person.read, album.read (as admin for the server totals, free space and background jobs: server.statistics, server.storage, queue.read – before Immich 2.4 job.read).",
 	"Fotos":               "Photos",
 	"Videos":              "Videos",
 	"Speicher":            "Storage",
@@ -1362,4 +1362,6 @@ var en = map[string]string{
 	"nicht eingerichtet":                                         "not set up",
 	"passt inhaltlich":                                           "matches in meaning",
 	"Das ist Paperless-AI mit Paperless-ngx als Archiv – hier bitte die Adresse von Paperless-ngx eintragen oder die Kachel Paperless-AI nehmen": "This is Paperless-AI with Paperless-ngx as archive – enter the address of Paperless-ngx here or use the Paperless-AI tile",
+	"Ab qBittorrent 5.2: Einstellungen → Web-UI → API-Schlüssel. Dann bleiben Benutzername und Passwort leer.":                                   "From qBittorrent 5.2: Options → Web UI → API key. Then leave user name and password empty.",
+	"qBittorrent lehnt den API-Key ab (%d)": "qBittorrent refuses the API key (%d)",
 }
