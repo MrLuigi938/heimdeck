@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -55,6 +56,9 @@ func (p paperlessAI) call(ctx context.Context, in *Instance, method, path string
 	if errors.As(err, &he) {
 		switch {
 		case he.Status == 401:
+			if to := redirectsElsewhere(ctx, in, path); to != "" {
+				return in.Errorf("Die Adresse leitet auf %s weiter – dorthin schickt Heimdeck den API-Key aus Sicherheitsgründen nicht mit. Bitte diese Adresse direkt eintragen (oder Paperless-AI selbst, z. B. http://192.168.1.20:3000)", to)
+			}
 			return paiUnauthorized(in, he.Body)
 		case he.Status == 403 && strings.Contains(he.Body, "admin_required"):
 			return in.Errorf("Dafür braucht der API-Key das Recht „Administration“")
@@ -73,6 +77,38 @@ var (
 	ngxTokenRe   = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	aiProviderRe = regexp.MustCompile(`^(sk-|sk_|AIza|gsk_)`)
 )
+
+// redirectsElsewhere asks the address once without following redirects: if
+// it sends the request on to another server, that server never got the key
+// (keepKeysHome drops it there). It returns where to, or "".
+func redirectsElsewhere(ctx context.Context, in *Instance, path string) string {
+	if in.Client == nil {
+		return ""
+	}
+	base, err := url.Parse(in.BaseURL)
+	if err != nil {
+		return ""
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(in.BaseURL, "/")+path, nil)
+	if err != nil {
+		return ""
+	}
+	c := *in.Client // a copy: the shared client stays as it is
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		return ""
+	}
+	resp.Body.Close()
+	if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+		return ""
+	}
+	loc, err := resp.Location()
+	if err != nil || strings.EqualFold(loc.Host, base.Host) {
+		return ""
+	}
+	return loc.Scheme + "://" + loc.Host
+}
 
 // paiUnauthorized tells why the key was refused: a key of another kind (the
 // Paperless-ngx token, the AI provider's key), a key Paperless-AI does not

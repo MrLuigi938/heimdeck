@@ -215,3 +215,25 @@ func TestPaperlessAIUnauthorized(t *testing.T) {
 		}
 	}
 }
+
+// An address that sends Heimdeck on to another server: the key is not sent
+// along there, and the message says where the address leads.
+func TestPaperlessAIRedirect(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-api-key") != "" {
+			t.Error("the key went to another server")
+		}
+		w.WriteHeader(401)
+		io.WriteString(w, `{"error":"Authentication required"}`)
+	}))
+	defer target.Close()
+	front := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, strings.Replace(target.URL, "127.0.0.1", "localhost", 1)+r.URL.Path, http.StatusMovedPermanently)
+	}))
+	defer front.Close()
+	in := &Instance{BaseURL: front.URL, Values: map[string]string{"apiKey": "pai_abcdefgh_" + strings.Repeat("x", 30)}, Client: NewClient(false), Lang: "de"}
+	_, err := paperlessAI{}.Fetch(context.Background(), in)
+	if err == nil || !strings.Contains(err.Error(), "leitet auf http://localhost:") {
+		t.Fatalf("got %v", err)
+	}
+}
