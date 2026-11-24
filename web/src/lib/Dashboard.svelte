@@ -1454,6 +1454,12 @@
   /* Compact: small square tiles with the icon. */
   .grid.compact { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); align-items: stretch; }
   .grid.compact .add { min-height: 0; aspect-ratio: 1; }
+  /* A group on the free page: its tiles share its whole width, no empty columns
+     on the right (auto-fit instead of auto-fill). The small icons keep their size. */
+  @media (min-width: 641px) {
+    :global(.pcell.pb-group) .grid:not(.compact) { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    :global(.pcell.pb-group) .grid.uniform { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  }
   .keylist { display: grid; gap: 8px; }
   .keylist div { display: flex; align-items: center; gap: 8px; }
   .keylist span { margin-left: 4px; }

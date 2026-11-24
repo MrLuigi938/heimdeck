@@ -139,10 +139,19 @@
   const isFixed = (b) => b.fixed || (b.kind === 'group' && arranging);
 
   // Rows a block's content needs at its current width.
+  // While arranging a group fills its whole block (flex: 1), so its scrollHeight
+  // would be the block's height, never less – a group could only grow, never
+  // shrink back to its tiles. For the measurement it takes its own height.
   function needRows(id) {
     const el = cells[id]?.firstElementChild;
     if (!el) return 0;
-    return Math.ceil((el.scrollHeight + GAP) / (ROW + GAP));
+    const { flex, height } = el.style;
+    el.style.flex = 'none';
+    el.style.height = 'auto';
+    const h = el.scrollHeight;
+    el.style.flex = flex;
+    el.style.height = height;
+    return Math.ceil((h + GAP) / (ROW + GAP));
   }
   // Blocks whose content is taller than the block (marked while arranging).
   let tooSmall = $state({});
