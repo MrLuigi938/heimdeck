@@ -136,6 +136,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/tiles/parts", s.handleTileParts)
 	api.HandleFunc("POST /api/tiles/choices", s.handleChoices)
 	api.HandleFunc("GET /api/tiles/{id}/widget", s.handleWidget)
+	api.HandleFunc("GET /api/blocks/weather", s.handleBlockWeather)
 	api.HandleFunc("POST /api/tiles/{id}/action", s.handleAction)
 	api.HandleFunc("GET /api/tiles/{id}/image", s.handleImage)
 	api.HandleFunc("GET /api/tiles/{id}/favicon", s.handleFavicon)

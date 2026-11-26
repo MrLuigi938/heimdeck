@@ -7,8 +7,8 @@
 export const BLOCK_TYPES = {
   clock: { icon: '🕒', name: 'Uhr', text: 'Große Uhr – digital, analog oder als Wortuhr, mit Datum und zweiter Zeitzone', size: { w: 4, h: 4 }, min: { w: 1, h: 1 },
     opt: { face: 'digital', font: 'thin', seconds: false, date: true, greet: false, tz: '', tzName: '' } },
-  weather: { icon: '🌤️', name: 'Wetter', text: 'Live-Wetter mit Stundenverlauf, Vorschau und Stimmung – aus einer Wetter-Kachel', size: { w: 5, h: 6 }, min: { w: 2, h: 1 }, source: 'weather',
-    opt: { mood: true, hours: 24, days: true } },
+  weather: { icon: '🌤️', name: 'Wetter', text: 'Live-Wetter mit Stundenverlauf, Vorschau und Stimmung – für einen Ort (Open-Meteo, ohne Konto) oder aus einer Wetter-Kachel', size: { w: 5, h: 6 }, min: { w: 2, h: 1 }, source: 'weather',
+    opt: { mood: true, hours: 24, days: true, place: '', units: '°C' } },
   status: { icon: '🟢', name: 'Status', text: 'Alles in Ordnung – oder welche Dienste gerade gestört sind', size: { w: 3, h: 2 }, min: { w: 1, h: 1 }, opt: {} },
   agenda: { icon: '📅', name: 'Termine', text: 'Die nächsten Termine aus einer Kalender-Kachel', size: { w: 4, h: 5 }, min: { w: 2, h: 2 }, source: 'calendar', opt: {} },
   text: { icon: '📝', name: 'Text & Notiz', text: 'Überschrift, Notiz oder Spruch – mit einfachem Markdown', size: { w: 3, h: 3 }, min: { w: 1, h: 1 },
@@ -25,6 +25,10 @@ export const CHART_SOURCES = ['hivornet', 'proxmox', 'speedtest', 'datasource'];
 // align '': as the kind of block does it (clock and countdown centred, text and lists left).
 // phone: also shown on phones (above the groups).
 export const BLOCK_STYLE = { bg: 'card', scale: 1, align: '', accent: '', phone: true };
+
+// A weather block with a place of its own (no weather tile): when it names a
+// place, or has no tile – blocks from before take their tile.
+export const ownWeather = (b) => b?.type === 'weather' && (!!b.opt?.place || !b.tile);
 
 export function newBlockId(taken) {
   let id;

@@ -266,3 +266,11 @@ func weatherCode(in *Instance, code int, day bool) (string, string) {
 	}
 	return "🌡️", "Wetter"
 }
+
+// UseWeatherAPIs points the weather at other addresses – for tests in other
+// packages (the weather block of the free page); it returns the way back.
+func UseWeatherAPIs(geo, api string) (restore func()) {
+	oldGeo, oldAPI := weatherGeoAPI, weatherAPI
+	weatherGeoAPI, weatherAPI = geo, api
+	return func() { weatherGeoAPI, weatherAPI = oldGeo, oldAPI }
+}

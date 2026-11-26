@@ -1056,6 +1056,7 @@ var en = map[string]string{
 	"%d Dienste sind wieder erreichbar":    "%d services are reachable again",
 	"Diese Kamera gibt es nicht mehr":      "This camera no longer exists",
 	"Bitte eine Uhrzeit wie 07:00 angeben": "Please enter a time like 07:00",
+	"Bitte einen Ort angeben":              "Please enter a place",
 
 	// Automations
 	"Es ist %s":                       "It is %s",

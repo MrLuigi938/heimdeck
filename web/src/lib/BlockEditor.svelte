@@ -1,7 +1,7 @@
 <script>
   import Modal from './Modal.svelte';
   import { t } from './i18n.svelte.js';
-  import { BLOCK_TYPES, BLOCK_STYLE, blockOf } from './infoBlocks.js';
+  import { BLOCK_TYPES, BLOCK_STYLE, blockOf, ownWeather } from './infoBlocks.js';
   import { get } from './api.js';
 
   // Adding an info block (first its kind, then its options) or changing one.
@@ -14,18 +14,23 @@
   let form = $state(block ? structuredClone($state.snapshot(blockOf(block))) : null);
   // svelte-ignore state_referenced_locally
   let creating = !block;
+  // Weather: for a place of its own (no tile needed) or from a weather tile.
+  // svelte-ignore state_referenced_locally
+  let wsrc = $state(block && !ownWeather(block) ? 'tile' : 'place');
+  let ownPlace = $derived(form?.type === 'weather' && wsrc === 'place');
 
   function pick(type) {
     const def = BLOCK_TYPES[type];
     const list = sources[def.source] || [];
-    form = { type, tile: list[0]?.id || 0, opt: { ...def.opt }, style: { ...BLOCK_STYLE } };
+    form = { type, tile: type === 'weather' ? 0 : list[0]?.id || 0, opt: { ...def.opt }, style: { ...BLOCK_STYLE } };
+    wsrc = 'place';
   }
 
   let def = $derived(form ? BLOCK_TYPES[form.type] : null);
   let list = $derived(def?.source ? sources[def.source] || [] : []);
   // A source tile added meanwhile (or the chosen one deleted): take the first one there is.
   $effect(() => {
-    if (form && def?.source && list.length && !list.some((x) => x.id === Number(form.tile))) form.tile = list[0].id;
+    if (form && def?.source && !ownPlace && list.length && !list.some((x) => x.id === Number(form.tile))) form.tile = list[0].id;
   });
 
   // A chart block: the charts the chosen tile delivers, to pick one.
@@ -66,6 +71,13 @@
     // Only what differs from the defaults is stored.
     for (const [k, v] of Object.entries(form.opt)) if (v !== def.opt[k] && k in def.opt) out.opt[k] = typeof v === 'string' ? v.slice(0, 5000) : v;
     for (const [k, v] of Object.entries(form.style)) if (v !== BLOCK_STYLE[k] && k in BLOCK_STYLE) out.style[k] = v;
+    if (form.type === 'weather' && ownPlace) {
+      out.tile = 0;
+      out.opt.place = form.opt.place.trim().slice(0, 120);
+    } else if (form.type === 'weather') {
+      delete out.opt.place;
+      delete out.opt.units;
+    }
     if (!Object.keys(out.opt).length) delete out.opt;
     if (!Object.keys(out.style).length) delete out.style;
     onSave(out);
@@ -87,7 +99,26 @@
     </div>
   {:else}
     <form id="block-form" class="form" onsubmit={save}>
-      {#if def.source}
+      {#if form.type === 'weather'}
+        <div class="field"><span>{t('Daten')}</span>
+          <div class="seg">
+            <button type="button" class="small" class:on={wsrc === 'place'} onclick={() => (wsrc = 'place')}>{t('Eigener Ort')}</button>
+            <button type="button" class="small" class:on={wsrc === 'tile'} onclick={() => (wsrc = 'tile')}>{t('Aus einer Wetter-Kachel')}</button>
+          </div>
+        </div>
+        {#if ownPlace}
+          <label class="field"><span>{t('Ort')}</span>
+            <input bind:value={form.opt.place} required maxlength="120" placeholder={t('z. B. Berlin oder 52.52, 13.40')} />
+            <span class="help">{t('Das Wetter kommt von Open-Meteo – kostenlos, ohne Konto und ohne Wetter-Kachel.')}</span>
+          </label>
+          <div class="field"><span>{t('Einheiten')}</span>
+            <div class="seg">
+              {#each ['°C', '°F'] as u (u)}<button type="button" class="small" class:on={(form.opt.units || '°C') === u} onclick={() => (form.opt.units = u)}>{u}</button>{/each}
+            </div>
+          </div>
+        {/if}
+      {/if}
+      {#if def.source && !ownPlace}
         <label class="field">
           <span>{t('Quelle')}</span>
           {#if list.length}

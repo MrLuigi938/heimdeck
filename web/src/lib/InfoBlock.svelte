@@ -1,7 +1,7 @@
 <script>
   import { get } from './api.js';
   import { t, i18n } from './i18n.svelte.js';
-  import { BLOCK_TYPES, shapeOf } from './infoBlocks.js';
+  import { BLOCK_TYPES, shapeOf, ownWeather } from './infoBlocks.js';
   import ClockBlock from './ClockBlock.svelte';
   import WeatherBlock from './WeatherBlock.svelte';
   import StatusBlock from './StatusBlock.svelte';
@@ -21,18 +21,20 @@
   let shape = $derived(shapeOf(it));
   let style = $derived(block.style);
 
-  // ---- data from the tile (weather, calendar) ----
+  // ---- data from the tile (weather, calendar), or for a place of its own (weather) ----
+  let own = $derived(ownWeather(block));
   let widget = $state(null);
   let error = $state('');
   let loaded = $state(false);
   $effect(() => {
-    if (!def?.source || !source) return;
-    source.id; i18n.lang;
+    if (!def?.source || (own ? !block.opt.place : !source)) return;
+    const path = own ? `/blocks/weather?${new URLSearchParams({ place: block.opt.place, units: block.opt.units || '°C' })}` : `/tiles/${source.id}/widget`;
+    i18n.lang;
     let stopped = false;
     let retry;
     const load = async () => {
       try {
-        const res = await get(`/tiles/${source.id}/widget`);
+        const res = await get(path);
         if (stopped) return;
         if (res.pending) {
           retry = setTimeout(load, 2500);
@@ -71,7 +73,12 @@
     <TextBlock opt={block.opt} {shape} />
   {:else if block.type === 'countdown'}
     <CountdownBlock opt={block.opt} {shape} />
-  {:else if def?.source && !source}
+  {:else if own && !block.opt.place}
+    <div class="hint">
+      <span>{def.icon} {t('Gib einen Ort für das Wetter an.')}</span>
+      {#if onSetup}<button type="button" class="small" onclick={onSetup}>{t('Einrichten')}</button>{/if}
+    </div>
+  {:else if def?.source && !source && !own}
     <div class="hint">
       <span>{def.icon} {block.type === 'weather' ? t('Wähle eine Wetter-Kachel als Quelle.') : block.type === 'chart' ? t('Wähle eine Kachel mit Diagrammen als Quelle.') : t('Wähle eine Kalender-Kachel als Quelle.')}</span>
       {#if onSetup}<button type="button" class="small" onclick={onSetup}>{t('Einrichten')}</button>{/if}
