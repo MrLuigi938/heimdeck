@@ -684,8 +684,10 @@
     let count = n;
     const GAP = 6;
     const run = () => {
-      const W = node.clientWidth;
-      const H = node.clientHeight;
+      // The room inside the padding (the background behind the buttons has some).
+      const cs = getComputedStyle(node);
+      const W = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const H = node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       if (!W || !H || !count) return;
       let best = { b: 0, c: count };
       for (let r = 1; r <= count; r++) {
@@ -694,7 +696,9 @@
         const b = Math.min(((H - (r - 1) * GAP) / r) * (r === 1 ? 0.76 : 0.92), (W - (c - 1) * GAP) / c, 72);
         if (b > best.b + 0.5) best = { b, c };
       }
-      node.style.setProperty('--b', Math.max(24, Math.floor(best.b)) + 'px');
+      // Never larger than the room: a flat, narrow block gets smaller buttons
+      // rather than a row that sticks out of it.
+      node.style.setProperty('--b', Math.max(14, Math.floor(best.b)) + 'px');
       node.style.setProperty('--cols', best.c);
     };
     const ro = new ResizeObserver(run);
@@ -1413,7 +1417,7 @@
      block: fitTools sets --b (the size of one button) and --cols (buttons per row). */
   .tools.pb.fit-tools {
     --b: 32px;
-    width: 100%; height: 100%; align-self: stretch; display: grid; grid-template-columns: repeat(var(--cols, 6), auto);
+    width: 100%; height: 100%; box-sizing: border-box; align-self: stretch; display: grid; grid-template-columns: repeat(var(--cols, 6), auto);
     justify-content: center; align-content: center; place-items: center; gap: 6px;
   }
   .fit-tools > button { width: var(--b); height: var(--b); min-width: 0; padding: 0; display: inline-grid; place-items: center; flex: none;
