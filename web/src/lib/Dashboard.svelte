@@ -20,7 +20,7 @@
   import Modal from './Modal.svelte';
   import { ACTIONS, keymap, blocked, isBoardKey, keyLabel } from './shortcuts.js';
   import { applyTheme, activeSeason } from './themes.js';
-  import { backgroundImages, pickBackground } from './backgrounds.js';
+  import { backgroundImages, pickBackground, backgroundTone } from './backgrounds.js';
   import AiChat from './AiChat.svelte';
   import SeasonFx from './SeasonFx.svelte';
   import DisplayMode from './DisplayMode.svelte';
@@ -336,7 +336,15 @@
     if (url) {
       document.body.style.setProperty('--bg-image', `url("${url.replace(/"/g, '%22').replace(/[\\\r\n]/g, '')}")`);
       document.body.classList.add('has-bg');
+      // Dark or light picture: text without a card on it follows the picture.
+      backgroundTone(url).then((tone) => {
+        if (document.body.style.getPropertyValue('--bg-image').includes(url.replace(/"/g, '%22'))) {
+          if (tone) document.body.dataset.bgTone = tone;
+          else delete document.body.dataset.bgTone;
+        }
+      });
     } else {
+      delete document.body.dataset.bgTone;
       document.body.style.removeProperty('--bg-image');
       document.body.classList.remove('has-bg');
     }

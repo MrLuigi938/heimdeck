@@ -100,6 +100,16 @@
   /* Without a card the text stands on the page; on a picture a soft shadow keeps it readable. */
   .bg-none { background: none; border: 0; }
   :global(body.has-bg) .bg-none { text-shadow: 0 1px 3px color-mix(in srgb, var(--bg) 85%, transparent), 0 0 12px color-mix(in srgb, var(--bg) 60%, transparent); }
+  /* The picture decides, not the theme: a light theme can have a dark photo and
+     the other way round (body data-bg-tone, measured from the picture). */
+  :global(body.has-bg[data-bg-tone='dark']) .bg-none {
+    --text: #f3f5f8; --muted: color-mix(in srgb, #f3f5f8 78%, transparent);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 12px rgba(0, 0, 0, .6);
+  }
+  :global(body.has-bg[data-bg-tone='light']) .bg-none {
+    --text: #14161b; --muted: color-mix(in srgb, #14161b 72%, transparent);
+    text-shadow: 0 1px 3px rgba(255, 255, 255, .85), 0 0 12px rgba(255, 255, 255, .6);
+  }
   .chartbox { height: 100%; padding: clamp(6px, 3cqmin, 14px); box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; }
   .hint { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center; font-size: 13px; opacity: .8; box-sizing: border-box; overflow: hidden; }
 </style>

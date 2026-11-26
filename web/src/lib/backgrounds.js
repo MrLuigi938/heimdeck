@@ -69,3 +69,34 @@ export function pickBackground(images, every, seed) {
   const slot = Math.floor(Date.now() / 1000 / every);
   return images[(slot * 7919) % images.length];
 }
+
+// How bright a background picture is: 'dark' or 'light', from its average
+// brightness at 24×24 pixels; '' when it cannot be read (a picture from another
+// server that does not allow it). Text without a card on the picture takes
+// its colour from this, not from the theme – a light theme can have a dark photo.
+const toneCache = new Map();
+export function backgroundTone(url) {
+  if (!toneCache.has(url)) {
+    toneCache.set(url, new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = c.height = 24;
+          const ctx = c.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, 24, 24);
+          const d = ctx.getImageData(0, 0, 24, 24).data;
+          let sum = 0;
+          for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          resolve(sum / (d.length / 4) < 140 ? 'dark' : 'light');
+        } catch {
+          resolve('');
+        }
+      };
+      img.onerror = () => resolve('');
+      img.src = url;
+    }));
+  }
+  return toneCache.get(url);
+}
