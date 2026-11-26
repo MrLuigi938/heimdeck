@@ -677,6 +677,30 @@
   let toolCount = $derived(
     (hasExternal ? 1 : 0) + (hasHidden ? 1 : 0) + ((data?.docker || data?.proxmox) && !readOnly ? 1 : 0) + (readOnly ? 0 : 1) + 1 + (settingsApart ? 0 : 1),
   );
+  // Buttons on the free page as large as their block allows: in one row, or –
+  // when the block is narrow or tall – in as many rows as make them largest
+  // (six buttons in a narrow block: two rows of three instead of six tiny ones).
+  function fitTools(node, n) {
+    let count = n;
+    const GAP = 6;
+    const run = () => {
+      const W = node.clientWidth;
+      const H = node.clientHeight;
+      if (!W || !H || !count) return;
+      let best = { b: 0, c: count };
+      for (let r = 1; r <= count; r++) {
+        const c = Math.ceil(count / r);
+        // One row keeps a margin above and below (76 % of the height), as before.
+        const b = Math.min(((H - (r - 1) * GAP) / r) * (r === 1 ? 0.76 : 0.92), (W - (c - 1) * GAP) / c, 72);
+        if (b > best.b + 0.5) best = { b, c };
+      }
+      node.style.setProperty('--b', Math.max(24, Math.floor(best.b)) + 'px');
+      node.style.setProperty('--cols', best.c);
+    };
+    const ro = new ResizeObserver(run);
+    ro.observe(node);
+    return { update(v) { count = v; run(); }, destroy: () => ro.disconnect() };
+  }
   // Settings as a block of their own, or back with the buttons.
   function setSettingsApart(apart) {
     const layout = draft.layout;
@@ -717,10 +741,13 @@
     let id = blockEdit.id;
     if (!id) {
       id = newBlockId(layout.blocks);
-      // Where you are looking: a free spot in the visible part of the page, or
-      // at its top with the rest moving down – not somewhere far below.
+      // Into a gap it fits in, otherwise below everything – it moves no other
+      // block; the page scrolls to it.
       const size = BLOCK_TYPES[block.type].size;
-      if (pageGrid) layout[device] = { ...layout[device], ...pageGrid.insert(id, size.w, size.h) };
+      if (pageGrid) {
+        layout[device] = { ...layout[device], ...pageGrid.insert(id, size.w, size.h) };
+        tick().then(() => pageGrid?.reveal(id));
+      }
       else {
         const taken = pageBlocks.map((b) => layout[device]?.[b.id] && { id: b.id, ...layout[device][b.id] }).filter(Boolean);
         layout[device] = { ...layout[device], [id]: freeSpot(taken, size.w, size.h) };
@@ -742,9 +769,13 @@
     draft.layout.hidden = [...new Set([...(draft.layout.hidden || []), id])];
   }
   function showPart(id) {
+    // Back to its old place on this device (hiding keeps it); what moved up into
+    // it goes back below it. Without an old place: the first free spot.
+    const old = draft.layout[device]?.[id];
+    if (pageGrid && old) draft.layout[device] = { ...draft.layout[device], ...pageGrid.putBack(id, old) };
+    else if (draft.layout[device]) delete draft.layout[device][id];
     draft.layout.hidden = (draft.layout.hidden || []).filter((x) => x !== id);
-    // Its old place may be taken meanwhile: it comes back on the first free spot.
-    for (const d of ['desktop', 'tablet']) if (draft.layout[d]) delete draft.layout[d][id];
+    tick().then(() => pageGrid?.reveal(id));
     if (!draft.layout.hidden.length) {
       delete draft.layout.hidden;
       hiddenMenu = false;
@@ -1092,7 +1123,7 @@
       {:else if b.id === 'search'}
         {@render searchBlock(searchShape(it))}
       {:else if b.id === 'tools'}
-        <div class="tools on-bg pb fit-tools" style:--n={toolCount}>
+        <div class="tools on-bg pb fit-tools" use:fitTools={toolCount}>
           {@render toolButtons()}
           {#if !settingsApart}
             {@render settingsButton(false)}
@@ -1102,7 +1133,7 @@
           {/if}
         </div>
       {:else if b.id === 'settings'}
-        <div class="tools on-bg pb fit-tools settings-block" style:--n={1}>
+        <div class="tools on-bg pb fit-tools settings-block" use:fitTools={1}>
           {@render settingsButton(it.w >= 2)}
           {#if updateBubble}
             <button class="update-bubble" onclick={() => { updateBubble = false; openSettings('info'); }}>⬆ {t('Update verfügbar')}</button>
@@ -1379,14 +1410,11 @@
     .settings-btn.wide { padding: 8px; }
   }
   /* Buttons (and the settings) on the free page grow and shrink with their
-     block: --b is the size of one button – as high as the block allows and as
-     wide as the block shared by all buttons (--n). Taller than wide: one column. */
+     block: fitTools sets --b (the size of one button) and --cols (buttons per row). */
   .tools.pb.fit-tools {
-    --b: clamp(24px, min(76cqh, calc((100cqw - (var(--n) - 1) * 6px) / var(--n)), 72px), 72px);
-    width: 100%; height: 100%; align-self: stretch; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;
-  }
-  @container (orientation: portrait) {
-    .tools.pb.fit-tools { --b: clamp(24px, min(76cqw, calc((100cqh - (var(--n) - 1) * 6px) / var(--n)), 72px), 72px); flex-direction: column; }
+    --b: 32px;
+    width: 100%; height: 100%; align-self: stretch; display: grid; grid-template-columns: repeat(var(--cols, 6), auto);
+    justify-content: center; align-content: center; place-items: center; gap: 6px;
   }
   .fit-tools > button { width: var(--b); height: var(--b); min-width: 0; padding: 0; display: inline-grid; place-items: center; flex: none;
     border-radius: calc(var(--b) * .3); font-size: calc(var(--b) * .44); }

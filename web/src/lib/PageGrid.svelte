@@ -1,5 +1,6 @@
 <script module>
-  import { COLS, overlaps, settle, freeSpot } from './FreeGrid.svelte';
+  import { COLS, overlaps, freeSpot } from './FreeGrid.svelte';
+  import { compact, pack, place, gapFor } from './pageLayout.js';
 
   // The whole page as a grid of blocks: title, search, buttons and groups.
   // 12 columns that grow with the window. While arranging, rows have a fixed
@@ -35,53 +36,13 @@
     }
     // Stored places that overlap (an older layout, a block grown to its minimum) are pushed apart.
     const clash = grown || items.some((a, i) => items.some((b, j) => j > i && overlaps(a, b)));
-    const placed = clash ? pack(items) : items;
+    const placed = clash ? compact(pack(items)) : items;
     for (const b of blocks) {
       if (positions?.[b.id]) continue;
       const s = b.size || { w: 3, h: 2 };
       placed.push({ id: b.id, ...freeSpot(placed, Math.min(s.w, COLS), s.h) });
     }
     return placed;
-  }
-
-  // Pushes blocks down until none overlap, top to bottom.
-  export function pack(items) {
-    const placed = [];
-    for (const it of [...items].sort((a, b) => a.y - b.y || a.x - b.x).map((i) => ({ ...i }))) {
-      let hit;
-      while ((hit = placed.filter((p) => overlaps(p, it))).length) it.y = Math.max(...hit.map((p) => p.y + p.h));
-      placed.push(it);
-    }
-    return placed;
-  }
-
-  // Moving up into space a change has just freed: `after` is the layout after a
-  // block was moved, resized, added or removed, `before` the one before it.
-  // A block moves up one row at a time, only into cells that are free now but
-  // were taken before (where the moved block or a block that just moved up
-  // was) – so whatever was below a moved block follows up and blocks pushed
-  // aside go back, while gaps that were empty before stay as they are. The
-  // block that was placed (keep) stays exactly where it was put.
-  export function closeGaps(before, after, keep = null) {
-    const taken = new Set();
-    for (const b of before) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) taken.add(x + ',' + y);
-    const list = after.map((i) => ({ ...i })).sort((a, b) => a.y - b.y || a.x - b.x);
-    let moved = true;
-    while (moved) {
-      moved = false;
-      for (const it of list) {
-        if (it.id === keep) continue;
-        while (it.y > 0) {
-          const y = it.y - 1;
-          let ok = true;
-          for (let x = it.x; x < it.x + it.w && ok; x++) ok = taken.has(x + ',' + y);
-          if (!ok || list.some((o) => o !== it && overlaps(o, { ...it, y }))) break;
-          it.y = y;
-          moved = true;
-        }
-      }
-    }
-    return list;
   }
 
   // fix: the height was set by hand (groups only) – kept, the content scrolls inside.
@@ -117,9 +78,9 @@
   let gridEl;
   let cells = {};
   let action = $state(null); // { kind: 'move' | 'size', it, x0, y0 } – y0 in page coordinates (scrolling while dragging counts)
-  // Puts a block in place, pushes what it covers down and lets everything move up again.
-  // The block goes exactly where it is put; what it pushed away and what was below its old place move up again.
-  const arrange = (list, moving) => closeGaps(list, settle(list, moving), moving.id);
+  // Puts a block in place: what it lands on makes room (above it if there is
+  // room, otherwise below), then every block moves up as far as it can.
+  const arrange = (list, moving) => place(list, moving);
 
   // w: the width the block has (or gets) – some blocks need more rows when narrower.
   const minOf = (id, w = byId[id]?.w || 1) => minSize(blocks.find((b) => b.id === id), w, colPx);
@@ -192,30 +153,32 @@
       if (blocks.find((x) => x.id === it.id)?.fixed) return it;
       return { ...it, h: Math.max(it.h, needRows(it.id)) };
     });
-    return toPositions(pack(out));
+    return toPositions(compact(pack(out)));
   }
 
-  // A place for a new block: in the part of the page that is on the screen
-  // (below the arrange bar), on a free spot there if there is one, otherwise at
-  // its top, pushing the rest down. Returns the positions of all blocks.
+  // A place for a new block that moves nothing: the first gap on the page it
+  // fits in, otherwise below everything. Returns the positions of all blocks.
   export function insert(id, w, h) {
-    const r = gridEl.getBoundingClientRect();
-    const step = ROW + GAP;
-    const top = Math.max(0, Math.ceil((120 - r.top) / step));
-    const bottom = Math.max(top + h, Math.floor((innerHeight - r.top) / step));
-    w = Math.min(w, COLS);
-    for (let y = top; y + h <= bottom; y++) {
-      for (let x = 0; x + w <= COLS; x++) {
-        const c = { id, x, y, w, h };
-        if (!items.some((i) => overlaps(i, c))) return toPositions([...items, c]);
-      }
-    }
-    return toPositions(arrange(items, { id, x: 0, y: top, w, h }));
+    return toPositions([...items, { id, ...gapFor(items, w, h) }]);
+  }
+
+  // A block that comes back (shown again): to its old place p. What took that
+  // place meanwhile moves back below it, so the page looks as it did before.
+  export function putBack(id, p) {
+    const b = blocks.find((x) => x.id === id);
+    const w = Math.min(COLS, Math.max(minSize(b, p.w, colPx).w, p.w));
+    const h = Math.max(minSize(b, w, colPx).h, p.h);
+    return toPositions(place(items.filter((i) => i.id !== id), { ...p, id, x: Math.min(p.x, COLS - w), w, h }));
+  }
+
+  // Scrolls a block into view (a new one may land below what is on the screen).
+  export function reveal(id) {
+    cells[id]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   // The positions after a block left the page (removed or hidden): the rest moves up.
   export function without(id) {
-    return toPositions(closeGaps(items, items.filter((i) => i.id !== id)));
+    return toPositions(compact(items.filter((i) => i.id !== id)));
   }
 
   function start(e, it, kind) {
