@@ -1,6 +1,6 @@
 <script module>
   import { COLS, overlaps, freeSpot } from './FreeGrid.svelte';
-  import { compact, pack, place, gapFor } from './pageLayout.js';
+  import { pack, place, gapFor, closeGaps } from './pageLayout.js';
 
   // The whole page as a grid of blocks: title, search, buttons and groups.
   // 12 columns that grow with the window. While arranging, rows have a fixed
@@ -36,7 +36,7 @@
     }
     // Stored places that overlap (an older layout, a block grown to its minimum) are pushed apart.
     const clash = grown || items.some((a, i) => items.some((b, j) => j > i && overlaps(a, b)));
-    const placed = clash ? compact(pack(items)) : items;
+    const placed = clash ? pack(items) : items;
     for (const b of blocks) {
       if (positions?.[b.id]) continue;
       const s = b.size || { w: 3, h: 2 };
@@ -79,7 +79,7 @@
   let cells = {};
   let action = $state(null); // { kind: 'move' | 'size', it, x0, y0 } – y0 in page coordinates (scrolling while dragging counts)
   // Puts a block in place: what it lands on makes room (above it if there is
-  // room, otherwise below), then every block moves up as far as it can.
+  // room, otherwise below); it stays exactly there, and what was below its old place follows up.
   const arrange = (list, moving) => place(list, moving);
 
   // w: the width the block has (or gets) – some blocks need more rows when narrower.
@@ -153,7 +153,7 @@
       if (blocks.find((x) => x.id === it.id)?.fixed) return it;
       return { ...it, h: Math.max(it.h, needRows(it.id)) };
     });
-    return toPositions(compact(pack(out)));
+    return toPositions(pack(out));
   }
 
   // A place for a new block that moves nothing: the first gap on the page it
@@ -178,7 +178,7 @@
 
   // The positions after a block left the page (removed or hidden): the rest moves up.
   export function without(id) {
-    return toPositions(compact(items.filter((i) => i.id !== id)));
+    return toPositions(closeGaps(items, items.filter((i) => i.id !== id)));
   }
 
   function start(e, it, kind) {
